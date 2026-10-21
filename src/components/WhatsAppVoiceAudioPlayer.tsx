@@ -232,6 +232,15 @@ export const WhatsAppVoiceAudioPlayer: React.FC<WhatsAppVoiceAudioPlayerProps> =
             </button>
           </div>
         </div>
+
+        <div className="relative shrink-0">
+          <div className="w-9 h-9 rounded-full bg-neutral-200 border border-white flex items-center justify-center text-xs font-bold text-neutral-700 overflow-hidden shadow-2xs">
+            {isOut ? 'TH' : (senderName?.substring(0, 2).toUpperCase() || 'LE')}
+          </div>
+          <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-emerald-500 border border-white flex items-center justify-center text-white">
+            <Mic className="w-2 h-2" />
+          </span>
+        </div>
       </div>
     </div>
   );

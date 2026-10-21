@@ -8,7 +8,7 @@ export function getSalespersonSlug(seller: { id: string; name: string; slug?: st
   const nameClean = seller.name
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)/g, '');
 
@@ -39,7 +39,7 @@ export function matchSalespersonFromRoute(
       s.name
         .toLowerCase()
         .normalize('NFD')
-        .replace(/[̀-ͯ]/g, '')
+        .replace(/[\u0300-\u036f]/g, '')
         .trim() === cleanIdent
   );
   if (byName) return byName;

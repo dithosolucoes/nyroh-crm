@@ -113,7 +113,7 @@ export function getInboxDir(): string {
  *  - 'outbound' (padrão): mídia que NÓS enviamos. Fica em /uploads, público por necessidade —
  *    a Meta baixa esse arquivo pela URL no momento do envio.
  *  - 'inbound': mídia que o CLIENTE mandou (foto, áudio, documento). Vai para uma pasta
- *    separada, servida só para quem está logado. Antes caia no mesmo /uploads público:
+ *    separada, servida só para quem está logado. Antes caía no mesmo /uploads público:
  *    qualquer pessoa com o link abria o documento de um cliente.
  */
 export async function saveMediaBuffer(

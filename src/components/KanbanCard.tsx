@@ -376,3 +376,4 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
     </>
   );
 };
+

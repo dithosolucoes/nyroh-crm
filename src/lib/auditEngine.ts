@@ -59,7 +59,7 @@ export function isPubliclyFetchableUrl(rawUrl: string): { ok: boolean; reason?: 
 
 /**
  * Executa auditoria 100% matemática, determinística e instantânea
- * no site antigo do lead sem utilizar inteligencia artificial.
+ * no site antigo do lead sem utilizar inteligência artificial.
  */
 export async function performWebsiteAudit(leadId: string, leadName: string, websiteUrl?: string): Promise<WebsiteAuditReport> {
   const now = new Date().toISOString();

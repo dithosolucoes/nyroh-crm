@@ -298,7 +298,7 @@ export const ZipUploadModal: React.FC<ZipUploadModalProps> = ({
       if (isDirectJson) {
         try {
           const rawContent = await selectedFile.text();
-          const cleanContent = rawContent.replace(/^﻿/, '').trim();
+          const cleanContent = rawContent.replace(/^\uFEFF/, '').trim();
           let parsed: any;
           try {
             parsed = JSON.parse(cleanContent);
@@ -339,7 +339,7 @@ export const ZipUploadModal: React.FC<ZipUploadModalProps> = ({
           ) {
             try {
               const rawContent = await fileObj.async('string');
-              const cleanContent = rawContent.replace(/^﻿/, '').trim();
+              const cleanContent = rawContent.replace(/^\uFEFF/, '').trim();
 
               const isJsonExt = normPath.toLowerCase().endsWith('.json');
               const isJsonContent = cleanContent.startsWith('{') || cleanContent.startsWith('[');
@@ -831,3 +831,4 @@ export const ZipUploadModal: React.FC<ZipUploadModalProps> = ({
     </div>
   );
 };
+

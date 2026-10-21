@@ -295,3 +295,4 @@ export interface QuickReply {
   mediaUrl?: string;
   createdAt?: string;
 }
+

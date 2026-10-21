@@ -45,7 +45,7 @@ Conclusão 3: mesmo com o código correto, a coexistência não funciona sem o m
 #	Caso	Esperado	Resultado	Veredito
 6.1	Áudio gravado no navegador	Converte p/ OGG/Opus e envia	Front manda base64; servidor tenta ffmpeg que não existe no deploy (fluxoClient.ts:218) → fallback com codec errado	❌
 6.2	Upload de mídia pública	Link HTTPS 200 durável	Usa litterbox/uguu/tmpfiles (fluxoClient.ts:248) — caem, bloqueiam, e expiram em 72h	❌
-6.3	Upload falhou	Não enviar quebrado	Retorna '' ou data: URI que a Meta recusa (131053)	❌
+6.3	Upload falhou	Não enviar quebrado	Retorna '' ou data: URI → envia media:{url:''} que a Meta recusa (131053)	❌
 6.4	execSync(ffmpeg)	Não travar servidor	Bloqueia o event loop por até 5s durante gravação	⚠️
 6.5	Imagem/arquivo recebidos do cliente	Baixar e exibir	downloadAndStoreFluxoMedia grava em /uploads local (server.ts:2993) — some em deploy/restart (sem volume)	⚠️
 7. Status de entrega (tiques ✓ ✓✓)
@@ -102,7 +102,7 @@ Data: 2026-10-06 Objetivo: deixar o WhatsApp do Nyroh 100% funcional (recebiment
 §A. Fatos da API (fonte da verdade — NÃO inventar nada fora daqui)
 A1. Autenticação (toda chamada à API)
 4 cabeçalhos: X-Fluxo-Key (fxk_live_…), X-Fluxo-Timestamp (Unix em segundos, texto), X-Fluxo-Nonce (único por requisição, 8–128 chars), X-Fluxo-Signature (v1= + HMAC-SHA256 hex).
-String assinada = 6 linhas unidas por \n, nesta ordem: v1, {timestamp}, {nonce}, {MÉTODO MAIÚsCULO}, {caminho+query exatamente como enviado}, {sha256(corpo) hex}.
+String assinada = 6 linhas unidas por \n, nesta ordem: v1, {timestamp}, {nonce}, {MÉTODO MAIÚSCULO}, {caminho+query exatamente como enviado}, {sha256(corpo) hex}.
 Corpo vazio usa sha256("") = e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855.
 Assine e envie os mesmos bytes do corpo (serializar 2x quebra a assinatura → invalid_signature).
 Timestamp tolera ±300s (stale_timestamp). Nonce memorizado 600s (409 nonce_reused).
@@ -306,7 +306,7 @@ Depende de: T22
 Arquivos: server.ts (processWebhookEventAsync try/catch ~4197).
 Passos: em falha transitória (ex.: DB fora, 5xx), relançar o erro para o BullMQ reprocessar (attempts: 3). Em erro permanente (payload inválido), logar e encerrar sem relançar (senão fica em loop).
 Critério de aceite: simular DB fora durante o processamento → o job é retentado; depois que o DB volta, a mensagem é persistida.
-Verificação: forçar excessão transitória e ver o job repetir nas tentativas (log do BullMQ).
+Verificação: forçar exceção transitória e ver o job repetir nas tentativas (log do BullMQ).
 FASE 3 — Coexistência (SINTOMA #1: "mando pelo celular e não aparece")
 T30 — Verificar o modo da instância (diagnóstico que destrava tudo)
 Depende de: T10

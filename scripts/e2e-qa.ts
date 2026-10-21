@@ -377,7 +377,7 @@ async function main() {
       ok(r402.status === 402 && /Cobran|mensalidade/i.test(r402.json?.error?.message + r402.json?.error?.action), 'mensalidade em aberto → 402 explicando', r402.json);
     }
 
-    group('📍 Envio de mídia (imagem / áudio / documento)');
+    group('📎 Envio de mídia (imagem / áudio / documento)');
     {
       await mock('POST', '/__mock/reset');
       await mock('POST', '/__mock/open-window', { phone: E164_A });

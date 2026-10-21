@@ -32,7 +32,7 @@ export function normalizeForMatch(text: string): string {
  * O cliente pediu para parar de receber mensagens?
  *
  * Antes isto era `texto.includes('pare')`: "parece ótimo, quanto custa?" era lido como
- * descadastro e o lead quente saia do funil. Agora "pare" só conta quando é a palavra
+ * descadastro e o lead quente saía do funil. Agora "pare" só conta quando é a palavra
  * inteira — e o mesmo vale para "remover" dentro de "removeram", etc.
  */
 export function detectOptOut(text: string): boolean {

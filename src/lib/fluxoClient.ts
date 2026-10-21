@@ -339,7 +339,7 @@ export async function transcodeAudioToWhatsAppVoice(buf: Buffer, inputMime: stri
 // ============================================================================
 
 /**
- * Upload de contingencia em hosts de terceiros. SÓ é usado quando o Nyroh não tem URL pública
+ * Upload de contingência em hosts de terceiros. SÓ é usado quando o Nyroh não tem URL pública
  * própria configurada (APP_PUBLIC_URL). Os links expiram (72h) e os serviços caem — não é o caminho padrão.
  */
 async function uploadThirdPartyPublicMedia(buffer: Buffer, filename: string, mimeType: string): Promise<string> {
@@ -373,14 +373,14 @@ async function uploadThirdPartyPublicMedia(buffer: Buffer, filename: string, mim
 /**
  * Publica o arquivo e devolve a URL pública. Prioridade:
  *  1. Armazenamento próprio (/uploads) sob APP_PUBLIC_URL — durável e sob nosso controle.
- *  2. Contingencia em host de terceiros (com aviso).
+ *  2. Contingência em host de terceiros (com aviso).
  */
 export async function uploadDirectPublicMedia(buffer: Buffer, filename: string, mimeType: string): Promise<string> {
   if (publicBaseUrl()) {
     const saved = await saveMediaBuffer(buffer, { mime: mimeType, filename });
     if (saved.publicUrl) return saved.publicUrl;
   }
-  // Contingencia em servidor de TERCEIROS: manda o arquivo do cliente para um site público externo e o link expira.
+  // Contingência em servidor de TERCEIROS: manda o arquivo do cliente para um site público externo e o link expira.
   // Por privacidade e confiabilidade só com opt-in explícito (ALLOW_THIRD_PARTY_MEDIA_HOST=true). O normal é ter
   // APP_PUBLIC_URL (na Railway o domínio público é detectado sozinho por RAILWAY_PUBLIC_DOMAIN).
   if (process.env.ALLOW_THIRD_PARTY_MEDIA_HOST === 'true') {
