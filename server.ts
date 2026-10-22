@@ -9105,6 +9105,41 @@ app.post('/api/campaign/upload-zip', diskUpload.single('zipFile') as any, async 
       });
     }
 
+    // DEDUP POR TELEFONE: não sobe de novo quem já recebeu disparo (outra safra ou CRM) nem quem está repetido no arquivo.
+    if (pgPool) {
+      const alreadyContacted = new Set<string>();
+      try {
+        const prev = await pgPool.query(
+          `SELECT regexp_replace(phone_number, '[^0-9]', '', 'g') AS d
+             FROM campaign_leads WHERE status NOT IN ('STAGING', 'DESCARTADO')
+           UNION
+           SELECT regexp_replace(phone_number, '[^0-9]', '', 'g') AS d
+             FROM leads WHERE sub_status ILIKE '%Disparo%' OR last_call_tag = 'WhatsApp Enviado'`
+        );
+        for (const r of prev.rows) if (r.d) alreadyContacted.add(String(r.d));
+      } catch (dedupErr: any) {
+        console.warn('[Import] Dedup por telefone indisponível:', dedupErr.message);
+      }
+
+      const seenInFile = new Set<string>();
+      const kept: typeof formattedLeadsToSave = [];
+      let skippedContacted = 0;
+      let skippedRepeated = 0;
+      for (const item of formattedLeadsToSave) {
+        const d = String(item.phoneNumber || '').replace(/[^0-9]/g, '');
+        if (!d) { kept.push(item); continue; }
+        if (alreadyContacted.has(d)) { skippedContacted++; continue; }
+        if (seenInFile.has(d)) { skippedRepeated++; continue; }
+        seenInFile.add(d);
+        kept.push(item);
+      }
+      if (skippedContacted || skippedRepeated) {
+        console.log(`[Import] Ignorados: ${skippedContacted} já disparado(s) antes, ${skippedRepeated} repetido(s) no arquivo.`);
+      }
+      formattedLeadsToSave.length = 0;
+      formattedLeadsToSave.push(...kept);
+    }
+
     // Gravação em Lotes no PostgreSQL (Chunks de 250 itens por consulta SQL)
     // Isso evita estourar memória RAM e reduz 15.000 queries para apenas algumas dezenas
     const CHUNK_SIZE = 250;
@@ -9669,6 +9704,12 @@ app.post('/api/campaign/dispatch', async (req: any, res) => {
            WHERE id IN (
              SELECT id FROM campaign_leads
              WHERE batch_id = $2 AND status = 'STAGING' AND is_mobile = TRUE
+               AND NOT EXISTS (
+                 SELECT 1 FROM campaign_leads cl2
+                 WHERE cl2.id <> campaign_leads.id
+                   AND cl2.status NOT IN ('STAGING', 'DESCARTADO')
+                   AND regexp_replace(cl2.phone_number, '[^0-9]', '', 'g') = regexp_replace(campaign_leads.phone_number, '[^0-9]', '', 'g')
+               )
              ORDER BY created_at ASC
              LIMIT $3
            )
@@ -9686,6 +9727,12 @@ app.post('/api/campaign/dispatch', async (req: any, res) => {
            WHERE id IN (
              SELECT id FROM campaign_leads
              WHERE batch_id = $2 AND status = 'STAGING' AND is_mobile = TRUE
+               AND NOT EXISTS (
+                 SELECT 1 FROM campaign_leads cl2
+                 WHERE cl2.id <> campaign_leads.id
+                   AND cl2.status NOT IN ('STAGING', 'DESCARTADO')
+                   AND regexp_replace(cl2.phone_number, '[^0-9]', '', 'g') = regexp_replace(campaign_leads.phone_number, '[^0-9]', '', 'g')
+               )
              ORDER BY created_at ASC
            )
            RETURNING id, name, phone_number AS "phoneNumber", is_mobile AS "isMobile", public_url AS "publicUrl", website, niche`,
