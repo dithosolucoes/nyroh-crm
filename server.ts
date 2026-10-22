@@ -9324,6 +9324,9 @@ app.get('/api/campaign/leads', async (req, res) => {
         WHERE status = 'DESCARTADO' AND response_preview LIKE '%Telefone fixo%'
       `).catch(() => {});
 
+      // Tira da lista do disparo quem já foi contatado (CRM ou outra campanha)
+      await cortarJaContatados();
+
       let query = `
         SELECT 
           id,
