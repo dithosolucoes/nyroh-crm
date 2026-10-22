@@ -7396,6 +7396,43 @@ function extractLegacyWebsite(data: any): string {
   return '';
 }
 
+/**
+ * CORTE AUTOMÁTICO: marca como DESCARTADO os leads que ainda estão em STAGING (qualquer safra)
+ * mas cujo telefone já recebeu disparo em outra safra ou já consta no CRM como contatado.
+ * Roda antes de cada disparo, então o pipeline se limpa sozinho.
+ */
+async function cortarJaContatados(): Promise<number> {
+  if (!pgPool) return 0;
+  const digits = (col: string) => `regexp_replace(${col}, '[^0-9]', '', 'g')`;
+  try {
+    const res = await pgPool.query(
+      `UPDATE campaign_leads cl
+          SET status = 'DESCARTADO',
+              response_preview = 'Já contatado antes (corte automático)'
+        WHERE cl.status = 'STAGING'
+          AND (
+            EXISTS (
+              SELECT 1 FROM campaign_leads o
+              WHERE o.id <> cl.id
+                AND o.status NOT IN ('STAGING', 'DESCARTADO')
+                AND ${digits('o.phone_number')} = ${digits('cl.phone_number')}
+            )
+            OR EXISTS (
+              SELECT 1 FROM leads l
+              WHERE (l.sub_status ILIKE '%Disparo%' OR l.last_call_tag = 'WhatsApp Enviado')
+                AND ${digits('l.phone_number')} = ${digits('cl.phone_number')}
+            )
+          )`
+    );
+    const cortados = res.rowCount || 0;
+    if (cortados > 0) console.log(`[Corte automático] ${cortados} lead(s) já contatado(s) removidos do pipeline.`);
+    return cortados;
+  } catch (err: any) {
+    console.warn('[Corte automático] falhou:', err.message);
+    return 0;
+  }
+}
+
 // Helper function to process lead items (shared between zip upload and batch JSON API)
 async function processLeadItems(items: any[]) {
   let totalProcessed = 0;
@@ -9684,6 +9721,9 @@ app.post('/api/campaign/dispatch', async (req: any, res) => {
     let dispatchedLeads: any[] = [];
 
     if (usePostgres && pgPool) {
+      // Antes de disparar, tira do pipeline quem já foi contatado (outra safra ou CRM)
+      await cortarJaContatados();
+
       if (Array.isArray(leadIds) && leadIds.length > 0) {
         const updateRes = await pgPool.query(
           `UPDATE campaign_leads
