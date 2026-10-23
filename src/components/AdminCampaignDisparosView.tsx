@@ -251,11 +251,23 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   }, [metaTemplatesList, selectedTemplate]);
 
 
-  // Limites oficiais de caracteres para parâmetros de templates da Meta Cloud API (evita erro #132005)
+  // Limite oficial da Meta para o CORPO do template (texto fixo + variáveis somados): 1024 caracteres.
+  // Cada variável pode ocupar o corpo inteiro; o que vale é o total renderizado.
+  const META_BODY_MAX = 1024;
   const META_CHAR_LIMITS = {
-    var1: 100,
-    var2: 160,
-    var3: 120
+    var1: META_BODY_MAX,
+    var2: META_BODY_MAX,
+    var3: META_BODY_MAX
+  };
+  // Tamanho do corpo já renderizado com as três variáveis
+  const renderedBodyLength = (v1: string, v2: string, v3: string) => {
+    const tpl = availableTemplates.find((t: any) => t.name === selectedTemplate) as any;
+    const base: string = tpl?.bodyText || '{{1}}{{2}}{{3}}';
+    return base
+      .replace('{{1}}', () => v1)
+      .replace('{{2}}', () => v2)
+      .replace('{{3}}', () => v3)
+      .length;
   };
 
   // Variáveis de Conteúdo (Nível 2: O que vai DENTRO de cada {{X}} do template)
@@ -524,30 +536,33 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   const insertTagIntoActiveVar = (tag: string) => {
     if (activeVarField === 'var1') {
       const next = `${templateVar1} ${tag}`.trim();
-      if (next.length > META_CHAR_LIMITS.var1) {
+      const total = renderedBodyLength(next, templateVar2, templateVar3);
+      if (total > META_BODY_MAX) {
         setActionNotification({
           type: 'error',
-          message: `Não foi possível inserir ${tag}: a Variável 1 atingiria ${next.length} caracteres (Limite Meta: ${META_CHAR_LIMITS.var1}).`
+          message: `Não foi possível inserir ${tag}: o corpo do template chegaria a ${total} caracteres (Limite Meta: ${META_BODY_MAX}).`
         });
         return;
       }
       setTemplateVar1(next);
     } else if (activeVarField === 'var2') {
       const next = `${templateVar2} ${tag}`.trim();
-      if (next.length > META_CHAR_LIMITS.var2) {
+      const total = renderedBodyLength(templateVar1, next, templateVar3);
+      if (total > META_BODY_MAX) {
         setActionNotification({
           type: 'error',
-          message: `Não foi possível inserir ${tag}: a Variável 2 atingiria ${next.length} caracteres (Limite Meta: ${META_CHAR_LIMITS.var2}).`
+          message: `Não foi possível inserir ${tag}: o corpo do template chegaria a ${total} caracteres (Limite Meta: ${META_BODY_MAX}).`
         });
         return;
       }
       setTemplateVar2(next);
     } else if (activeVarField === 'var3') {
       const next = `${templateVar3} ${tag}`.trim();
-      if (next.length > META_CHAR_LIMITS.var3) {
+      const total = renderedBodyLength(templateVar1, templateVar2, next);
+      if (total > META_BODY_MAX) {
         setActionNotification({
           type: 'error',
-          message: `Não foi possível inserir ${tag}: a Variável 3 atingiria ${next.length} caracteres (Limite Meta: ${META_CHAR_LIMITS.var3}).`
+          message: `Não foi possível inserir ${tag}: o corpo do template chegaria a ${total} caracteres (Limite Meta: ${META_BODY_MAX}).`
         });
         return;
       }
@@ -1185,16 +1200,9 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
     }
 
     // Validação rígida dos limites de caracteres da Meta para evitar o erro #132005 (Translated text too long)
-    if (templateVar1.length > META_CHAR_LIMITS.var1) {
-      showNotification('error', `A Variável 1 excede o limite da Meta (${templateVar1.length}/${META_CHAR_LIMITS.var1} caracteres). Ajuste o texto antes do disparo.`);
-      return;
-    }
-    if (templateVar2.length > META_CHAR_LIMITS.var2) {
-      showNotification('error', `A Variável 2 excede o limite da Meta (${templateVar2.length}/${META_CHAR_LIMITS.var2} caracteres). Ajuste o texto antes do disparo.`);
-      return;
-    }
-    if (templateVar3.length > META_CHAR_LIMITS.var3) {
-      showNotification('error', `A Variável 3 excede o limite da Meta (${templateVar3.length}/${META_CHAR_LIMITS.var3} caracteres). Ajuste o texto antes do disparo.`);
+    const totalBody = renderedBodyLength(templateVar1, templateVar2, templateVar3);
+    if (totalBody > META_BODY_MAX) {
+      showNotification('error', `O corpo do template ficou com ${totalBody} caracteres (limite da Meta: ${META_BODY_MAX}). Encurte o texto antes do disparo.`);
       return;
     }
 
