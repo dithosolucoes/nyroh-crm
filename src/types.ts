@@ -240,6 +240,9 @@ export interface CampaignBatch {
   allowedClosers: string[];
   hotLeadsRetainedByAdmin: boolean;
   dispatchedCount: number;
+  acceptedCount?: number;
+  deliveredCount?: number;
+  failedCount?: number;
   hotCount: number;
   coldCount: number;
   optOutCount: number;

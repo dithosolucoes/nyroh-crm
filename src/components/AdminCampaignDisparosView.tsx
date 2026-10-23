@@ -1765,7 +1765,9 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
           <div className="hidden lg:flex items-center gap-3 text-xs text-neutral-600">
             <span>Criada em: <strong>{new Date(currentBatch.createdAt).toLocaleDateString('pt-BR')}</strong></span>
             <span>• Total: <strong>{currentBatch.totalLeads} leads</strong></span>
-            <span>• Disparados: <strong className="text-blue-700">{currentBatch.dispatchedCount}</strong></span>
+            <span>• Aceitos pela API: <strong className="text-blue-700">{currentBatch.acceptedCount ?? currentBatch.dispatchedCount}</strong></span>
+            <span>• Entregues: <strong className="text-emerald-700">{currentBatch.deliveredCount ?? 0}</strong></span>
+            <span>• Falhas (sem WhatsApp, etc.): <strong className="text-red-700">{currentBatch.failedCount ?? 0}</strong></span>
           </div>
         )}
       </div>

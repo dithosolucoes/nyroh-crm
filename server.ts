@@ -8723,6 +8723,17 @@ app.get('/api/campaign/batches', async (req, res) => {
           b.allowed_closers AS "allowedClosers",
           b.hot_retained_by_admin AS "hotLeadsRetainedByAdmin",
           b.dispatched_count AS "dispatchedCount",
+          (SELECT COUNT(*) FROM campaign_leads cl
+             WHERE cl.batch_id = b.id AND cl.whatsapp_message_id IS NOT NULL)::int AS "acceptedCount",
+          (SELECT COUNT(*) FROM campaign_leads cl
+             WHERE cl.batch_id = b.id AND cl.whatsapp_message_id IS NOT NULL
+               AND EXISTS (
+                 SELECT 1 FROM lead_messages m
+                 WHERE m.whatsapp_message_id = cl.whatsapp_message_id
+                   AND m.status IN ('delivered', 'read')
+               ))::int AS "deliveredCount",
+          (SELECT COUNT(*) FROM campaign_leads cl
+             WHERE cl.batch_id = b.id AND cl.status = 'FALHA')::int AS "failedCount",
           b.hot_count AS "hotCount",
           b.cold_count AS "coldCount",
           b.opt_out_count AS "optOutCount",
