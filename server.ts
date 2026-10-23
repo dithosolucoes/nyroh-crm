@@ -7416,11 +7416,16 @@ async function cortarJaContatados(): Promise<number> {
               SELECT 1 FROM campaign_leads o
               WHERE o.id <> cl.id
                 AND o.status NOT IN ('STAGING', 'DESCARTADO')
+                AND (o.whatsapp_message_id IS NOT NULL OR o.status = 'INTERESSADO')
                 AND ${digits('o.phone_number')} = ${digits('cl.phone_number')}
             )
             OR EXISTS (
               SELECT 1 FROM leads l
               WHERE (l.sub_status ILIKE '%Disparo%' OR l.last_call_tag = 'WhatsApp Enviado')
+                AND EXISTS (
+                  SELECT 1 FROM lead_messages m
+                  WHERE m.lead_id = l.id AND m.whatsapp_message_id IS NOT NULL
+                )
                 AND ${digits('l.phone_number')} = ${digits('cl.phone_number')}
             )
           )`
@@ -9763,6 +9768,7 @@ app.post('/api/campaign/dispatch', async (req: any, res) => {
                  SELECT 1 FROM campaign_leads cl2
                  WHERE cl2.id <> campaign_leads.id
                    AND cl2.status NOT IN ('STAGING', 'DESCARTADO')
+                   AND (cl2.whatsapp_message_id IS NOT NULL OR cl2.status = 'INTERESSADO')
                    AND regexp_replace(cl2.phone_number, '[^0-9]', '', 'g') = regexp_replace(campaign_leads.phone_number, '[^0-9]', '', 'g')
                )
              ORDER BY created_at ASC
@@ -9786,6 +9792,7 @@ app.post('/api/campaign/dispatch', async (req: any, res) => {
                  SELECT 1 FROM campaign_leads cl2
                  WHERE cl2.id <> campaign_leads.id
                    AND cl2.status NOT IN ('STAGING', 'DESCARTADO')
+                   AND (cl2.whatsapp_message_id IS NOT NULL OR cl2.status = 'INTERESSADO')
                    AND regexp_replace(cl2.phone_number, '[^0-9]', '', 'g') = regexp_replace(campaign_leads.phone_number, '[^0-9]', '', 'g')
                )
              ORDER BY created_at ASC
@@ -10530,6 +10537,17 @@ app.post('/api/campaign/batches/:batchId/return-unsent', async (req: any, res) =
       );
       returned = upd.rowCount || 0;
     }
+
+    // 2b) Os que o corte antigo descartou por engano (marcados só porque estavam na fila, sem envio real)
+    const cutBack = await pgPool.query(
+      `UPDATE campaign_leads
+          SET status = 'STAGING', response_preview = NULL
+        WHERE batch_id = $1 AND status = 'DESCARTADO'
+          AND response_preview = 'Já contatado antes (corte automático)'
+          AND whatsapp_message_id IS NULL`,
+      [batchId]
+    );
+    returned += cutBack.rowCount || 0;
 
     // 3) Recalcula o contador do lote a partir do banco
     await pgPool.query(
