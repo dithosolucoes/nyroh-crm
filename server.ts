@@ -37,6 +37,7 @@ import {
   pauseBatchProgress,
   resumeBatchProgress,
   cancelBatchProgress,
+  removeBatchWaitingJobs,
   setCampaignSpeed,
   getCampaignSpeed,
   recordBatchJobResult,
@@ -10493,6 +10494,63 @@ app.post('/api/campaign/batches/:batchId/quarantine-config', async (req: any, re
   } catch (err: any) {
     console.error('Erro ao salvar configuração de quarentena:', err);
     return res.status(500).json({ error: `Erro ao salvar configuração: ${err.message}` });
+  }
+});
+
+// Devolve para Novos Leads só quem NÃO foi aceito pela Meta (sem ID de mensagem), tirando da fila as mensagens pendentes
+app.post('/api/campaign/batches/:batchId/return-unsent', async (req: any, res) => {
+  const { batchId } = req.params;
+  try {
+    if (!usePostgres || !pgPool) {
+      return res.status(400).json({ success: false, error: 'Recurso disponível apenas com banco Postgres.' });
+    }
+
+    // 1) Tira da fila as mensagens desse lote que ainda não saíram (evita envio duplicado depois)
+    const removedFromQueue = await removeBatchWaitingJobs(batchId);
+
+    // 2) Candidatos: em quarentena sem ID de envio da Meta
+    const candidates = await pgPool.query(
+      `SELECT id, phone_number AS "phoneNumber" FROM campaign_leads
+        WHERE batch_id = $1 AND status = 'QUARENTENA' AND whatsapp_message_id IS NULL`,
+      [batchId]
+    );
+    const ids: string[] = candidates.rows
+      .filter((r: any) => formatAndValidateE164Phone(String(r.phoneNumber || '')).isValid)
+      .map((r: any) => r.id);
+    const skippedInvalid = (candidates.rowCount || 0) - ids.length;
+
+    let returned = 0;
+    if (ids.length > 0) {
+      const upd = await pgPool.query(
+        `UPDATE campaign_leads
+            SET status = 'STAGING', sent_at = NULL, quarantine_expires_at = NULL
+          WHERE batch_id = $1 AND id = ANY($2::text[])
+            AND status = 'QUARENTENA' AND whatsapp_message_id IS NULL`,
+        [batchId, ids]
+      );
+      returned = upd.rowCount || 0;
+    }
+
+    // 3) Recalcula o contador do lote a partir do banco
+    await pgPool.query(
+      `UPDATE campaign_batches
+          SET dispatched_count = (SELECT COUNT(*) FROM campaign_leads
+                                   WHERE batch_id = $1 AND status IN ('QUARENTENA', 'INTERESSADO'))
+        WHERE id = $1`,
+      [batchId]
+    );
+
+    broadcastSocketEvent('LEAD_UPDATED', { batchId, count: returned });
+    return res.json({
+      success: true,
+      returned,
+      removedFromQueue,
+      skippedInvalid,
+      message: `${returned} lead(s) voltaram para Novos Leads. ${removedFromQueue} mensagem(ns) removida(s) da fila. ${skippedInvalid} número(s) inválido(s) ficaram de fora.`
+    });
+  } catch (err: any) {
+    console.error('[Retorno] Erro:', err);
+    return res.status(500).json({ success: false, error: `Erro ao devolver leads: ${err.message}` });
   }
 });
 

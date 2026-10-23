@@ -380,6 +380,27 @@ export function isBatchCancelled(batchId?: string): boolean {
   return batchId ? cancelledBatches.has(batchId) : false;
 }
 
+// Tira da fila as mensagens desse lote que ainda não começaram a sair.
+// Mensagens já em envio (active) não dá pra remover; a flag de cancelamento faz elas pararem.
+export async function removeBatchWaitingJobs(batchId: string): Promise<number> {
+  cancelledBatches.add(batchId);
+  pausedBatches.delete(batchId);
+  if (!campaignDispatchQueue) return 0;
+  let removed = 0;
+  try {
+    const jobs = await campaignDispatchQueue.getJobs(['waiting', 'delayed']);
+    for (const job of jobs) {
+      if (job?.data?.batchId === batchId) {
+        await job.remove();
+        removed++;
+      }
+    }
+  } catch (err: any) {
+    console.error('[Retorno] Erro ao remover mensagens da fila:', err?.message || err);
+  }
+  return removed;
+}
+
 let webhookQueue: Queue<WebhookJobData> | null = null;
 let zipImportQueue: Queue<ZipImportJobData> | null = null;
 let campaignDispatchQueue: Queue<CampaignDispatchJobData> | null = null;

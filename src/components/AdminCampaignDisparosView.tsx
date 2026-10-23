@@ -1444,6 +1444,28 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
     }
   };
 
+  // Devolve para Novos Leads só os que NÃO saíram de fato (sem ID da Meta) e limpa as mensagens pendentes da fila
+  const handleReturnUnsent = async () => {
+    if (!selectedBatchId) return;
+    const ok = window.confirm(
+      'Devolver para Novos Leads os leads que NÃO foram enviados de fato?\n\nIsso cancela as mensagens pendentes deste lote na fila. Os que já foram aceitos pela Meta continuam como estão.'
+    );
+    if (!ok) return;
+    try {
+      const res = await fetch(`/api/campaign/batches/${selectedBatchId}/return-unsent`, { method: 'POST' });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showNotification('success', data.message);
+        await fetchBatches();
+        await fetchLeads();
+      } else {
+        showNotification('error', data.error || 'Erro ao devolver leads.');
+      }
+    } catch (err: any) {
+      showNotification('error', `Falha ao devolver leads: ${err.message}`);
+    }
+  };
+
   // Zerar Disparos e Restaurar Todos os Leads para Staging
   const handleResetBatchToStaging = async () => {
     if (!selectedBatchId) return;
@@ -1619,6 +1641,18 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
             <Upload className="w-3.5 h-3.5" />
             <span>Subir ZIP</span>
           </button>
+
+          {/* Botão para devolver os não enviados pra Novos Leads */}
+          {selectedBatchId && (
+            <button
+              onClick={handleReturnUnsent}
+              title="Devolve para Novos Leads os leads que não saíram de fato e tira as mensagens pendentes da fila"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-900 text-xs font-bold shadow-2xs transition cursor-pointer"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-emerald-700" />
+              <span className="hidden md:inline">Devolver não enviados</span>
+            </button>
+          )}
 
           {/* Botão de Zerar Disparos e Resetar Safra */}
           {selectedBatchId && (
