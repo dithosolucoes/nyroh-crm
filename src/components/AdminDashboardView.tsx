@@ -42,6 +42,7 @@ import {
   Send
 } from 'lucide-react';
 import { AdminCampaignDisparosView } from './AdminCampaignDisparosView';
+import { ownerOf } from '../lib/sellerCounts';
 
 interface AdminDashboardViewProps {
   currentUser: User;
@@ -390,7 +391,8 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
   ];
 
   const sellerPerformance = salespeople.map(seller => {
-    const sellerLeads = leads.filter(l => l.salespersonId === seller.id);
+    // FASE 3: mesma regra de dono em todo o painel (sem dono = Thomas)
+    const sellerLeads = leads.filter(l => ownerOf(l) === seller.id.toLowerCase());
     const sellerClosed = sellerLeads.filter(l => l.columnStatus === 'Fechado').length;
     const sellerUncontacted = sellerLeads.filter(l => l.columnStatus === 'Leads' && (!l.callCount || l.callCount === 0)).length;
     const sellerNegotiation = sellerLeads.filter(l => 
