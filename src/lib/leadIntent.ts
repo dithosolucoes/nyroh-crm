@@ -71,3 +71,6 @@ export function resolveManualInterest(text: string, wantsInterest: boolean): boo
   if (detectOptOut(text)) return false;
   return wantsInterest;
 }
+
+/** Tag de resultado para quem pediu descadastro (FASE 2). */
+export const SEM_INTERESSE_TAG = { id: 'tag-sem-interesse', name: 'Sem interesse', color: '#475569', bgColor: '#f1f5f9' };

@@ -18,7 +18,7 @@ import { performWebsiteAudit } from './src/lib/auditEngine.js';
 import { executeFluxoRequest, downloadFluxoMediaBinary, prepareOutboundMedia, fluxoInstancePath, hasFfmpeg } from './src/lib/fluxoClient.js';
 import type { FluxoApiResult } from './src/lib/fluxoClient.js';
 import { verifyFluxoWebhook } from './src/lib/webhookAuth.js';
-import { detectOptOut, sanitizeTemplateVariable, resolveManualInterest } from './src/lib/leadIntent.js';
+import { detectOptOut, sanitizeTemplateVariable, resolveManualInterest, SEM_INTERESSE_TAG } from './src/lib/leadIntent.js';
 import { arePhonesEquivalent, normalizeE164Phone, phoneDigitVariants, formatAndValidateE164Phone } from './src/lib/phone.js';
 import { getUploadsDir, getInboxDir, INBOX_SUBDIR, isUploadsDirDurable, publicBaseUrl, saveMediaBuffer, extensionFor } from './src/lib/mediaStorage.js';
 import { statusRank, shouldApplyStatus, normalizeStatus } from './src/lib/fluxoStatus.js';
@@ -220,6 +220,7 @@ const DEFAULT_CUSTOM_TAGS: CustomTag[] = [
   { id: 'tag-retornar', name: 'Pediu para retornar', color: '#7e22ce', bgColor: '#f3e8ff' },
   { id: 'tag-ligar-14h', name: 'Ligar após 14h', color: '#0369a1', bgColor: '#e0f2fe' },
   { id: 'tag-ocupado', name: 'Ocupado', color: '#be123c', bgColor: '#ffe4e6' },
+  { id: SEM_INTERESSE_TAG.id, name: SEM_INTERESSE_TAG.name, color: SEM_INTERESSE_TAG.color, bgColor: SEM_INTERESSE_TAG.bgColor },
 ];
 
 // Default Salesperson: Thomas (Vendedor Principal)
@@ -4297,6 +4298,23 @@ async function processIncomingWhatsAppMessage(params: {
 
   // Qualquer resposta do lead (exceto opt-out explícito) é engajamento e demonstra interesse ativo
   const isPositiveInterest = !isOptOut;
+
+  // FASE 2: quem pediu descadastro recebe a tag "Sem interesse" (atrás de flag, desligada por padrão).
+  if (isOptOut && matched && process.env.NYROH_TAG_SEM_INTERESSE === 'true') {
+    const taggedLead = memoryLeadsMap.get(matched.id);
+    if (taggedLead) taggedLead.lastCallTag = SEM_INTERESSE_TAG.name;
+    if (usePostgres && pgPool) {
+      try {
+        await pgPool.query(
+          `INSERT INTO custom_tags (id, name, color, bg_color) VALUES ($1, $2, $3, $4) ON CONFLICT (name) DO NOTHING`,
+          [SEM_INTERESSE_TAG.id, SEM_INTERESSE_TAG.name, SEM_INTERESSE_TAG.color, SEM_INTERESSE_TAG.bgColor]
+        );
+        await pgPool.query(`UPDATE leads SET last_call_tag = $1 WHERE id = $2`, [SEM_INTERESSE_TAG.name, matched.id]);
+      } catch (tagErr: any) {
+        console.warn('[fase2] não consegui aplicar a tag Sem interesse:', tagErr?.message);
+      }
+    }
+  }
 
   // Atualizar estágio do lead caso encontrado
   if (matched) {
