@@ -19,6 +19,7 @@ import { executeFluxoRequest, downloadFluxoMediaBinary, prepareOutboundMedia, fl
 import type { FluxoApiResult } from './src/lib/fluxoClient.js';
 import { verifyFluxoWebhook } from './src/lib/webhookAuth.js';
 import { detectOptOut, sanitizeTemplateVariable, resolveManualInterest, SEM_INTERESSE_TAG } from './src/lib/leadIntent.js';
+import { distributionByCount } from './src/lib/distribution.js';
 import { arePhonesEquivalent, normalizeE164Phone, phoneDigitVariants, formatAndValidateE164Phone } from './src/lib/phone.js';
 import { getUploadsDir, getInboxDir, INBOX_SUBDIR, isUploadsDirDurable, publicBaseUrl, saveMediaBuffer, extensionFor } from './src/lib/mediaStorage.js';
 import { statusRank, shouldApplyStatus, normalizeStatus } from './src/lib/fluxoStatus.js';
@@ -6846,7 +6847,7 @@ async function assignLeadViaRoulette(
       let lowestSaturation = Infinity;
 
       for (const seller of eligibleSellers) {
-        const weight = leadType === 'interessado'
+        const weight = distributionByCount() ? 1 : leadType === 'interessado'
           ? Number(seller.pctInteressados)
           : Number(seller.pctNaoInteressados);
         const effectiveWeight = Math.max(1, weight);
@@ -6910,7 +6911,7 @@ async function assignLeadViaRoulette(
       let chosen = candidates[0];
       let lowestSaturation = Infinity;
       for (const seller of candidates) {
-        const weight = leadType === 'interessado'
+        const weight = distributionByCount() ? 1 : leadType === 'interessado'
           ? (seller.pctInteressados ?? 50)
           : (seller.pctNaoInteressados ?? 50);
         const saturation = (seller.leadsRecebidosHoje || 0) / Math.max(1, weight);
@@ -10279,7 +10280,7 @@ app.post('/api/campaign/simulate-action', async (req: any, res) => {
 
 // 7. Distribute leads to Salespeople (Transfers leads into active CRM pipeline!)
 app.post('/api/campaign/distribute', async (req: any, res) => {
-  const { batchId, distributions, sellerQuotas, onlyCold = true, retainHotForAdmin = true, includeQuarantine = true } = req.body;
+  const { batchId, distributions, sellerQuotas, onlyCold = true, retainHotForAdmin = !distributionByCount(), includeQuarantine = true } = req.body;
 
   // Normalizar distribuição aceitando tanto array de distribuições quanto objeto sellerQuotas
   let normalizedDistributions: { salespersonId: string; salespersonName: string; quota: number }[] = [];
