@@ -60,3 +60,14 @@ export function sanitizeTemplateVariable(value: string): string {
     .replace(/\s{2,}/g, ' ')
     .trim();
 }
+
+/**
+ * Decide se a resposta manual deve virar INTERESSADO.
+ *
+ * Um pedido de descadastro NUNCA vira interesse, mesmo que quem registrou a resposta
+ * tenha marcado "interessado" por padrão.
+ */
+export function resolveManualInterest(text: string, wantsInterest: boolean): boolean {
+  if (detectOptOut(text)) return false;
+  return wantsInterest;
+}

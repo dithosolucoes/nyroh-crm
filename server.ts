@@ -18,7 +18,7 @@ import { performWebsiteAudit } from './src/lib/auditEngine.js';
 import { executeFluxoRequest, downloadFluxoMediaBinary, prepareOutboundMedia, fluxoInstancePath, hasFfmpeg } from './src/lib/fluxoClient.js';
 import type { FluxoApiResult } from './src/lib/fluxoClient.js';
 import { verifyFluxoWebhook } from './src/lib/webhookAuth.js';
-import { detectOptOut, sanitizeTemplateVariable } from './src/lib/leadIntent.js';
+import { detectOptOut, sanitizeTemplateVariable, resolveManualInterest } from './src/lib/leadIntent.js';
 import { arePhonesEquivalent, normalizeE164Phone, phoneDigitVariants, formatAndValidateE164Phone } from './src/lib/phone.js';
 import { getUploadsDir, getInboxDir, INBOX_SUBDIR, isUploadsDirDurable, publicBaseUrl, saveMediaBuffer, extensionFor } from './src/lib/mediaStorage.js';
 import { statusRank, shouldApplyStatus, normalizeStatus } from './src/lib/fluxoStatus.js';
@@ -11676,6 +11676,10 @@ app.post('/api/leads/:leadId/simulate-reply', async (req: any, res) => {
         : 'Não temos interesse no momento, por favor não enviar mais mensagens.');
 
   const replyText = text || defaultText;
+  // FASE 1: pedido de descadastro nunca vira interesse (atrás de flag, desligada por padrão).
+  const interestedNow = process.env.NYROH_OPTOUT_FORA_DO_FUNIL === 'true'
+    ? resolveManualInterest(replyText, !!isInterested)
+    : !!isInterested;
 
   const incomingMessage: LeadChatMessage = {
     id: `msg_in_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
@@ -11697,7 +11701,7 @@ app.post('/api/leads/:leadId/simulate-reply', async (req: any, res) => {
   // If it's a campaign lead, update status to INTERESSADO or DESCARTADO
   const cLead = memoryCampaignLeadsMap.get(leadId);
   if (cLead) {
-    if (isInterested) {
+    if (interestedNow) {
       cLead.status = 'INTERESSADO';
       cLead.respondedAt = new Date().toISOString();
       cLead.responsePreview = replyText;
@@ -11709,7 +11713,7 @@ app.post('/api/leads/:leadId/simulate-reply', async (req: any, res) => {
 
   // Also if in CRM leads, update column if interested
   const crmLead = memoryLeadsMap.get(leadId);
-  if (crmLead && isInterested) {
+  if (crmLead && interestedNow) {
     crmLead.columnStatus = 'Interessado';
     crmLead.subStatus = 'Em Negociação WhatsApp';
     crmLead.lastCallTag = '🔥 Respondeu no WhatsApp';
@@ -11721,10 +11725,10 @@ app.post('/api/leads/:leadId/simulate-reply', async (req: any, res) => {
     leadName: leadTarget?.name,
     message: incomingMessage,
     isReply: true,
-    isInterested
+    isInterested: interestedNow
   });
 
-  if (isInterested) {
+  if (interestedNow) {
     broadcastSSE('LEAD_HOT_REPLY', {
       leadId,
       leadName: leadTarget?.name,
