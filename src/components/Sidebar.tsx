@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { LayoutGrid, Table, FileArchive, Sparkles, Tag, BarChart3, Menu, X, Users, MessageSquare, UserCheck, ChevronRight, Shield, LogOut, KeyRound } from 'lucide-react';
 import { Salesperson, User } from '../types';
 import { getSalespersonSlug } from '../lib/salesperson';
+import { isUiFlagOn } from '../lib/uiFlags';
+const SHOW_SEED_SAMPLES = isUiFlagOn(import.meta.env.VITE_MOSTRAR_SEED);
 
 interface SidebarProps {
   activeTab: 'admin' | 'kanban' | 'table' | 'dashboard' | 'whatsapp';
@@ -533,6 +535,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <span>Upload de Arquivos ZIP</span>
                     </button>
 
+                    {SHOW_SEED_SAMPLES && (
                     <button
                       onClick={() => {
                         onSeedSamples();
@@ -543,6 +546,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <Sparkles className="w-4 h-4 text-amber-500" />
                       <span>Gerar Leads de Exemplo</span>
                     </button>
+                    )}
                   </>
                 )}
               </div>
