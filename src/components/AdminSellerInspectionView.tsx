@@ -170,6 +170,8 @@ export const AdminSellerInspectionView: React.FC<AdminSellerInspectionViewProps>
   const handleReassignLead = async (leadId: string, newSalespersonId: string) => {
     if (!newSalespersonId) return;
     const target = salespeople.find((s) => s.id === newSalespersonId);
+    // FASE 4: troca de carteira exige confirmação (antes acontecia com um clique no dropdown).
+    if (!window.confirm(`Mover este lead para ${target?.name || 'o vendedor escolhido'}?`)) return;
     try {
       const res = await fetch(`/api/leads/${leadId}/assign`, {
         method: 'PUT',

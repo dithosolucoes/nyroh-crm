@@ -18,6 +18,7 @@ import {
   getMasterColumn, 
   resolveTargetColumnStatus 
 } from '../lib/pipeline';
+import { callResultToSave } from '../lib/callResult';
 
 interface LeadDetailModalProps {
   isOpen: boolean;
@@ -183,11 +184,7 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
     }
   };
 
-  useEffect(() => {
-    if (tags.length > 0 && selectedTags.length === 0) {
-      setSelectedTags([tags[0].name]);
-    }
-  }, [tags]);
+  // FASE 4: nenhum resultado vem pré-selecionado. "Atendeu" só entra se o vendedor escolher.
 
   // Reset / initialize state when lead changes
   useEffect(() => {
@@ -199,12 +196,8 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
       setComment('');
       setFollowUpDateTime('');
 
-      // Clean default tag for THIS lead
-      if (tags.length > 0) {
-        setSelectedTags([tags[0].name]);
-      } else {
-        setSelectedTags([]);
-      }
+      // FASE 4: começa sem resultado marcado (antes marcava a primeira tag sozinho).
+      setSelectedTags([]);
 
       // Check if this transition was marked for auto-dial/auto-start
       const autoDialPayload = localStorage.getItem(`crm_autodial_${lead.id}`);
@@ -405,7 +398,12 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
   const saveCallLog = async (closeModalAfter = true, advanceToNext = false) => {
     if (!lead) return;
 
-    const tagToUse = selectedTags.length > 0 ? selectedTags.join(', ') : (tags[0]?.name || 'Atendeu');
+    // FASE 4: sem resultado escolhido não existe ligação para registrar. Antes gravava "Atendeu" por padrão.
+    const tagToUse = callResultToSave(selectedTags);
+    if (!tagToUse) {
+      onShowToast('Escolha o resultado da ligação antes de salvar.');
+      return;
+    }
     
     // Cálculo de Duração Exata com base no Timestamp de Início (Clock do Sistema)
     let finalDuration = accumulatedSeconds;
