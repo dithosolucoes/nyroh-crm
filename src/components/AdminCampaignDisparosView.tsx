@@ -63,6 +63,9 @@ import {
 import { CampaignBatch, CampaignLead, CampaignLeadStatus, CampaignCopyTemplate, Salesperson } from '../types';
 import { AdminDispatchTestSandbox } from './AdminDispatchTestSandbox';
 import { ZipImportProgressModal, ImportProgressData } from './ZipImportProgressModal';
+import { isUiFlagOn } from '../lib/uiFlags';
+
+const SHOW_SIMULATE = isUiFlagOn(import.meta.env.VITE_MOSTRAR_SIMULAR);
 
 interface MetaTemplateButton {
   type: 'QUICK_REPLY' | 'URL' | 'PHONE_NUMBER';
@@ -3478,13 +3481,15 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
                         </div>
 
                         <div className="pt-1 border-t border-neutral-100 flex items-center justify-between">
-                          <button
+                                                    {SHOW_SIMULATE && (
+<button
                             onClick={() => handleSimulateLeadReply(lead.id, true)}
                             className="text-[10px] font-bold text-rose-600 hover:text-rose-700 hover:underline flex items-center gap-1 cursor-pointer"
                           >
                             <Flame className="w-3 h-3" />
                             Simular Resposta 🔥
                           </button>
+                          )}
 
                           <button
                             onClick={() => handleMoveLeadStatus(lead.id, 'FRIO', 'Sem resposta no prazo.')}

@@ -46,6 +46,9 @@ import { onRealtime, onRealtimeConnection } from '../lib/realtime';
 import { QuickRepliesModal } from './QuickRepliesModal';
 import { arePhonesEquivalent } from '../lib/phone';
 import { shouldApplyStatus, statusRank } from '../lib/fluxoStatus';
+import { isUiFlagOn } from '../lib/uiFlags';
+
+const SHOW_SIMULATE = isUiFlagOn(import.meta.env.VITE_MOSTRAR_SIMULAR);
 
 /** ID único por tentativa de envio: o servidor usa para NÃO enviar duas vezes (duplo clique / retry de rede). */
 function newClientMessageId(): string {
@@ -1636,7 +1639,8 @@ export const ThomasWhatsAppDesktopView: React.FC<ThomasWhatsAppDesktopViewProps>
 
                 {/* Simulador: só existe fora de produção (o servidor responde 404 quando desligado) */}
                 <div className={`relative group ${runtime.simulatorsEnabled ? '' : 'hidden'}`}>
-                  <button
+                                    {SHOW_SIMULATE && (
+<button
                     disabled={isSimulating}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold border border-amber-300 transition-all shadow-2xs cursor-pointer"
                     title="Simular interações do cliente"
@@ -1644,6 +1648,7 @@ export const ThomasWhatsAppDesktopView: React.FC<ThomasWhatsAppDesktopViewProps>
                     <Flame className="w-3.5 h-3.5 text-amber-600" />
                     <span>{isSimulating ? 'Simulando...' : '⚡ Simular Resposta'}</span>
                   </button>
+                  )}
 
                   <div className="absolute right-0 mt-1 w-52 bg-white border border-neutral-200 rounded-xl shadow-lg p-1.5 hidden group-hover:block z-30 animate-in fade-in">
                     <button
