@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { countSellerLeads } from '../lib/sellerCounts';
 import { Salesperson, Lead } from '../types';
 import { getSalespersonSlug, matchSalespersonFromRoute } from '../lib/salesperson';
 import {
@@ -141,7 +142,7 @@ export const AdminSellerInspectionView: React.FC<AdminSellerInspectionViewProps>
     ? leads
     : leads.filter((l) => (l.salespersonId || '').toLowerCase() === salespersonId.toLowerCase());
 
-  const totalLeads = sellerLeads.length;
+  const totalLeads = countSellerLeads(leads, salespersonId, isAll);
   const uncontacted = sellerLeads.filter((l) => l.columnStatus === 'Leads' && (!l.callCount || l.callCount === 0)).length;
   const inProgress = sellerLeads.filter((l) => l.columnStatus && l.columnStatus.startsWith('Ligação')).length;
   const closed = sellerLeads.filter((l) => l.columnStatus === 'Fechado').length;
@@ -393,7 +394,7 @@ export const AdminSellerInspectionView: React.FC<AdminSellerInspectionViewProps>
               </div>
               <p className="text-xs text-neutral-500 mt-0.5">
                 {isAll
-                  ? 'Métricas somadas, funil macro de vendas e auditoria da carteira global com 684+ leads.'
+                  ? `Métricas somadas, funil macro de vendas e auditoria da carteira global com ${totalLeads} leads.`
                   : `Auditoria e controle total de ${currentSeller?.name || 'vendedor'}: funil, carteira individual, notas e credenciais de acesso.`}
               </p>
             </div>
