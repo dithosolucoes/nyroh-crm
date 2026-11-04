@@ -6,10 +6,10 @@ Estado de cada item. "Feito" = código pronto e checado por teste automático.
 
 | # | Item | Estado | Onde está | Como validar |
 |---|------|--------|-----------|--------------|
-| 1 | Regra de um contato por lead por dia, somando todas as marcas | Validar | `src/lib/uxRoutes.ts` (`regraForaDoDisparoSql`), `server.ts` (`/api/campaign/dispatch`) | Dois lotes no mesmo dia com o mesmo telefone: o segundo não pode sair |
-| 2 | Disparo usa o número da marca da safra | Validar | `server.ts` (`processCampaignDispatch`) + `instanciaDaSafra` em `uxRoutes.ts` | Safra ligada a marca com número com `fluxo_instance_id`: o envio usa essa instância |
-| 3 | Direcionar bloco ou remessa para marca | Feito | `POST /api/central/{selections,remessas}/:id/direcionar`; botões em `AdminEstruturaView.tsx` | `scripts/qa-tudo.ts` (grupo 4) |
-| 4 | Bloqueados fora de todos os fluxos | Feito | Disparo (regra 1), caixa de entrada, distribuição, `GET /api/leads` | `scripts/qa-tudo.ts` (grupo 5) |
+| 1 | Regra de um contato por lead por dia, somando todas as marcas | Feito no SQL (testado com Postgres); falta disparo real | `src/lib/uxRoutes.ts` (`regraForaDoDisparoSql`), `server.ts` (`/api/campaign/dispatch`) | Dois lotes no mesmo dia com o mesmo telefone: o segundo não pode sair |
+| 2 | Disparo usa o número da marca da safra | Feito (testado com Postgres); falta envio real | `server.ts` (`processCampaignDispatch`) + `instanciaDaSafra` em `uxRoutes.ts` | Safra ligada a marca com número com `fluxo_instance_id`: o envio usa essa instância |
+| 3 | Direcionar bloco ou remessa para marca | Feito (testado com Postgres) | `POST /api/central/{selections,remessas}/:id/direcionar`; botões em `AdminEstruturaView.tsx` | `scripts/qa-tudo.ts` (grupo 4) |
+| 4 | Bloqueados fora de todos os fluxos | Feito (testado com Postgres) | Disparo (regra 1), caixa de entrada, distribuição, `GET /api/leads` | `scripts/qa-tudo.ts` (grupo 5) |
 | 5 | Testes fixos das rotas e regras | Feito | `scripts/test-ux-regras.ts` (`npm run test:ux`), `scripts/qa-tudo.ts` | Rodar os dois |
 | 6 | Mensagem clara quando a migração está desligada | Feito | `jsonFetch` em `AdminEstruturaView.tsx` (trata 503) | Desligar a flag e abrir a Estrutura |
 | 7 | Migração em um só lugar | Feito | `migrations/2026-11-ux-experiencias.sql` é a única fonte; o módulo só lê esse arquivo | — |
