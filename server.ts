@@ -13,7 +13,7 @@ import JSZip from 'jszip';
 import pg from 'pg';
 import { Lead, CallLog, ColumnStatus, PIPELINE_COLUMNS, CustomTag, Salesperson, DistributeLeadsParams, User, AuditLog, QuickReply } from './src/types.js';
 import { getLeadNiche } from './src/lib/niche.js';
-import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regraForaDoDisparoSql, instanciaDaSafra } from './src/lib/uxRoutes.js';
+import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regrasDeContatoSql, instanciaDaSafra } from './src/lib/uxRoutes.js';
 import { hashPassword, verifyPassword, generateSessionToken, DEFAULT_USERS, StoredUser, isUserAdmin } from './src/lib/serverAuth.js';
 import { performWebsiteAudit } from './src/lib/auditEngine.js';
 import { executeFluxoRequest, downloadFluxoMediaBinary, prepareOutboundMedia, fluxoInstancePath, hasFfmpeg } from './src/lib/fluxoClient.js';
@@ -9790,8 +9790,8 @@ app.post('/api/campaign/dispatch', async (req: any, res) => {
       // Antes de disparar, tira do pipeline quem já foi contatado (outra safra ou CRM)
       await cortarJaContatados();
 
-      // Regra única (todas as marcas): lead bloqueado fora e um contato por telefone por dia.
-      const foraDoDisparo = uxSchemaOn() ? regraForaDoDisparoSql() : '';
+      // Regras de contato (tela Configurações > Regras de contato) + bloqueio pelo admin.
+      const foraDoDisparo = uxSchemaOn() ? await regrasDeContatoSql(pgPool) : '';
 
       if (Array.isArray(leadIds) && leadIds.length > 0) {
         const updateRes = await pgPool.query(

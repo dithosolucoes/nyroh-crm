@@ -16,6 +16,7 @@
     "test": "tsx scripts/test-units.ts",
     "test:e2e": "tsx scripts/e2e-qa.ts",
     "test:ux": "tsx scripts/test-ux-regras.ts",
+    "test:regras": "tsx scripts/test-regras-contato.ts",
     "test:boot": "tsx scripts/e2e-boot-security.ts",
     "mock:fluxo": "tsx scripts/mock-fluxo.ts"
   },

@@ -77,3 +77,26 @@ CREATE TABLE IF NOT EXISTS contato_marcas (
   ultimo_contato TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (telefone, marca_id)
 );
+
+-- Regras de contato do disparo, editáveis na tela. Cada linha vira uma condição do filtro.
+--  tipo 'limite_janela': no máximo `max_contatos` contatos por janela (janela_horas NULL = dia de calendário, fuso de São Paulo).
+--  tipo 'apos_resposta': depois que o lead respondeu, não recebe novo disparo por `janela_horas` (NULL = para sempre).
+--  escopo 'global': conta todas as marcas juntas; escopo 'marca': conta só os contatos dessa marca.
+CREATE TABLE IF NOT EXISTS regras_contato (
+  id VARCHAR(100) PRIMARY KEY,
+  nome VARCHAR(255) NOT NULL,
+  tipo VARCHAR(30) NOT NULL,
+  escopo VARCHAR(20) NOT NULL DEFAULT 'global',
+  marca_id VARCHAR(255) REFERENCES brands(id) ON DELETE CASCADE,
+  max_contatos INT NOT NULL DEFAULT 1,
+  janela_horas INT,
+  ativa BOOLEAN NOT NULL DEFAULT TRUE,
+  criada_em TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Regras padrão: reproduzem exatamente o comportamento que já estava no código.
+INSERT INTO regras_contato (id, nome, tipo, escopo, max_contatos, janela_horas, ativa)
+VALUES
+  ('regra_um_por_dia', 'Um contato por dia (todas as marcas)', 'limite_janela', 'global', 1, NULL, TRUE),
+  ('regra_pos_resposta', 'Não reenviar após resposta (para sempre)', 'apos_resposta', 'global', 1, NULL, TRUE)
+ON CONFLICT (id) DO NOTHING;

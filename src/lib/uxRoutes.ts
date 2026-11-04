@@ -82,6 +82,78 @@ export function regraForaDoDisparoSql(): string {
     )`;
 }
 
+// ---------------------------------------------------------------------------
+// Motor de regras de contato: monta o filtro do disparo a partir da tabela `regras_contato`.
+// Bloqueio pelo admin continua fixo (não é regra configurável).
+// ---------------------------------------------------------------------------
+
+const cacheRegras: { at: number; sql: string | null } = { at: 0, sql: null };
+export function invalidarCacheRegras(): void {
+  cacheRegras.sql = null;
+  cacheRegras.at = 0;
+}
+
+const escapaTexto = (s: string) => `'${String(s).replace(/'/g, "''")}'`;
+
+/** Trecho SQL que diz se um registro com timestamp `col` cai na janela da regra. */
+function janelaSql(col: string, janelaHoras: number | null): string {
+  return janelaHoras == null
+    ? `(${col} AT TIME ZONE ${FUSO})::date = (now() AT TIME ZONE ${FUSO})::date`
+    : `${col} >= now() - interval '${janelaHoras} hours'`;
+}
+
+export async function regrasDeContatoSql(pool: pg.Pool): Promise<string> {
+  if (cacheRegras.sql !== null && Date.now() - cacheRegras.at < 30_000) return cacheRegras.sql;
+
+  const regras = await pool.query(
+    `SELECT id, tipo, escopo, marca_id, max_contatos, janela_horas
+       FROM regras_contato WHERE ativa = TRUE ORDER BY criada_em, id`
+  );
+  const tel = digitos('campaign_leads.phone_number');
+  // Bloqueado pelo admin: sempre fora.
+  let sql = `
+    AND NOT EXISTS (
+      SELECT 1 FROM leads lb
+      WHERE lb.blocked_at IS NOT NULL AND ${digitos('lb.phone_number')} = ${tel}
+    )`;
+
+  for (const r of regras.rows) {
+    const janela = r.janela_horas == null ? null : Math.max(1, Math.floor(Number(r.janela_horas)));
+    const doMarca = r.escopo === 'marca' && r.marca_id;
+    const joinMarca = (alias: string) =>
+      doMarca ? `JOIN campaign_batches cb_${alias} ON cb_${alias}.id = ${alias}.batch_id AND cb_${alias}.brand_id = ${escapaTexto(r.marca_id)}` : '';
+
+    if (r.tipo === 'limite_janela') {
+      const max = Math.max(1, Math.floor(Number(r.max_contatos) || 1));
+      const envios = `
+        SELECT COUNT(*) FROM campaign_leads cj ${joinMarca('cj')}
+         WHERE cj.id <> campaign_leads.id AND cj.sent_at IS NOT NULL
+           AND ${janelaSql('cj.sent_at', janela)}
+           AND ${digitos('cj.phone_number')} = ${tel}`;
+      // Mensagens do vendedor contam só na regra global (somando marcas).
+      const msgs = doMarca ? '0' : `(
+        SELECT COUNT(*) FROM lead_messages lm JOIN leads lx ON lx.id = lm.lead_id
+         WHERE lm.sender = 'salesperson' AND ${janelaSql('lm.timestamp', janela)}
+           AND ${digitos('lx.phone_number')} = ${tel})`;
+      sql += `
+    AND ((${envios}) + ${msgs}) < ${max}`;
+    } else if (r.tipo === 'apos_resposta') {
+      sql += `
+    AND NOT EXISTS (
+      SELECT 1 FROM campaign_leads cl2 ${joinMarca('cl2')}
+       WHERE cl2.id <> campaign_leads.id AND cl2.status NOT IN ('STAGING','DESCARTADO')
+         AND (cl2.whatsapp_message_id IS NOT NULL OR cl2.status = 'INTERESSADO')
+         ${janela == null ? '' : `AND cl2.sent_at >= now() - interval '${janela} hours'`}
+         AND ${digitos('cl2.phone_number')} = ${tel}
+    )`;
+    }
+  }
+
+  cacheRegras.sql = sql;
+  cacheRegras.at = Date.now();
+  return sql;
+}
+
 /** Instância da FluxoAPI do número vinculado à marca da safra. Cache de 60 s por safra. */
 const cacheInstancia = new Map<string, { at: number; temMarca: boolean; instanceId: string }>();
 export async function instanciaDaSafra(pool: pg.Pool | null, batchId: string): Promise<{ temMarca: boolean; instanceId: string }> {
@@ -244,6 +316,94 @@ export function registerUxRoutes(app: Express, deps: UxDeps): void {
 
   // ---------- Central de leads ----------
   /** Remessas (uploads) com quantos leads cada uma tem e quantos já estão bloqueados. */
+  // ---------------- Regras de contato (tela Configurações > Regras de contato) ----------------
+  const TIPOS_REGRA = ['limite_janela', 'apos_resposta'];
+  const ESCOPOS_REGRA = ['global', 'marca'];
+
+  /** Valida e normaliza uma regra. `atual` é a regra existente (no PATCH), para completar campos. */
+  const normalizaRegra = (body: any, atual?: any) => {
+    const tipo = String(body?.tipo ?? atual?.tipo ?? '');
+    const escopo = String(body?.escopo ?? atual?.escopo ?? 'global');
+    const nome = String(body?.nome ?? atual?.nome ?? '').trim();
+    const marcaId = body?.marcaId !== undefined ? (body.marcaId ? String(body.marcaId) : null) : (atual?.marca_id ?? null);
+    const maxRaw = body?.maxContatos !== undefined ? body.maxContatos : atual?.max_contatos ?? 1;
+    const janelaRaw = body?.janelaHoras !== undefined ? body.janelaHoras : atual?.janela_horas ?? null;
+    const ativa = body?.ativa !== undefined ? Boolean(body.ativa) : atual?.ativa ?? true;
+
+    if (!nome) return { erro: 'Dê um nome para a regra.' };
+    if (!TIPOS_REGRA.includes(tipo)) return { erro: 'Tipo de regra inválido.' };
+    if (!ESCOPOS_REGRA.includes(escopo)) return { erro: 'Escopo inválido.' };
+    if (escopo === 'marca' && !marcaId) return { erro: 'Escolha a marca desta regra.' };
+    const max = Number(maxRaw);
+    if (tipo === 'limite_janela' && (!Number.isInteger(max) || max < 1 || max > 50)) {
+      return { erro: 'Quantidade de contatos deve ser um número entre 1 e 50.' };
+    }
+    let janela: number | null = null;
+    if (janelaRaw !== null && janelaRaw !== '' && janelaRaw !== undefined) {
+      janela = Number(janelaRaw);
+      if (!Number.isInteger(janela) || janela < 1 || janela > 8760) return { erro: 'Janela deve ser de 1 a 8760 horas (ou vazia).' };
+    }
+    return { valor: { nome, tipo, escopo, marcaId: escopo === 'marca' ? marcaId : null, max: tipo === 'limite_janela' ? max : 1, janela, ativa } };
+  };
+
+  app.get('/api/regras-contato', withDb(async (pool, req, res) => {
+    if (!requireAdmin(req, res)) return;
+    const r = await pool.query(
+      `SELECT r.id, r.nome, r.tipo, r.escopo, r.marca_id AS "marcaId", b.name AS "marcaNome",
+              r.max_contatos AS "maxContatos", r.janela_horas AS "janelaHoras", r.ativa
+         FROM regras_contato r LEFT JOIN brands b ON b.id = r.marca_id
+        ORDER BY r.criada_em, r.id`
+    );
+    res.json(r.rows);
+  }));
+
+  app.post('/api/regras-contato', withDb(async (pool, req, res) => {
+    if (!requireAdmin(req, res)) return;
+    const n = normalizaRegra(req.body);
+    if ('erro' in n) return res.status(400).json({ error: n.erro });
+    const v = n.valor!;
+    const id = newId('regra');
+    await pool.query(
+      `INSERT INTO regras_contato (id, nome, tipo, escopo, marca_id, max_contatos, janela_horas, ativa)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [id, v.nome, v.tipo, v.escopo, v.marcaId, v.max, v.janela, v.ativa]
+    );
+    invalidarCacheRegras();
+    res.status(201).json({ id });
+  }));
+
+  app.patch('/api/regras-contato/:id', withDb(async (pool, req, res) => {
+    if (!requireAdmin(req, res)) return;
+    const atual = await pool.query('SELECT * FROM regras_contato WHERE id = $1', [req.params.id]);
+    if (!atual.rowCount) return res.status(404).json({ error: 'Regra não encontrada.' });
+    const n = normalizaRegra(req.body, atual.rows[0]);
+    if ('erro' in n) return res.status(400).json({ error: n.erro });
+    const v = n.valor!;
+    await pool.query(
+      `UPDATE regras_contato SET nome = $2, tipo = $3, escopo = $4, marca_id = $5, max_contatos = $6, janela_horas = $7, ativa = $8
+        WHERE id = $1`,
+      [req.params.id, v.nome, v.tipo, v.escopo, v.marcaId, v.max, v.janela, v.ativa]
+    );
+    invalidarCacheRegras();
+    res.json({ ok: true });
+  }));
+
+  app.delete('/api/regras-contato/:id', withDb(async (pool, req, res) => {
+    if (!requireAdmin(req, res)) return;
+    await pool.query('DELETE FROM regras_contato WHERE id = $1', [req.params.id]);
+    invalidarCacheRegras();
+    res.json({ ok: true });
+  }));
+
+  /** Prévia: quantos contatos em espera passariam hoje com as regras atuais. */
+  app.post('/api/regras-contato/previa', withDb(async (pool, req, res) => {
+    if (!requireAdmin(req, res)) return;
+    const filtro = await regrasDeContatoSql(pool);
+    const total = await pool.query(`SELECT COUNT(*)::int AS n FROM campaign_leads WHERE status = 'STAGING' AND is_mobile = TRUE`);
+    const passam = await pool.query(`SELECT COUNT(*)::int AS n FROM campaign_leads WHERE status = 'STAGING' AND is_mobile = TRUE ${filtro}`);
+    res.json({ emEspera: total.rows[0].n, passariam: passam.rows[0].n, barrados: total.rows[0].n - passam.rows[0].n });
+  }));
+
   app.get('/api/central/remessas', withDb(async (pool, req, res) => {
     if (!requireAdmin(req, res)) return; // a Central de leads é só do admin
     const r = await pool.query(`
@@ -415,7 +575,17 @@ export function registerUxRoutes(app: Express, deps: UxDeps): void {
   app.get('/api/central/selections', withDb(async (pool, req, res) => {
     if (!requireAdmin(req, res)) return;
     const r = await pool.query(
-      `SELECT id, name, size, created_at AS "createdAt" FROM lead_selections ORDER BY created_at DESC LIMIT 100`
+      `SELECT s.id, s.name, s.size, s.created_at AS "createdAt",
+              (SELECT COUNT(DISTINCT l.id)::int
+                 FROM jsonb_array_elements_text(s.lead_ids) AS x(lid)
+                 JOIN leads l ON l.id = x.lid
+                WHERE EXISTS (
+                  SELECT 1 FROM campaign_leads cl
+                   WHERE cl.sent_at >= (date_trunc('day', now() AT TIME ZONE ${FUSO}) AT TIME ZONE ${FUSO})
+                     AND cl.sent_at < ((date_trunc('day', now() AT TIME ZONE ${FUSO}) + interval '1 day') AT TIME ZONE ${FUSO})
+                     AND ${digitos('cl.phone_number')} = ${digitos('l.phone_number')}
+                )) AS "contatadosHoje"
+         FROM lead_selections s ORDER BY s.created_at DESC LIMIT 100`
     );
     res.json(r.rows);
   }));

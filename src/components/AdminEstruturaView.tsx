@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Lead } from '../types';
 
-type Tab = 'central' | 'marcas' | 'numeros' | 'bloqueios';
+type Tab = 'central' | 'marcas' | 'numeros' | 'bloqueios' | 'regras';
 
 interface Remessa { id: string; name: string; createdAt: string; leadCount: number; blockedCount: number; contatadosHoje?: number }
 interface Brand { id: string; name: string; services: string; numberIds: string[] }
@@ -39,11 +39,12 @@ const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'marcas', label: 'Marcas' },
   { id: 'numeros', label: 'Números' },
   { id: 'bloqueios', label: 'Bloqueios pendentes' },
+  { id: 'regras', label: 'Regras de contato' },
 ];
 
 const TABS_POR_SECAO: Record<'leads' | 'configuracoes', Tab[]> = {
   leads: ['central', 'bloqueios'],
-  configuracoes: ['marcas', 'numeros'],
+  configuracoes: ['marcas', 'numeros', 'regras'],
 };
 
 export const AdminEstruturaView: React.FC<Props> = ({ leads, onShowToast, onOpenDetails, secao = 'leads' }) => {
@@ -80,6 +81,7 @@ export const AdminEstruturaView: React.FC<Props> = ({ leads, onShowToast, onOpen
       {tab === 'marcas' && <Marcas onShowToast={onShowToast} onError={setError} />}
       {tab === 'numeros' && <Numeros onShowToast={onShowToast} onError={setError} />}
       {tab === 'bloqueios' && <Bloqueios onShowToast={onShowToast} onError={setError} leads={leads} onOpenDetails={onOpenDetails} />}
+      {tab === 'regras' && <RegrasContato onShowToast={onShowToast} onError={setError} />}
     </div>
   );
 };
@@ -185,7 +187,11 @@ const CentralLeads: React.FC<{ leads: Lead[]; onShowToast: (m: string) => void; 
               <li key={b.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm">
                 <span className="font-semibold text-neutral-900">{b.name}</span>
                 <span className="flex items-center gap-2">
-                  <span className="text-xs text-neutral-500 font-mono">{b.size} leads · {new Date(b.createdAt).toLocaleDateString('pt-BR')}</span>
+                  <span className="text-xs text-neutral-500 font-mono">
+                    {b.size} leads
+                    {((b as any).contatadosHoje || 0) > 0 && <span className="text-amber-700"> · {(b as any).contatadosHoje} já contatados hoje</span>}
+                    {' · '}{new Date(b.createdAt).toLocaleDateString('pt-BR')}
+                  </span>
                   <button onClick={() => direcionar('selections', b.id, b.name)} className="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold">Direcionar para a marca</button>
                 </span>
               </li>
@@ -393,6 +399,234 @@ const Bloqueios: React.FC<{ onShowToast: (m: string) => void; onError: (m: strin
           })}
         </ul>
       )}
+    </div>
+  );
+};
+
+
+// ---------------- Regras de contato ----------------
+interface RegraContato {
+  id: string; nome: string; tipo: 'limite_janela' | 'apos_resposta'; escopo: 'global' | 'marca';
+  marcaId: string | null; marcaNome?: string | null; maxContatos: number; janelaHoras: number | null; ativa: boolean;
+}
+
+const OPCOES_JANELA_LIMITE = [
+  { v: '', l: 'Dia de calendário (fuso de São Paulo)' },
+  { v: '24', l: 'Últimas 24 horas' },
+  { v: '72', l: 'Últimas 72 horas' },
+  { v: '168', l: 'Últimos 7 dias' },
+  { v: '720', l: 'Últimos 30 dias' },
+];
+const OPCOES_JANELA_APOS_RESPOSTA = [
+  { v: 'sempre', l: 'Para sempre' },
+  { v: '24', l: '24 horas depois da resposta' },
+  { v: '72', l: '72 horas depois da resposta' },
+  { v: '168', l: '7 dias depois da resposta' },
+  { v: '720', l: '30 dias depois da resposta' },
+];
+
+const descreveRegra = (r: RegraContato) => {
+  const escopo = r.escopo === 'marca' ? `só marca ${r.marcaNome || ''}`.trim() : 'todas as marcas juntas';
+  if (r.tipo === 'limite_janela') {
+    const janela = r.janelaHoras == null ? 'por dia (SP)' : `nas últimas ${r.janelaHoras} h`;
+    return `No máximo ${r.maxContatos} contato(s) ${janela}, ${escopo}.`;
+  }
+  const janela = r.janelaHoras == null ? 'para sempre' : `durante ${r.janelaHoras} h`;
+  return `Depois que o lead responder, não recebe novo disparo ${janela}, ${escopo}.`;
+};
+
+const RegrasContato: React.FC<{ onShowToast: (m: string) => void; onError: (m: string | null) => void }> = ({ onShowToast, onError }) => {
+  const [regras, setRegras] = useState<RegraContato[]>([]);
+  const [marcas, setMarcas] = useState<Array<{ id: string; name: string }>>([]);
+  const [previa, setPrevia] = useState<{ emEspera: number; passariam: number; barrados: number } | null>(null);
+  const [novo, setNovo] = useState({ nome: '', tipo: 'limite_janela' as RegraContato['tipo'], escopo: 'global' as 'global' | 'marca', marcaId: '', max: 1, janela: '' });
+
+  const carregar = useCallback(async () => {
+    try {
+      const [r, m] = await Promise.all([
+        jsonFetch<RegraContato[]>('/api/regras-contato'),
+        jsonFetch<Array<{ id: string; name: string }>>('/api/brands'),
+      ]);
+      setRegras(r);
+      setMarcas(m);
+      onError(null);
+    } catch (e: any) {
+      onError(e.message);
+    }
+  }, [onError]);
+
+  const atualizarPrevia = useCallback(async () => {
+    try {
+      setPrevia(await jsonFetch('/api/regras-contato/previa', { method: 'POST' }));
+    } catch {
+      setPrevia(null);
+    }
+  }, []);
+
+  useEffect(() => { carregar(); atualizarPrevia(); }, [carregar, atualizarPrevia]);
+
+  const salvar = async (r: RegraContato, mudancas: Partial<RegraContato>) => {
+    try {
+      await jsonFetch(`/api/regras-contato/${r.id}`, { method: 'PATCH', body: JSON.stringify(mudancas) });
+      onShowToast('Regra salva.');
+      await carregar();
+      await atualizarPrevia();
+    } catch (e: any) {
+      onError(e.message);
+    }
+  };
+
+  const remover = async (r: RegraContato) => {
+    if (!window.confirm(`Apagar a regra "${r.nome}"?`)) return;
+    try {
+      await jsonFetch(`/api/regras-contato/${r.id}`, { method: 'DELETE' });
+      onShowToast('Regra apagada.');
+      await carregar();
+      await atualizarPrevia();
+    } catch (e: any) {
+      onError(e.message);
+    }
+  };
+
+  const criar = async () => {
+    const janelaVal = novo.janela === 'sempre' ? null : novo.janela === '' ? null : Number(novo.janela);
+    try {
+      await jsonFetch('/api/regras-contato', {
+        method: 'POST',
+        body: JSON.stringify({
+          nome: novo.nome,
+          tipo: novo.tipo,
+          escopo: novo.escopo,
+          marcaId: novo.escopo === 'marca' ? novo.marcaId : null,
+          maxContatos: novo.max,
+          janelaHoras: janelaVal,
+          ativa: true,
+        }),
+      });
+      onShowToast('Regra criada.');
+      setNovo({ nome: '', tipo: 'limite_janela', escopo: 'global', marcaId: '', max: 1, janela: '' });
+      await carregar();
+      await atualizarPrevia();
+    } catch (e: any) {
+      onError(e.message);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white p-4 rounded-2xl border border-neutral-200 shadow-2xs">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div>
+            <h3 className="text-sm font-bold text-neutral-900">Prévia do próximo disparo</h3>
+            <p className="text-xs text-neutral-500">Com as regras abaixo, quantos contatos em espera podem sair agora.</p>
+          </div>
+          {previa ? (
+            <div className="text-xs font-mono text-neutral-700">
+              {previa.emEspera} em espera · <span className="text-emerald-700 font-bold">{previa.passariam} passam</span> · <span className="text-amber-700 font-bold">{previa.barrados} barrados</span>
+            </div>
+          ) : (
+            <span className="text-xs text-neutral-400">Sem prévia disponível</span>
+          )}
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        {regras.length === 0 && <div className="text-xs text-neutral-400 py-4 text-center border border-dashed border-neutral-200 rounded-xl">Nenhuma regra cadastrada.</div>}
+        {regras.map(r => {
+          const opcoesJanela = r.tipo === 'apos_resposta' ? OPCOES_JANELA_APOS_RESPOSTA : OPCOES_JANELA_LIMITE;
+          const janelaSel = r.janelaHoras == null ? (r.tipo === 'apos_resposta' ? 'sempre' : '') : String(r.janelaHoras);
+          return (
+            <div key={r.id} className={`bg-white p-4 rounded-2xl border shadow-2xs ${r.ativa ? 'border-neutral-200' : 'border-neutral-200 opacity-60'}`}>
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div className="min-w-0">
+                  <div className="text-sm font-bold text-neutral-900">{r.nome}</div>
+                  <div className="text-xs text-neutral-500">{descreveRegra(r)}</div>
+                </div>
+                <label className="flex items-center gap-2 text-xs font-semibold text-neutral-700 cursor-pointer">
+                  <input type="checkbox" checked={r.ativa} onChange={e => salvar(r, { ativa: e.target.checked })} />
+                  Ativa
+                </label>
+              </div>
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-4 gap-2 items-end">
+                {r.tipo === 'limite_janela' && (
+                  <label className="text-[11px] font-semibold text-neutral-600">Quantidade
+                    <input
+                      type="number" min={1} max={50} defaultValue={r.maxContatos}
+                      onBlur={e => { const v = Number(e.target.value); if (v !== r.maxContatos) salvar(r, { maxContatos: v }); }}
+                      className="mt-1 w-full px-2 py-1.5 rounded-lg border border-neutral-300 text-xs"
+                    />
+                  </label>
+                )}
+                <label className="text-[11px] font-semibold text-neutral-600">Janela
+                  <select
+                    value={janelaSel}
+                    onChange={e => {
+                      const v = e.target.value;
+                      salvar(r, { janelaHoras: v === 'sempre' || v === '' ? null : Number(v) });
+                    }}
+                    className="mt-1 w-full px-2 py-1.5 rounded-lg border border-neutral-300 text-xs bg-white"
+                  >
+                    {opcoesJanela.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+                  </select>
+                </label>
+                <label className="text-[11px] font-semibold text-neutral-600">Escopo
+                  <select
+                    value={r.escopo === 'marca' ? `marca:${r.marcaId}` : 'global'}
+                    onChange={e => {
+                      const v = e.target.value;
+                      if (v === 'global') salvar(r, { escopo: 'global', marcaId: null });
+                      else salvar(r, { escopo: 'marca', marcaId: v.slice(6) });
+                    }}
+                    className="mt-1 w-full px-2 py-1.5 rounded-lg border border-neutral-300 text-xs bg-white"
+                  >
+                    <option value="global">Todas as marcas juntas</option>
+                    {marcas.map(m => <option key={m.id} value={`marca:${m.id}`}>Só {m.name}</option>)}
+                  </select>
+                </label>
+                <div className="flex justify-end">
+                  <button onClick={() => remover(r)} className="text-xs font-semibold text-red-700 hover:underline cursor-pointer">Apagar regra</button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="bg-neutral-50 p-4 rounded-2xl border border-neutral-200">
+        <h3 className="text-sm font-bold text-neutral-900 mb-2">Nova regra</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <input value={novo.nome} onChange={e => setNovo({ ...novo, nome: e.target.value })} placeholder="Nome (ex.: Máximo 2 por semana)" className="px-2 py-1.5 rounded-lg border border-neutral-300 text-xs" />
+          <select value={novo.tipo} onChange={e => setNovo({ ...novo, tipo: e.target.value as RegraContato['tipo'], janela: '' })} className="px-2 py-1.5 rounded-lg border border-neutral-300 text-xs bg-white">
+            <option value="limite_janela">Limite de contatos numa janela</option>
+            <option value="apos_resposta">Esperar depois da resposta</option>
+          </select>
+          <select value={novo.escopo} onChange={e => setNovo({ ...novo, escopo: e.target.value as 'global' | 'marca' })} className="px-2 py-1.5 rounded-lg border border-neutral-300 text-xs bg-white">
+            <option value="global">Todas as marcas juntas</option>
+            <option value="marca">Só uma marca</option>
+          </select>
+          {novo.escopo === 'marca' && (
+            <select value={novo.marcaId} onChange={e => setNovo({ ...novo, marcaId: e.target.value })} className="px-2 py-1.5 rounded-lg border border-neutral-300 text-xs bg-white">
+              <option value="">Escolha a marca</option>
+              {marcas.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+            </select>
+          )}
+          {novo.tipo === 'limite_janela' && (
+            <input type="number" min={1} max={50} value={novo.max} onChange={e => setNovo({ ...novo, max: Number(e.target.value) })} className="px-2 py-1.5 rounded-lg border border-neutral-300 text-xs" placeholder="Quantidade" />
+          )}
+          <select value={novo.janela} onChange={e => setNovo({ ...novo, janela: e.target.value })} className="px-2 py-1.5 rounded-lg border border-neutral-300 text-xs bg-white">
+            {(novo.tipo === 'apos_resposta' ? OPCOES_JANELA_APOS_RESPOSTA : OPCOES_JANELA_LIMITE).map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+          </select>
+        </div>
+        <div className="mt-3 flex justify-end">
+          <button
+            onClick={criar}
+            disabled={!novo.nome.trim() || (novo.escopo === 'marca' && !novo.marcaId)}
+            className="px-3 py-1.5 rounded-lg bg-neutral-900 text-white text-xs font-bold disabled:opacity-40 cursor-pointer"
+          >
+            Criar regra
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
