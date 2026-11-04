@@ -102,3 +102,6 @@ Baseado em CRMs de vendas (Pipedrive: pipeline como centro) e em boas práticas 
 - Fase 4: a tela segue a URL (`/pipeline`, `/lista`, `/conversas`, `/relatorios`, `/hoje`, `/admin/leads`, `/admin/campanhas`, `/admin/configuracoes`, `/admin/equipe`, `/admin/carteiras`, `/admin/vendedores`, `/admin/auditoria`). Voltar e avançar do navegador funcionam. Links `/v/<vendedor>` continuam como antes. Mapa em `src/lib/rotas.ts`.
 - Fase 5 (dividir `server.ts` e as views grandes): não executada nesta entrega. Precisa de banco de testes ativo para validar cada divisão.
 - Pendente: conferir o layout no navegador. A verificação feita foi de tipos, build de produção e testes automáticos.
+- Verificado no navegador (prints em 2026-11-04): Pipeline, Conversas, Lista, Relatórios, Leads, Configurações, Campanhas, Equipe e menu do celular carregam sem erro de console.
+- Correções encontradas ao testar: rotas de marcas, números e central estavam atrás do handler 404 (agora registradas antes); colunas de safras de disparo que faltavam em bancos antigos agora são adicionadas na inicialização; login respeita a URL aberta.
+- Ainda para limpar: a tela de Campanhas tem botões repetidos (cabeçalho e cartão) e três níveis de abas; a tela de Equipe ainda mostra o cabeçalho do cockpit.

@@ -888,6 +888,17 @@ async function initDatabase(retries = 5, delayMs = 3000) {
           ALTER TABLE campaign_batches ADD COLUMN IF NOT EXISTS copy_var1 TEXT;
           ALTER TABLE campaign_batches ADD COLUMN IF NOT EXISTS copy_var2 TEXT;
           ALTER TABLE campaign_batches ADD COLUMN IF NOT EXISTS copy_var3 TEXT;
+          ALTER TABLE campaign_batches ADD COLUMN IF NOT EXISTS with_nyroh_url INT DEFAULT 0;
+          ALTER TABLE campaign_batches ADD COLUMN IF NOT EXISTS with_website INT DEFAULT 0;
+          ALTER TABLE campaign_batches ADD COLUMN IF NOT EXISTS quarantine_hours INT DEFAULT 4;
+          ALTER TABLE campaign_batches ADD COLUMN IF NOT EXISTS quarantine_started_at TIMESTAMP WITH TIME ZONE;
+          ALTER TABLE campaign_batches ADD COLUMN IF NOT EXISTS quarantine_ends_at TIMESTAMP WITH TIME ZONE;
+          ALTER TABLE campaign_batches ADD COLUMN IF NOT EXISTS allowed_closers JSONB DEFAULT '["seller-thomas"]'::jsonb;
+          ALTER TABLE campaign_batches ADD COLUMN IF NOT EXISTS hot_retained_by_admin BOOLEAN DEFAULT TRUE;
+          ALTER TABLE campaign_batches ADD COLUMN IF NOT EXISTS dispatched_count INT DEFAULT 0;
+          ALTER TABLE campaign_batches ADD COLUMN IF NOT EXISTS hot_count INT DEFAULT 0;
+          ALTER TABLE campaign_batches ADD COLUMN IF NOT EXISTS cold_count INT DEFAULT 0;
+          ALTER TABLE campaign_batches ADD COLUMN IF NOT EXISTS opt_out_count INT DEFAULT 0;
 
           CREATE TABLE IF NOT EXISTS campaign_copy_templates (
             id VARCHAR(255) PRIMARY KEY,
@@ -11959,6 +11970,14 @@ app.get('/api/infrastructure/status', async (req, res) => {
   }
 });
 
+// Experiências de UX: marcas, números, central de leads e bloqueio com aprovação.
+registerUxRoutes(app, {
+  getPool: () => (usePostgres ? pgPool : null),
+  currentUser: (req: any) => req.user,
+  isAdmin: (user: any) => isUserAdmin(user),
+  getLeadOwnerId,
+});
+
 // 404 Handler for unhandled API routes
 app.use('/api/*', (req, res) => {
   res.status(404).json({ error: `Rota de API não encontrada: ${req.originalUrl}` });
@@ -11988,13 +12007,6 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   });
 });
 
-// Experiências de UX: marcas, números, central de leads e bloqueio com aprovação.
-registerUxRoutes(app, {
-  getPool: () => (usePostgres ? pgPool : null),
-  currentUser: (req: any) => req.user,
-  isAdmin: (user: any) => isUserAdmin(user),
-  getLeadOwnerId,
-});
 
 // START SERVER & VITE INTEGRATION
 async function main() {

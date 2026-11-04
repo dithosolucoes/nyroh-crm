@@ -130,10 +130,10 @@ export const MenuLateral: React.FC<MenuLateralProps> = ({
     grupos.push({
       titulo: 'Configurações',
       itens: [
-        { label: 'Marcas, números e integrações', icon: <Layers className={`${iconeCls} text-neutral-500`} />, destino: { tab: 'admin', section: 'configuracoes' } },
+        { label: 'Configurações', icon: <Layers className={`${iconeCls} text-neutral-500`} />, destino: { tab: 'admin', section: 'configuracoes' } },
         { label: 'Etiquetas de ligação', icon: <Tag className={`${iconeCls} text-neutral-500`} />, acao: onOpenTagsModal },
-        { label: 'Mensagem padrão do WhatsApp', icon: <MessageSquare className={`${iconeCls} text-neutral-500`} />, acao: onOpenWhatsAppSettings },
-        { label: 'Histórico de alterações', icon: <Clock className={`${iconeCls} text-neutral-500`} />, destino: { tab: 'admin', section: 'auditoria' } },
+        { label: 'Mensagem do WhatsApp', icon: <MessageSquare className={`${iconeCls} text-neutral-500`} />, acao: onOpenWhatsAppSettings },
+        { label: 'Histórico', icon: <Clock className={`${iconeCls} text-neutral-500`} />, destino: { tab: 'admin', section: 'auditoria' } },
         ...(INFRA_ON
           ? [{ label: 'Infraestrutura', icon: <Database className={`${iconeCls} text-neutral-500`} />, destino: { tab: 'admin' as const, section: 'blindagem' as const } }]
           : [])
@@ -144,7 +144,7 @@ export const MenuLateral: React.FC<MenuLateralProps> = ({
       titulo: 'Ferramentas',
       itens: [
         { label: 'Etiquetas de ligação', icon: <Tag className={`${iconeCls} text-neutral-500`} />, acao: onOpenTagsModal },
-        { label: 'Mensagem padrão do WhatsApp', icon: <MessageSquare className={`${iconeCls} text-neutral-500`} />, acao: onOpenWhatsAppSettings }
+        { label: 'Mensagem do WhatsApp', icon: <MessageSquare className={`${iconeCls} text-neutral-500`} />, acao: onOpenWhatsAppSettings }
       ]
     });
   }

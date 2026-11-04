@@ -90,12 +90,19 @@ export default function App() {
         const data = await res.json();
         if (data.user) {
           setCurrentUser(data.user);
+          // Fase 4: ao entrar, respeita a URL que o usuário abriu (ex.: /pipeline, /admin/leads).
+          const destinoDaUrl = destinoDoCaminho(window.location.pathname);
           if (data.user.role === 'salesperson' && data.user.salespersonId) {
             setSelectedSalespersonId(data.user.salespersonId);
-            setActiveTab('kanban');
+            setActiveTab(destinoDaUrl && destinoDaUrl.tab !== 'admin' ? destinoDaUrl.tab : 'kanban');
           } else if (data.user.role === 'admin') {
-            setActiveTab('admin');
-            setAdminSection('cockpit');
+            if (destinoDaUrl) {
+              setActiveTab(destinoDaUrl.tab);
+              setAdminSection(destinoDaUrl.section ?? 'cockpit');
+            } else {
+              setActiveTab('admin');
+              setAdminSection('cockpit');
+            }
           }
         } else {
           setCurrentUser(null);
@@ -845,7 +852,7 @@ export default function App() {
         ) : (
           <>
             {/* Top Operational Audit Banner for Super Admin when inspecting Kanban */}
-            {currentUser?.role === 'admin' && (
+            {currentUser?.role === 'admin' && selectedSalespersonId !== 'ALL' && (activeTab === 'kanban' || activeTab === 'table') && (
               <div className="bg-neutral-900 text-white px-4 py-2 flex items-center justify-between text-xs shrink-0 border-b border-neutral-800 shadow-2xs">
                 <div className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
@@ -903,65 +910,6 @@ export default function App() {
                     {selectedTagFilters.length > 0 && ` • (${selectedTagFilters.length} tag(s))`}
                   </p>
                 </div>
-              </div>
-
-              {/* View Modes Switcher */}
-              <div className="hidden lg:flex items-center bg-neutral-100 p-1 rounded-xl border border-neutral-200 shadow-2xs">
-                <button
-                  onClick={() => setActiveTab('kanban')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                    activeTab === 'kanban'
-                      ? 'bg-white text-neutral-900 shadow-2xs font-bold'
-                      : 'text-neutral-600 hover:text-neutral-900'
-                  }`}
-                >
-                  Kanban
-                </button>
-                <button
-                  onClick={() => setActiveTab('table')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                    activeTab === 'table'
-                      ? 'bg-white text-neutral-900 shadow-2xs font-bold'
-                      : 'text-neutral-600 hover:text-neutral-900'
-                  }`}
-                >
-                  Tabela
-                </button>
-                {(activeSalesperson?.id === 'seller-thomas' || activeSalesperson?.name === 'Thomas' || isAdmin) && (
-                  <button
-                    onClick={() => setActiveTab('whatsapp')}
-                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                      activeTab === 'whatsapp'
-                        ? 'bg-emerald-600 text-white shadow-2xs font-bold'
-                        : 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100'
-                    }`}
-                    title="Experiência completa de WhatsApp com leads"
-                  >
-                    <MessageSquare className="w-3.5 h-3.5" />
-                    <span>WhatsApp</span>
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  </button>
-                )}
-                <button
-                  onClick={() => setActiveTab('hoje')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                    activeTab === 'hoje'
-                      ? 'bg-white text-neutral-900 shadow-2xs font-bold'
-                      : 'text-neutral-600 hover:text-neutral-900'
-                  }`}
-                >
-                  Meu dia
-                </button>
-                <button
-                  onClick={() => setActiveTab('dashboard')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                    activeTab === 'dashboard'
-                      ? 'bg-white text-neutral-900 shadow-2xs font-bold'
-                      : 'text-neutral-600 hover:text-neutral-900'
-                  }`}
-                >
-                  Dashboard
-                </button>
               </div>
 
               {/* Salesperson Quick Tabs / Selector & Routing Switcher (Role-Based) */}
