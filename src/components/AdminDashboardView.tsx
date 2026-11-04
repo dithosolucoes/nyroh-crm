@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { isUiFlagOn } from '../lib/uiFlags';
 const INFRA_ON = isUiFlagOn(import.meta.env.VITE_MOSTRAR_INFRA);
-import { User, Salesperson, Lead, AuditLog } from '../types';
+import { User, Salesperson, Lead, AuditLog, PIPELINE_COLUMNS, PIPELINE_STAGE_META } from '../types';
 import { BulkCreateSalespeopleModal } from './BulkCreateSalespeopleModal';
 import { AdminWhatsAppFluxoView } from './AdminWhatsAppFluxoView';
 import {
@@ -381,16 +381,14 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
     l.columnStatus === 'Interessado'
   ).length;
 
-  const funnelStages = [
-    { label: 'Novos / Sem Contato', status: 'Leads', count: leads.filter(l => l.columnStatus === 'Leads').length, color: 'bg-neutral-500', barColor: '#64748b' },
-    { label: 'Ligação 1 Realizada', status: 'Ligação 1', count: leads.filter(l => l.columnStatus === 'Ligação 1').length, color: 'bg-blue-500', barColor: '#3b82f6' },
-    { label: 'Ligação 2 Realizada', status: 'Ligação 2', count: leads.filter(l => l.columnStatus === 'Ligação 2').length, color: 'bg-indigo-500', barColor: '#6366f1' },
-    { label: 'Ligação 3 Realizada', status: 'Ligação 3', count: leads.filter(l => l.columnStatus === 'Ligação 3').length, color: 'bg-violet-500', barColor: '#8b5cf6' },
-    { label: 'Ligação 4 Realizada', status: 'Ligação 4', count: leads.filter(l => l.columnStatus === 'Ligação 4').length, color: 'bg-purple-500', barColor: '#a855f7' },
-    { label: 'Qualificados / Interessados', status: 'Interessado', count: leads.filter(l => l.columnStatus === 'Interessado').length, color: 'bg-amber-500', barColor: '#f59e0b' },
-    { label: 'Vendas Concluídas (Fechados)', status: 'Fechado', count: leads.filter(l => l.columnStatus === 'Fechado').length, color: 'bg-emerald-500', barColor: '#10b981' },
-    { label: 'Contatos Recusados / Perdidos', status: 'Recusado', count: leads.filter(l => l.columnStatus === 'Recusado').length, color: 'bg-rose-500', barColor: '#f43f5e' },
-  ];
+  // Funil único: mesmas etapas e rótulos do Kanban e do Analytics (PIPELINE_STAGE_META).
+  const funnelStages = PIPELINE_COLUMNS.map((col) => ({
+    label: PIPELINE_STAGE_META[col].label,
+    status: col,
+    count: leads.filter(l => l.columnStatus === col).length,
+    color: PIPELINE_STAGE_META[col].color,
+    barColor: PIPELINE_STAGE_META[col].barColor,
+  }));
 
   const sellerPerformance = salespeople.map(seller => {
     // FASE 3: mesma regra de dono em todo o painel (sem dono = Thomas)

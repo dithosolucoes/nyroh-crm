@@ -19,6 +19,18 @@ export const PIPELINE_COLUMNS: ColumnStatus[] = [
   'Recusado'
 ];
 
+// Definição única de rótulo e cor das etapas do funil. Cockpit, Kanban e Analytics leem daqui.
+export const PIPELINE_STAGE_META: Record<ColumnStatus, { label: string; color: string; barColor: string }> = {
+  'Leads': { label: 'Novos / Sem contato', color: 'bg-neutral-500', barColor: '#64748b' },
+  'Ligação 1': { label: 'Ligação 1 realizada', color: 'bg-blue-500', barColor: '#3b82f6' },
+  'Ligação 2': { label: 'Ligação 2 realizada', color: 'bg-indigo-500', barColor: '#6366f1' },
+  'Ligação 3': { label: 'Ligação 3 realizada', color: 'bg-violet-500', barColor: '#8b5cf6' },
+  'Ligação 4': { label: 'Ligação 4 realizada', color: 'bg-purple-500', barColor: '#a855f7' },
+  'Interessado': { label: 'Interessados', color: 'bg-amber-500', barColor: '#f59e0b' },
+  'Fechado': { label: 'Fechados', color: 'bg-emerald-500', barColor: '#10b981' },
+  'Recusado': { label: 'Recusados / perdidos', color: 'bg-rose-500', barColor: '#f43f5e' },
+};
+
 export type MasterColumnId = 'novos' | 'tentativas' | 'interessados' | 'fechados' | 'recusados';
 
 export type InteressadoSubStage = 

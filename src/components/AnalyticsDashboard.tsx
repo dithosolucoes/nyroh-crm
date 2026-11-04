@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Lead, CustomTag, PIPELINE_COLUMNS, ColumnStatus, Salesperson } from '../types';
+import { Lead, CustomTag, PIPELINE_COLUMNS, PIPELINE_STAGE_META, ColumnStatus, Salesperson } from '../types';
 import {
   BarChart3,
   TrendingUp,
@@ -311,7 +311,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
               <div key={f.name} className="space-y-1">
                 <div className="flex items-center justify-between text-xs">
                   <span className={`px-2 py-0.5 rounded text-[11px] font-semibold border ${getColumnBadgeStyle(f.name as ColumnStatus)}`}>
-                    {f.name}
+                    {PIPELINE_STAGE_META[f.name as ColumnStatus]?.label ?? f.name}
                   </span>
                   <div className="flex items-center gap-2 font-mono text-neutral-600 text-xs">
                     <span className="font-bold text-neutral-900">{f.count}</span>
