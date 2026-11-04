@@ -418,7 +418,17 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
   }).sort((a, b) => b.closedLeads - a.closedLeads || b.totalLeads - a.totalLeads);
 
   // Filtered Users
-  const filteredUsers = users.filter(u => {
+  // Contas de demonstração (seed) somem da lista de equipe fora do ambiente de desenvolvimento.
+  const SHOW_DEMO_USERS = isUiFlagOn(import.meta.env.VITE_MOSTRAR_SEED);
+  const DEMO_USER_IDS = ['user-admin-demo', 'user-admin', 'user-lara', 'user-polly'];
+  const visibleUsers = SHOW_DEMO_USERS
+    ? users
+    : users.filter(u => {
+        if (DEMO_USER_IDS.includes(u.id)) return false;
+        const email = (u.email || '').toLowerCase();
+        return !(email.endsWith('@demo.com') || email.endsWith('@crm.com'));
+      });
+  const filteredUsers = visibleUsers.filter(u => {
     if (roleFilter !== 'ALL' && u.role !== roleFilter) return false;
     if (userSearchQuery.trim()) {
       const q = userSearchQuery.toLowerCase();
@@ -532,7 +542,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
               {salespeople.length}
             </div>
             <div className="text-[10px] text-neutral-500 mt-0.5">
-              {users.length} usuários cadastrados
+              {visibleUsers.length} usuários cadastrados
             </div>
           </div>
 
@@ -592,51 +602,6 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
           >
             <LayoutDashboard className="w-3.5 h-3.5" />
             <span>Cockpit Geral da Operação</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setActiveSubTab('usuarios');
-              onChangeSection?.('usuarios');
-            }}
-            className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold border transition-all whitespace-nowrap ${
-              activeSubTab === 'usuarios'
-                ? 'bg-neutral-900 text-white border-neutral-900 shadow-2xs'
-                : 'bg-white text-neutral-600 hover:bg-neutral-50 border-neutral-200'
-            }`}
-          >
-            <Users className="w-3.5 h-3.5" />
-            <span>Gestão da Equipe ({users.length})</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setActiveSubTab('carteiras');
-              onChangeSection?.('carteiras');
-            }}
-            className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold border transition-all whitespace-nowrap ${
-              activeSubTab === 'carteiras'
-                ? 'bg-neutral-900 text-white border-neutral-900 shadow-2xs'
-                : 'bg-white text-neutral-600 hover:bg-neutral-50 border-neutral-200'
-            }`}
-          >
-            <Share2 className="w-3.5 h-3.5" />
-            <span>Divisão de Leads & Carteiras ({salespeople.length})</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setActiveSubTab('auditoria');
-              onChangeSection?.('auditoria');
-            }}
-            className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold border transition-all whitespace-nowrap ${
-              activeSubTab === 'auditoria'
-                ? 'bg-neutral-900 text-white border-neutral-900 shadow-2xs'
-                : 'bg-white text-neutral-600 hover:bg-neutral-50 border-neutral-200'
-            }`}
-          >
-            <Clock className="w-3.5 h-3.5" />
-            <span>Caixa-Preta de Auditoria ({auditLogs.length})</span>
           </button>
 
           {isUiFlagOn(import.meta.env.VITE_MOSTRAR_INFRA) && (
