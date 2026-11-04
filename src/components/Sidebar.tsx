@@ -6,7 +6,7 @@ import { isUiFlagOn } from '../lib/uiFlags';
 const SHOW_SEED_SAMPLES = isUiFlagOn(import.meta.env.VITE_MOSTRAR_SEED);
 
 interface SidebarProps {
-  activeTab: 'admin' | 'kanban' | 'table' | 'dashboard' | 'whatsapp';
+  activeTab: 'admin' | 'kanban' | 'table' | 'dashboard' | 'whatsapp' | 'hoje';
   setActiveTab: (tab: 'admin' | 'kanban' | 'table' | 'dashboard' | 'whatsapp') => void;
   onOpenZipModal: () => void;
   onOpenTagsModal: () => void;

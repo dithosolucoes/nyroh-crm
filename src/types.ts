@@ -231,6 +231,7 @@ export interface CampaignLead {
   sentAt?: string;
   respondedAt?: string;
   responsePreview?: string;
+  failureNote?: string; // motivo da falha na entrega (vem de notes quando status = FALHA)
   assignedSalespersonId?: string;
   assignedSalespersonName?: string;
   createdAt: string;

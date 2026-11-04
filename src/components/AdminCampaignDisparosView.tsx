@@ -66,6 +66,34 @@ import { ZipImportProgressModal, ImportProgressData } from './ZipImportProgressM
 import { isUiFlagOn } from '../lib/uiFlags';
 
 const SHOW_SIMULATE = isUiFlagOn(import.meta.env.VITE_MOSTRAR_SIMULAR);
+/** Estado real do disparo: falhou (com motivo), lido/respondeu, ou ainda sem confirmação de entrega. */
+const DispatchStateLine: React.FC<{ lead: CampaignLead }> = ({ lead }) => {
+  if (lead.status === 'FALHA' || lead.failureNote) {
+    const motivo = (lead.failureNote || '').replace(/^\s*\[?Falha[^:]*:\s*/i, '').replace(/\]\s*$/, '').trim();
+    return (
+      <div className="p-1.5 bg-rose-50 rounded border border-rose-200 text-[10px] text-rose-800">
+        <span className="flex items-center gap-1 font-bold"><AlertTriangle className="w-3 h-3" /> Falhou</span>
+        <span className="block mt-0.5">{motivo || 'Motivo não informado pela API.'}</span>
+      </div>
+    );
+  }
+  if (lead.respondedAt) {
+    return (
+      <div className="p-1.5 bg-emerald-50 rounded border border-emerald-200 text-[10px] text-emerald-800 flex items-center gap-1 font-semibold">
+        <CheckCircle2 className="w-3 h-3" /> Respondeu {lead.sentAt ? '' : ''}
+      </div>
+    );
+  }
+  return (
+    <div className="p-1.5 bg-neutral-50 rounded border border-neutral-200 text-[10px] text-neutral-600 flex items-center justify-between">
+      <span className="flex items-center gap-1 text-neutral-700 font-semibold">
+        <Send className="w-3 h-3" /> Enviado à Meta
+      </span>
+      <span className="text-neutral-400">aguardando confirmação de entrega</span>
+    </div>
+  );
+};
+
 const SHOW_SANDBOX = isUiFlagOn(import.meta.env.VITE_MOSTRAR_SANDBOX);
 
 interface MetaTemplateButton {
@@ -1707,98 +1735,66 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
         </div>
       </header>
 
-      {/* SUB-NAVIGATION TABS: Full Width, Neutral-100 Pill Bar */}
-      <div className="w-full bg-white border-b border-neutral-200 px-4 sm:px-6 py-2 flex items-center justify-between gap-2 overflow-x-auto no-scrollbar shrink-0">
-        <div className="flex items-center gap-1.5 p-1 bg-neutral-100 rounded-xl border border-neutral-200 shadow-2xs">
-          <button
-            onClick={() => setActiveTab('kanban')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs transition-all cursor-pointer ${
-              activeTab === 'kanban'
-                ? 'bg-emerald-600 text-white font-bold shadow-2xs'
-                : 'text-neutral-700 hover:text-neutral-900 font-semibold'
-            }`}
-          >
-            <Kanban className="w-3.5 h-3.5" />
-            <span>⭐ 1. Kanban de Disparos</span>
-            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
-              activeTab === 'kanban' ? 'bg-emerald-700 text-white' : 'bg-neutral-200 text-neutral-800'
-            }`}>
-              {leads.length}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('safras')}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer ${
-              activeTab === 'safras'
-                ? 'bg-white text-neutral-900 font-bold shadow-2xs'
-                : 'text-neutral-600 hover:text-neutral-900 font-medium'
-            }`}
-          >
-            <Layers className="w-3.5 h-3.5" />
-            <span>2. Safras & Base</span>
-            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-neutral-200 text-neutral-800 font-mono font-bold">
-              {batches.length}
-            </span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('montador')}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer ${
-              activeTab === 'montador'
-                ? 'bg-white text-neutral-900 font-bold shadow-2xs'
-                : 'text-neutral-600 hover:text-neutral-900 font-medium'
-            }`}
-          >
-            <Sliders className="w-3.5 h-3.5" />
-            <span>3. Montador de Copy</span>
-          </button>
-
-          {SHOW_SANDBOX && (
-          <button
-            onClick={() => setActiveTab('teste_sandbox')}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer ${
-              activeTab === 'teste_sandbox'
-                ? 'bg-emerald-600 text-white font-bold shadow-2xs'
-                : 'text-emerald-700 bg-emerald-50 hover:bg-emerald-100 font-medium'
-            }`}
-            title="Disparo individual de teste real com integração direta ao WhatsApp e ao Kanban do Thomas"
-          >
-            <Send className="w-3.5 h-3.5 text-emerald-200" />
-            <span>4. Teste Sandbox</span>
-          </button>
-          )}
-
-          <button
-            onClick={() => setActiveTab('quarentena')}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer ${
-              activeTab === 'quarentena'
-                ? 'bg-white text-neutral-900 font-bold shadow-2xs'
-                : 'text-neutral-600 hover:text-neutral-900 font-medium'
-            }`}
-          >
-            <Clock className="w-3.5 h-3.5 text-amber-600" />
-            <span>5. Quarentena</span>
-            {currentBatch?.status === 'quarantine' && (
-              <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+      {/* PASSOS DO DISPARO: 1 Subir, 2 Montar, 3 Disparar. As telas internas continuam as mesmas. */}
+      {(() => {
+        const STEPS: Array<{ id: 'subir' | 'montar' | 'disparar'; label: string; icon: any; views: SubPageTab[] }> = [
+          { id: 'subir', label: '1. Subir', icon: Layers, views: ['safras'] },
+          { id: 'montar', label: '2. Montar', icon: Kanban, views: ['kanban', 'montador'] },
+          { id: 'disparar', label: '3. Disparar', icon: Send, views: ['quarentena', 'distribuicao', ...(SHOW_SANDBOX ? ['teste_sandbox' as SubPageTab] : [])] },
+        ];
+        const currentStep = STEPS.find(st => st.views.includes(activeTab)) ?? STEPS[0];
+        const VIEW_LABEL: Partial<Record<SubPageTab, string>> = {
+          kanban: 'Kanban de disparos',
+          montador: 'Montador de copy',
+          quarentena: 'Quarentena',
+          distribuicao: 'Distribuição',
+          teste_sandbox: 'Teste Sandbox',
+        };
+        return (
+          <div className="w-full bg-white border-b border-neutral-200 px-4 sm:px-6 py-2 flex flex-col gap-2 shrink-0">
+            <div className="flex items-center gap-1.5 p-1 bg-neutral-100 rounded-xl border border-neutral-200 shadow-2xs w-fit max-w-full overflow-x-auto no-scrollbar">
+              {STEPS.map(st => {
+                const active = st.id === currentStep.id;
+                const Icon = st.icon;
+                return (
+                  <button
+                    key={st.id}
+                    onClick={() => setActiveTab(st.views[0])}
+                    className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs whitespace-nowrap transition-all cursor-pointer ${
+                      active ? 'bg-emerald-600 text-white font-bold shadow-2xs' : 'text-neutral-700 hover:text-neutral-900 font-semibold'
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    <span>{st.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {currentStep.views.length > 1 && (
+              <div className="flex items-center gap-1.5 text-xs">
+                {currentStep.views.map(v => (
+                  <button
+                    key={v}
+                    onClick={() => setActiveTab(v)}
+                    className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
+                      activeTab === v ? 'bg-neutral-900 text-white font-bold' : 'text-neutral-600 hover:bg-neutral-100 font-medium'
+                    }`}
+                  >
+                    {VIEW_LABEL[v]}
+                    {v === 'quarentena' && currentBatch?.status === 'quarantine' && (
+                      <span className="inline-block w-2 h-2 ml-1.5 rounded-full bg-amber-500 animate-ping" />
+                    )}
+                  </button>
+                ))}
+              </div>
             )}
-          </button>
+          </div>
+        );
+      })()}
 
-          <button
-            onClick={() => setActiveTab('distribuicao')}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer ${
-              activeTab === 'distribuicao'
-                ? 'bg-white text-neutral-900 font-bold shadow-2xs'
-                : 'text-neutral-600 hover:text-neutral-900 font-medium'
-            }`}
-          >
-            <Share2 className="w-3.5 h-3.5 text-emerald-600" />
-            <span>6. Distribuição</span>
-          </button>
-        </div>
-
-        {/* Quick Batch Details */}
-        {currentBatch && (
+      {/* Barra de detalhes da safra atual */}
+      {currentBatch && (
+        <div className="w-full bg-white border-b border-neutral-200 px-4 sm:px-6 py-1.5 flex items-center justify-between gap-2 shrink-0">
           <div className="hidden lg:flex items-center gap-3 text-xs text-neutral-600">
             <span>Criada em: <strong>{new Date(currentBatch.createdAt).toLocaleDateString('pt-BR')}</strong></span>
             <span>• Total: <strong>{currentBatch.totalLeads} leads</strong></span>
@@ -1806,8 +1802,8 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
             <span>• Entregues: <strong className="text-emerald-700">{currentBatch.deliveredCount ?? 0}</strong></span>
             <span>• Falhas (sem WhatsApp, etc.): <strong className="text-red-700">{currentBatch.failedCount ?? 0}</strong></span>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* MAIN VIEW CONTENT (Aproveita toda a tela) */}
       <div className="w-full flex-1 p-4 sm:p-6 lg:p-8 flex flex-col gap-6">
@@ -3472,13 +3468,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
 
                         <div className="text-[11px] text-neutral-600 font-mono">{lead.phoneNumber}</div>
 
-                        <div className="p-1.5 bg-neutral-50 rounded border border-neutral-200 text-[10px] text-neutral-600 flex items-center justify-between">
-                          <span className="flex items-center gap-1 text-emerald-700 font-semibold">
-                            <CheckCircle2 className="w-3 h-3" />
-                            Enviado via Meta
-                          </span>
-                          <span className="text-neutral-400 font-mono">24h Quarentena</span>
-                        </div>
+                        <DispatchStateLine lead={lead} />
 
                         <div className="pt-1 border-t border-neutral-100 flex items-center justify-between">
                                                     {SHOW_SIMULATE && (

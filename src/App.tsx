@@ -3,6 +3,9 @@ import React, { useState, useEffect, useCallback, useMemo, useDeferredValue, use
 import { Lead, ColumnStatus, CustomTag, Salesperson, User } from './types';
 import { Sidebar } from './components/Sidebar';
 import { KanbanBoard } from './components/KanbanBoard';
+import { CommandPalette } from './components/CommandPalette';
+import { MeuDia } from './components/MeuDia';
+import { AdminEstruturaView } from './components/AdminEstruturaView';
 import { AllLeadsTable } from './components/AllLeadsTable';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard';
 import { LeadDetailModal } from './components/LeadDetailModal';
@@ -44,7 +47,7 @@ export default function App() {
   const [websiteFilter, setWebsiteFilter] = useState<'ALL' | 'PRIORITIZE_WITH' | 'PRIORITIZE_WITHOUT' | 'ONLY_WITH' | 'ONLY_WITHOUT'>('ALL');
   const [routeSalespersonSlug, setRouteSalespersonSlug] = useState<string | null>(null);
   const [loadingLeads, setLoadingLeads] = useState(true);
-  const [activeTab, setActiveTab] = useState<'admin' | 'kanban' | 'table' | 'dashboard' | 'whatsapp'>('kanban');
+  const [activeTab, setActiveTab] = useState<'admin' | 'kanban' | 'table' | 'dashboard' | 'whatsapp' | 'hoje'>('kanban');
   const [selectedTagFilters, setSelectedTagFilters] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [whatsappInitialLeadId, setWhatsappInitialLeadId] = useState<string | undefined>();
@@ -774,6 +777,12 @@ export default function App() {
                     setActiveTab('whatsapp');
                   }}
                 />
+              ) : adminSection === 'estrutura' ? (
+                <AdminEstruturaView
+                  leads={leads}
+                  onShowToast={showToast}
+                  onOpenDetails={(lead) => setSelectedLeadForDetail(lead)}
+                />
               ) : adminSection === 'vendedores' ? (
                 <AdminSellerInspectionView
                   salespersonId={inspectedSellerId}
@@ -930,6 +939,16 @@ export default function App() {
                   </button>
                 )}
                 <button
+                  onClick={() => setActiveTab('hoje')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    activeTab === 'hoje'
+                      ? 'bg-white text-neutral-900 shadow-2xs font-bold'
+                      : 'text-neutral-600 hover:text-neutral-900'
+                  }`}
+                >
+                  Meu dia
+                </button>
+                <button
                   onClick={() => setActiveTab('dashboard')}
                   className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                     activeTab === 'dashboard'
@@ -1046,7 +1065,7 @@ export default function App() {
             </header>
 
             {/* Barra de Métricas, Busca Global & Filtros de Vendas */}
-            {activeTab !== 'dashboard' && activeTab !== 'whatsapp' && (
+            {activeTab !== 'dashboard' && activeTab !== 'whatsapp' && activeTab !== 'hoje' && (
               <MetricsBar
                 leads={displayedLeads}
                 allLeads={leads}
@@ -1080,6 +1099,14 @@ export default function App() {
                   onShowToast={showToast}
                   activeSalesperson={activeSalesperson}
                   initialLeadId={whatsappInitialLeadId}
+                />
+              ) : activeTab === 'hoje' ? (
+                <MeuDia
+                  leads={leads}
+                  sellerId={activeSalesperson?.id}
+                  sellerName={activeSalesperson?.name}
+                  onOpenDetails={(lead) => setSelectedLeadForDetail(lead)}
+                  onToast={showToast}
                 />
               ) : activeTab === 'kanban' ? (
                 <KanbanBoard
@@ -1194,6 +1221,13 @@ export default function App() {
         onClose={() => setIsChangePasswordModalOpen(false)}
         currentUser={currentUser}
         onShowToast={showToast}
+      />
+
+      {/* Busca global ⌘K / Ctrl+K */}
+      <CommandPalette
+        leads={leads}
+        onOpenLead={(lead) => setSelectedLeadForDetail(lead)}
+        onNavigate={(tab) => setActiveTab(tab)}
       />
 
       {/* Global Toast Notification */}

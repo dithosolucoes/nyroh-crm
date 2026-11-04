@@ -183,6 +183,8 @@ export const MetricsBar: React.FC<MetricsBarProps> = ({
     }
   };
 
+  const activeFilterCount = (selectedNicheFilter !== 'ALL' ? 1 : 0) + (websiteFilter !== 'ALL' ? 1 : 0) + selectedTagFilters.length;
+
   return (
     <div className="bg-white border-b border-neutral-200 px-3 md:px-6 py-2.5 md:py-3.5 space-y-2.5 md:space-y-3 shrink-0 shadow-2xs">
       {/* Cards de Métricas Principais (Scrollable Horizontal até telas xl: 1280px+) */}
@@ -305,22 +307,39 @@ export const MetricsBar: React.FC<MetricsBarProps> = ({
             )}
           </div>
 
-          {/* Botão de Toggle de Filtros no Mobile (com indicador de filtros ativos) */}
+          {/* Filtros recolhidos em todas as telas: um botão, com contagem dos filtros ativos */}
           <button
             type="button"
             onClick={() => setIsMobileFiltersOpen(!isMobileFiltersOpen)}
-            className={`md:hidden shrink-0 inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg border shadow-2xs transition-colors ${
-              (selectedNicheFilter !== 'ALL' || websiteFilter !== 'ALL' || selectedTagFilters.length > 0)
+            aria-expanded={isMobileFiltersOpen}
+            className={`shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg border shadow-2xs transition-colors ${
+              activeFilterCount > 0
                 ? 'bg-blue-50 text-blue-700 border-blue-300'
                 : 'bg-white text-neutral-700 border-neutral-300 hover:bg-neutral-50'
             }`}
           >
             <SlidersHorizontal className="w-3.5 h-3.5" />
             <span>Filtros</span>
-            {(selectedNicheFilter !== 'ALL' || websiteFilter !== 'ALL' || selectedTagFilters.length > 0) && (
-              <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+            {activeFilterCount > 0 && (
+              <span className="px-1.5 rounded-full bg-blue-600 text-white font-mono text-[10px]">{activeFilterCount}</span>
             )}
           </button>
+
+          {activeFilterCount > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                onNicheFilterChange('ALL');
+                onWebsiteFilterChange('ALL');
+                onTagFilterChange([]);
+              }}
+              className="shrink-0 inline-flex items-center gap-1 px-2 py-1.5 text-xs font-semibold text-neutral-600 hover:text-neutral-900 rounded-lg hover:bg-neutral-100 transition-colors"
+              title="Voltar à lista completa"
+            >
+              <X className="w-3 h-3" />
+              <span className="hidden sm:inline">Limpar filtros</span>
+            </button>
+          )}
 
           {/* Botão CSV rápido */}
           <button
@@ -339,7 +358,7 @@ export const MetricsBar: React.FC<MetricsBarProps> = ({
         </div>
 
         {/* Linha de Filtros Avançados: Aberta no Desktop (md:flex), Colapsável no Mobile */}
-        <div className={`${isMobileFiltersOpen ? 'flex' : 'hidden'} md:flex flex-wrap items-center gap-2 pt-1`}>
+        <div className={`${isMobileFiltersOpen ? 'flex' : 'hidden'} flex-wrap items-center gap-2 pt-1`}>
           {/* Filtro por Nicho do Lead */}
           <div className="flex items-center gap-1.5 bg-white border border-neutral-300 rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-neutral-50 transition-colors w-full sm:w-auto">
             <Briefcase className="w-3.5 h-3.5 text-amber-600 shrink-0" />

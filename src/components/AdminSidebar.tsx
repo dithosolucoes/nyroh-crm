@@ -26,6 +26,7 @@ export type AdminViewSection =
   | 'usuarios'
   | 'carteiras'
   | 'vendedores'
+  | 'estrutura'
   | 'auditoria'
   | 'blindagem'
   | 'whatsapp';
@@ -141,6 +142,20 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                 <div className="flex items-center gap-2.5">
                   <Users className="w-4 h-4 text-neutral-400" />
                   <span>Gestão da Equipe</span>
+                </div>
+              </button>
+
+              <button
+                onClick={() => onChangeSection('estrutura')}
+                className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  currentSection === 'estrutura'
+                    ? 'bg-neutral-900 text-white font-bold shadow-xs'
+                    : 'text-neutral-700 hover:bg-neutral-100'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <Layers className={`w-4 h-4 ${currentSection === 'estrutura' ? 'text-white' : 'text-neutral-400'}`} />
+                  <span>Estrutura: marcas, números, central</span>
                 </div>
               </button>
 

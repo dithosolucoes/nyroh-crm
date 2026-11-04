@@ -13,6 +13,7 @@ import JSZip from 'jszip';
 import pg from 'pg';
 import { Lead, CallLog, ColumnStatus, PIPELINE_COLUMNS, CustomTag, Salesperson, DistributeLeadsParams, User, AuditLog, QuickReply } from './src/types.js';
 import { getLeadNiche } from './src/lib/niche.js';
+import { registerUxRoutes } from './src/lib/uxRoutes.js';
 import { hashPassword, verifyPassword, generateSessionToken, DEFAULT_USERS, StoredUser, isUserAdmin } from './src/lib/serverAuth.js';
 import { performWebsiteAudit } from './src/lib/auditEngine.js';
 import { executeFluxoRequest, downloadFluxoMediaBinary, prepareOutboundMedia, fluxoInstancePath, hasFfmpeg } from './src/lib/fluxoClient.js';
@@ -9378,6 +9379,7 @@ app.get('/api/campaign/leads', async (req, res) => {
           sent_at AS "sentAt",
           responded_at AS "respondedAt",
           response_preview AS "responsePreview",
+          CASE WHEN status = 'FALHA' THEN notes END AS "failureNote",
           assigned_salesperson_id AS "assignedSalespersonId",
           assigned_salesperson_name AS "assignedSalespersonName",
           created_at AS "createdAt"
@@ -11956,6 +11958,14 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   res.status(status).json({
     error: err.message || 'Erro interno no servidor.'
   });
+});
+
+// Experiências de UX: marcas, números, central de leads e bloqueio com aprovação.
+registerUxRoutes(app, {
+  getPool: () => (usePostgres ? pgPool : null),
+  currentUser: (req: any) => req.user,
+  isAdmin: (user: any) => isUserAdmin(user),
+  getLeadOwnerId,
 });
 
 // START SERVER & VITE INTEGRATION
