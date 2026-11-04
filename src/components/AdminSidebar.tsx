@@ -490,6 +490,15 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                     </button>
 
                     <button
+                      onClick={() => { onChangeSection('estrutura'); }}
+                      className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-semibold ${
+                        currentSection === 'estrutura' ? 'bg-neutral-900 text-white' : 'text-neutral-700 hover:bg-neutral-100'
+                      }`}
+                    >
+                      <Layers className="w-4 h-4" />
+                      <span>Estrutura: marcas, números, central</span>
+                    </button>
+                    <button
                       onClick={() => {
                         onChangeSection('carteiras');
                         setMobileMenuOpen(false);

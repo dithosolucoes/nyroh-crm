@@ -232,6 +232,8 @@ export interface CampaignLead {
   respondedAt?: string;
   responsePreview?: string;
   failureNote?: string; // motivo da falha na entrega (vem de notes quando status = FALHA)
+  deliveryStatus?: 'sent' | 'delivered' | 'read' | 'failed' | string | null; // estado real vindo de lead_messages
+  deliveryError?: string | null;
   assignedSalespersonId?: string;
   assignedSalespersonName?: string;
   createdAt: string;

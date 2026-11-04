@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutGrid, Table, FileArchive, Sparkles, Tag, BarChart3, Menu, X, Users, MessageSquare, UserCheck, ChevronRight, Shield, LogOut, KeyRound } from 'lucide-react';
+import { CalendarClock, LayoutGrid, Table, FileArchive, Sparkles, Tag, BarChart3, Menu, X, Users, MessageSquare, UserCheck, ChevronRight, Shield, LogOut, KeyRound } from 'lucide-react';
 import { Salesperson, User } from '../types';
 import { getSalespersonSlug } from '../lib/salesperson';
 import { isUiFlagOn } from '../lib/uiFlags';
@@ -7,7 +7,7 @@ const SHOW_SEED_SAMPLES = isUiFlagOn(import.meta.env.VITE_MOSTRAR_SEED);
 
 interface SidebarProps {
   activeTab: 'admin' | 'kanban' | 'table' | 'dashboard' | 'whatsapp' | 'hoje';
-  setActiveTab: (tab: 'admin' | 'kanban' | 'table' | 'dashboard' | 'whatsapp') => void;
+  setActiveTab: (tab: 'admin' | 'kanban' | 'table' | 'dashboard' | 'whatsapp' | 'hoje') => void;
   onOpenZipModal: () => void;
   onOpenTagsModal: () => void;
   onOpenSalesTeamModal: () => void;
@@ -147,6 +147,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <div className="flex items-center gap-2 min-w-0">
                 <Table className="w-4 h-4 text-neutral-500 shrink-0" />
                 <span className="truncate">Lista Geral</span>
+              </div>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('hoje')}
+              className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                activeTab === 'hoje'
+                  ? 'bg-neutral-100 text-neutral-900 font-semibold'
+                  : 'text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900'
+              }`}
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <CalendarClock className="w-4 h-4 text-neutral-500 shrink-0" />
+                <span className="truncate">Meu dia</span>
               </div>
             </button>
 
@@ -422,6 +436,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <span className="text-[10px] font-mono bg-neutral-200 text-neutral-700 px-2 py-0.5 rounded-full">
                     {totalLeads}
                   </span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setActiveTab('hoje');
+                    setMobileMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between p-2.5 rounded-lg text-xs font-medium ${
+                    activeTab === 'hoje' ? 'bg-neutral-100 text-neutral-900 font-bold' : 'text-neutral-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <CalendarClock className="w-4 h-4 text-neutral-500" />
+                    <span>Meu dia</span>
+                  </div>
                 </button>
 
                 <button

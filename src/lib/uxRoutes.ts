@@ -32,6 +32,26 @@ interface UxDeps {
 
 const SCHEMA_FLAG = 'NYROH_APLICAR_MIGRACOES_UX';
 
+/** Verdadeiro quando o schema de UX está liberado (flag ligada). Só então as consultas usam as colunas novas. */
+export const uxSchemaOn = (): boolean => process.env[SCHEMA_FLAG] === 'true';
+
+/** Aplica a migração de UX (idempotente). Chamado no boot só com a flag ligada. */
+export async function applyUxMigration(pool: pg.Pool): Promise<void> {
+  const { default: fs } = await import('fs');
+  const path = await import('path');
+  const sql = fs.readFileSync(path.resolve(process.cwd(), 'migrations', '2026-11-ux-experiencias.sql'), 'utf8');
+  await pool.query(sql);
+  console.log('[UX] migração de UX aplicada (flag NYROH_APLICAR_MIGRACOES_UX=true).');
+}
+
+/** Cria uma remessa para um upload e devolve o id. Sem o schema de UX, devolve null. */
+export async function abrirRemessa(pool: pg.Pool | null, nome: string): Promise<string | null> {
+  if (!pool || !uxSchemaOn()) return null;
+  const id = `rem_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`;
+  await pool.query(`INSERT INTO remessas (id, name) VALUES ($1, $2)`, [id, nome.slice(0, 250)]);
+  return id;
+}
+
 export function registerUxRoutes(app: Express, deps: UxDeps): void {
   let schemaReady = false;
 
@@ -145,6 +165,28 @@ export function registerUxRoutes(app: Express, deps: UxDeps): void {
       [id, label, req.body?.phoneDisplay || null, req.body?.metaPhoneNumberId || null, req.body?.fluxoInstanceId || null]
     );
     res.status(201).json({ id, label });
+  }));
+
+  /** Liga a safra (campanha) a uma marca. Só admin (rota /api/campaign/ já é restrita). */
+  app.put('/api/campaign/batches/:id/brand', withDb(async (pool, req, res) => {
+    if (!requireAdmin(req, res)) return;
+    const brandId = req.body?.brandId ? String(req.body.brandId) : null;
+    await pool.query(`UPDATE campaign_batches SET brand_id = $1 WHERE id = $2`, [brandId, req.params.id]);
+    res.json({ batchId: req.params.id, brandId });
+  }));
+
+  /** Histórico de pedidos de bloqueio de um lead (admin vê todos; vendedor só os seus). */
+  app.get('/api/leads/:id/block-requests', withDb(async (pool, req, res) => {
+    const user = deps.currentUser(req);
+    if (!user) return res.status(401).json({ error: 'Não autenticado.' });
+    const owner = await deps.getLeadOwnerId(req.params.id);
+    if (owner === undefined) return res.status(404).json({ error: 'Lead não encontrado.' });
+    if (!deps.isAdmin(user) && owner !== user.salespersonId) return res.status(403).json({ error: 'Lead de outro vendedor.' });
+    const r = await pool.query(
+      `SELECT id, reason_code AS "reasonCode", reason_text AS "reasonText", status, decision_note AS "decisionNote",
+              requested_at AS "requestedAt", decided_at AS "decidedAt"
+       FROM lead_block_requests WHERE lead_id = $1 ORDER BY requested_at DESC LIMIT 50`, [req.params.id]);
+    res.json(r.rows);
   }));
 
   // ---------- Central de leads ----------

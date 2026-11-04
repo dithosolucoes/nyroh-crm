@@ -62,3 +62,6 @@ CREATE TABLE IF NOT EXISTS lead_block_requests (
   decided_at TIMESTAMP WITH TIME ZONE
 );
 CREATE INDEX IF NOT EXISTS idx_block_requests_status ON lead_block_requests(status);
+
+-- Safra (campanha) ligada a uma marca. Os números usados vêm do vínculo marca ↔ número.
+ALTER TABLE campaign_batches ADD COLUMN IF NOT EXISTS brand_id VARCHAR(255) REFERENCES brands(id);

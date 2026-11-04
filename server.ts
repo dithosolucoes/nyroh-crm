@@ -13,7 +13,7 @@ import JSZip from 'jszip';
 import pg from 'pg';
 import { Lead, CallLog, ColumnStatus, PIPELINE_COLUMNS, CustomTag, Salesperson, DistributeLeadsParams, User, AuditLog, QuickReply } from './src/types.js';
 import { getLeadNiche } from './src/lib/niche.js';
-import { registerUxRoutes } from './src/lib/uxRoutes.js';
+import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa } from './src/lib/uxRoutes.js';
 import { hashPassword, verifyPassword, generateSessionToken, DEFAULT_USERS, StoredUser, isUserAdmin } from './src/lib/serverAuth.js';
 import { performWebsiteAudit } from './src/lib/auditEngine.js';
 import { executeFluxoRequest, downloadFluxoMediaBinary, prepareOutboundMedia, fluxoInstancePath, hasFfmpeg } from './src/lib/fluxoClient.js';
@@ -1354,6 +1354,7 @@ async function initDatabase(retries = 5, delayMs = 3000) {
         client.release();
         pgPool = pool;
         usePostgres = true;
+        if (uxSchemaOn()) { await applyUxMigration(pool).catch((e: any) => console.error('[UX] migração falhou:', e?.message)); }
         dbBootDone = true;
         if (dbReconnectTimer) {
           clearTimeout(dbReconnectTimer);
@@ -5698,6 +5699,9 @@ app.get('/api/leads', async (req: any, res) => {
         params.push(salespersonId);
         whereClause = ` WHERE l.salesperson_id = $1`;
       }
+      if (uxSchemaOn()) {
+        whereClause += (whereClause ? ' AND' : ' WHERE') + ' l.blocked_at IS NULL'; // bloqueados saem da base principal
+      }
 
       const query = `
         WITH call_stats AS (
@@ -7460,7 +7464,8 @@ async function cortarJaContatados(): Promise<number> {
 }
 
 // Helper function to process lead items (shared between zip upload and batch JSON API)
-async function processLeadItems(items: any[]) {
+async function processLeadItems(items: any[], remessaNome?: string) {
+  const remessaId = remessaNome && usePostgres && pgPool ? await abrirRemessa(pgPool, remessaNome).catch(() => null) : null;
   let totalProcessed = 0;
   let insertedCount = 0;
   let skippedDuplicates = 0;
@@ -7530,6 +7535,9 @@ async function processLeadItems(items: any[]) {
         [leadId, name, phoneNumber, publicUrl, website, salespersonId, salespersonName, niche, categoriesStr, JSON.stringify(data)]
       );
 
+      if (remessaId) {
+        await pgPool.query(`UPDATE leads SET remessa_id = COALESCE(remessa_id, $1) WHERE id = $2`, [remessaId, leadId]).catch(() => {});
+      }
       if (upsertRes.rows[0]?.is_inserted) {
         insertedCount++;
       } else {
@@ -7870,7 +7878,7 @@ app.post('/api/upload-zip', diskUpload.single('zipFile') as any, async (req, res
       }
     }
 
-    const stats = await processLeadItems(allItems);
+    const stats = await processLeadItems(allItems, `Upload ZIP ${new Date().toLocaleString('pt-BR')}`);
 
     // Limpa o arquivo temporário após o término
     await fs.promises.unlink(tempFilePath).catch(() => {});
@@ -8200,7 +8208,7 @@ app.post('/api/leads/batch', async (req, res) => {
       return res.status(400).json({ error: 'Formato inválido. Esperado array de items.' });
     }
 
-    const stats = await processLeadItems(items);
+    const stats = await processLeadItems(items, `Lote JSON ${new Date().toLocaleString('pt-BR')}`);
     return res.json(stats);
   } catch (error: any) {
     console.error('Error handling batch leads:', error);
@@ -9380,6 +9388,12 @@ app.get('/api/campaign/leads', async (req, res) => {
           responded_at AS "respondedAt",
           response_preview AS "responsePreview",
           CASE WHEN status = 'FALHA' THEN notes END AS "failureNote",
+          (SELECT lm.status FROM lead_messages lm
+            WHERE lm.whatsapp_message_id IS NOT NULL AND lm.whatsapp_message_id = campaign_leads.whatsapp_message_id
+            ORDER BY lm.status_rank DESC NULLS LAST LIMIT 1) AS "deliveryStatus",
+          (SELECT lm.error_message FROM lead_messages lm
+            WHERE lm.whatsapp_message_id IS NOT NULL AND lm.whatsapp_message_id = campaign_leads.whatsapp_message_id
+            ORDER BY lm.status_rank DESC NULLS LAST LIMIT 1) AS "deliveryError",
           assigned_salesperson_id AS "assignedSalespersonId",
           assigned_salesperson_name AS "assignedSalespersonName",
           created_at AS "createdAt"
@@ -12019,7 +12033,7 @@ async function main() {
             } catch (e) {}
           }
         }
-        const stats = await processLeadItems(allItems);
+        const stats = await processLeadItems(allItems, `Upload ZIP (fila) ${new Date().toLocaleString('pt-BR')}`);
         broadcastSocketEvent('zip_import_completed', {
           originalFileName: jobData.originalFileName,
           stats,

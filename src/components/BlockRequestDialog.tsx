@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { X } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { X, Ban } from 'lucide-react';
 
 export const MOTIVOS_BLOQUEIO_UI: Array<{ code: string; label: string }> = [
   { code: 'sem_whatsapp', label: 'Sem WhatsApp / número inválido' },
@@ -71,6 +71,38 @@ export const BlockRequestDialog: React.FC<Props> = ({ leadId, leadName, onClose,
           <button onClick={enviar} disabled={sending} className="px-3 py-1.5 rounded-lg text-xs font-bold bg-neutral-900 text-white disabled:opacity-50">{sending ? 'Enviando…' : 'Enviar para aprovação'}</button>
         </div>
       </div>
+    </div>
+  );
+};
+
+interface BlockHistoryItem { id: string; reasonCode: string; reasonText?: string; status: string; decisionNote?: string; requestedAt: string; decidedAt?: string }
+const STATUS_LABEL: Record<string, string> = { pendente: 'aguardando admin', aprovado: 'bloqueado', recusado: 'recusado' };
+
+/** Histórico de pedidos de bloqueio do lead. Vazio = não aparece. */
+export const BlockHistory: React.FC<{ leadId: string; refreshKey?: number }> = ({ leadId, refreshKey }) => {
+  const [items, setItems] = useState<BlockHistoryItem[]>([]);
+  useEffect(() => {
+    let alive = true;
+    fetch(`/api/leads/${leadId}/block-requests`)
+      .then(r => (r.ok ? r.json() : []))
+      .then(d => { if (alive && Array.isArray(d)) setItems(d); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [leadId, refreshKey]);
+  if (items.length === 0) return null;
+  return (
+    <div className="mx-4 mt-2 p-2.5 rounded-lg bg-neutral-50 border border-neutral-200 text-xs text-neutral-700">
+      <p className="font-bold mb-1 flex items-center gap-1"><Ban className="w-3 h-3" /> Histórico de bloqueio</p>
+      <ul className="space-y-1">
+        {items.map(i => (
+          <li key={i.id}>
+            <span className="font-semibold">{MOTIVOS_BLOQUEIO_UI.find(m => m.code === i.reasonCode)?.label || i.reasonCode}</span>
+            {i.reasonText ? ` — ${i.reasonText}` : ''}
+            <span className="text-neutral-500"> · {STATUS_LABEL[i.status] || i.status} · {new Date(i.requestedAt).toLocaleDateString('pt-BR')}</span>
+            {i.decisionNote ? <span className="text-neutral-500"> · {i.decisionNote}</span> : null}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 };

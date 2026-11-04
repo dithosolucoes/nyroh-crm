@@ -4,10 +4,12 @@ import {
   X, Phone, ExternalLink, Calendar, MessageSquare, Plus, CheckCircle2, 
   QrCode, Tag as TagIcon, Play, Pause, RotateCcw, Clock, ArrowRight, PhoneCall, PhoneOff,
   CalendarClock, AlertTriangle, Bell, User, Sparkles, ChevronRight, Zap, History, Briefcase,
-  Inbox, Star, Trophy, XCircle, Trash2, Globe, Copy, Check, FileSearch, Download, Pencil
+  Inbox, Star, Trophy, XCircle, Trash2, Globe, Copy, Check, FileSearch, Download, Pencil,
+  Ban
 } from 'lucide-react';
 import { openWhatsApp, getStoredWhatsAppAppType, setStoredWhatsAppAppType, WhatsAppAppType, getDialerTelLink, getStoredWhatsAppTemplate, formatWhatsAppMessage } from '../lib/phone';
 import { QrCodeModal } from './QrCodeModal';
+import { BlockRequestDialog, BlockHistory } from './BlockRequestDialog';
 import { AuditReportModal } from './AuditReportModal';
 import { WebsiteAuditReport } from '../types/audit';
 import { getFollowUpInfo } from '../lib/followUp';
@@ -66,6 +68,8 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
   onShowToast
 }) => {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [blockOpen, setBlockOpen] = useState(false);
+  const [blockRefresh, setBlockRefresh] = useState(0);
   const [comment, setComment] = useState('');
   const [selectedColumn, setSelectedColumn] = useState<ColumnStatus>('Leads');
   const [subStatus, setSubStatus] = useState<string>('Contato Feito');
@@ -488,6 +492,10 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
 
   return (
     <>
+    {blockOpen && lead && (
+      <BlockRequestDialog leadId={lead.id} leadName={lead.name} onClose={() => setBlockOpen(false)} onSent={(msg) => { setBlockRefresh(x => x + 1); onShowToast(msg); }} />
+    )}
+    <>
       <div 
         className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-0 sm:p-4 overflow-hidden animate-in fade-in duration-150"
         onClick={(e) => {
@@ -533,6 +541,15 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
 
               {/* Action Buttons */}
               <div className="flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setBlockOpen(true)}
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-neutral-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                  title="Sugerir bloqueio deste lead (o admin aprova)"
+                  aria-label="Sugerir bloqueio"
+                >
+                  <Ban className="w-4 h-4" />
+                </button>
                 {onDeleteLead && (
                   <button
                     type="button"
@@ -561,6 +578,8 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                 </button>
               </div>
             </div>
+
+            <BlockHistory leadId={lead.id} refreshKey={blockRefresh} />
 
             {/* Direct Quick Action Bar (Discar, WhatsApp, Site da Nyroh) */}
             <div className="flex flex-wrap items-center gap-2 mt-2.5 pt-2.5 border-t border-neutral-100">
@@ -1423,6 +1442,7 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
         onRefresh={() => fetchWebsiteAudit(lead.id)}
         sellerName={currentSeller?.name || currentUser?.name || 'Especialista Nyroh'}
       />
+    </>
     </>
   );
 };

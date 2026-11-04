@@ -68,28 +68,28 @@ import { isUiFlagOn } from '../lib/uiFlags';
 const SHOW_SIMULATE = isUiFlagOn(import.meta.env.VITE_MOSTRAR_SIMULAR);
 /** Estado real do disparo: falhou (com motivo), lido/respondeu, ou ainda sem confirmação de entrega. */
 const DispatchStateLine: React.FC<{ lead: CampaignLead }> = ({ lead }) => {
-  if (lead.status === 'FALHA' || lead.failureNote) {
-    const motivo = (lead.failureNote || '').replace(/^\s*\[?Falha[^:]*:\s*/i, '').replace(/\]\s*$/, '').trim();
+  const motivoFalha = (lead.deliveryError || (lead.failureNote || '').replace(/^\s*\[?Falha[^:]*:\s*/i, '').replace(/\]\s*$/, '')).trim();
+  const estado = lead.status === 'FALHA' || lead.deliveryStatus === 'failed' ? 'falhou'
+    : lead.deliveryStatus === 'read' || lead.respondedAt ? 'lido'
+    : lead.deliveryStatus === 'delivered' ? 'entregue'
+    : 'enviado';
+  if (estado === 'falhou') {
     return (
       <div className="p-1.5 bg-rose-50 rounded border border-rose-200 text-[10px] text-rose-800">
         <span className="flex items-center gap-1 font-bold"><AlertTriangle className="w-3 h-3" /> Falhou</span>
-        <span className="block mt-0.5">{motivo || 'Motivo não informado pela API.'}</span>
+        <span className="block mt-0.5">{motivoFalha || 'Motivo não informado pela API.'}</span>
       </div>
     );
   }
-  if (lead.respondedAt) {
-    return (
-      <div className="p-1.5 bg-emerald-50 rounded border border-emerald-200 text-[10px] text-emerald-800 flex items-center gap-1 font-semibold">
-        <CheckCircle2 className="w-3 h-3" /> Respondeu {lead.sentAt ? '' : ''}
-      </div>
-    );
-  }
+  const visual = {
+    lido: { label: 'Lido', cls: 'bg-emerald-50 border-emerald-200 text-emerald-800', icon: <CheckCircle2 className="w-3 h-3" /> },
+    entregue: { label: 'Entregue', cls: 'bg-sky-50 border-sky-200 text-sky-800', icon: <CheckCircle2 className="w-3 h-3" /> },
+    enviado: { label: 'Enviado à Meta', cls: 'bg-neutral-50 border-neutral-200 text-neutral-700', icon: <Send className="w-3 h-3" /> },
+  }[estado];
   return (
-    <div className="p-1.5 bg-neutral-50 rounded border border-neutral-200 text-[10px] text-neutral-600 flex items-center justify-between">
-      <span className="flex items-center gap-1 text-neutral-700 font-semibold">
-        <Send className="w-3 h-3" /> Enviado à Meta
-      </span>
-      <span className="text-neutral-400">aguardando confirmação de entrega</span>
+    <div className={`p-1.5 rounded border text-[10px] flex items-center justify-between ${visual.cls}`}>
+      <span className="flex items-center gap-1 font-semibold">{visual.icon} {visual.label}</span>
+      {estado === 'enviado' && <span className="text-neutral-400">aguardando confirmação</span>}
     </div>
   );
 };
@@ -157,6 +157,10 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   const instanceLabel = formatInstancePhone(runtime.instancePhone);
   const [activeTab, setActiveTab] = useState<SubPageTab>('kanban');
   const [batches, setBatches] = useState<CampaignBatch[]>([]);
+  const [brandOptions, setBrandOptions] = useState<Array<{ id: string; name: string }>>([]);
+  useEffect(() => {
+    fetch('/api/brands').then(r => (r.ok ? r.json() : [])).then(d => { if (Array.isArray(d)) setBrandOptions(d); }).catch(() => {});
+  }, []);
   const [selectedBatchId, setSelectedBatchId] = useState<string>('');
   const [leads, setLeads] = useState<CampaignLead[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -1638,6 +1642,34 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
 
         {/* Safra Picker & Actions */}
         <div className="flex items-center flex-wrap gap-2.5">
+          {currentBatch && (
+            <div className="flex items-center gap-2 bg-neutral-100 border border-neutral-200 rounded-xl px-3 py-1.5">
+              <span className="text-xs text-neutral-500 font-semibold">Marca:</span>
+              <select
+                value={(currentBatch as any).brandId || ''}
+                onChange={async (e) => {
+                  const brandId = e.target.value || null;
+                  try {
+                    const res = await fetch(`/api/campaign/batches/${currentBatch.id}/brand`, {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ brandId }),
+                    });
+                    if (!res.ok) throw new Error();
+                    setBatches(prev => prev.map(b => (b.id === currentBatch.id ? ({ ...b, brandId } as any) : b)));
+                  } catch {
+                    setActionNotification({ type: 'error', message: 'Não foi possível ligar a safra à marca.' });
+                  }
+                }}
+                className="bg-transparent text-neutral-900 text-xs font-bold focus:outline-none cursor-pointer max-w-[180px]"
+              >
+                <option value="" className="bg-white">Sem marca</option>
+                {brandOptions.map(b => (
+                  <option key={b.id} value={b.id} className="bg-white">{b.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className="flex items-center gap-2 bg-neutral-100 border border-neutral-200 rounded-xl px-3 py-1.5">
             <span className="text-xs text-neutral-500 font-semibold">Campanha:</span>
             <select
