@@ -39,11 +39,22 @@ Estrutura de telas alvo: `docs/BLUEPRINT-TELAS.md`.
 |---|------|--------|-----------|--------------|
 | 17 | Card do Pipeline: "Sem próxima ação" | Feito (tsc) | `KanbanCard.tsx` | Lead aberto sem retorno agendado |
 | 18 | Card do Pipeline: contador de contatos do dia | Feito (tsc): selo 'N contatos hoje' (`contatosHoje` em `/api/leads`) | `KanbanCard.tsx`, `server.ts` (`/api/leads`), índice em `campaign_leads(sent_at)` na migração | Lead disparado hoje mostra o selo |
-| 18b | Card do Pipeline: marca do lead | Pendente de decisão: um lead pode estar em mais de uma marca. Falta escolher se o lead guarda uma marca principal | — | — |
+| 18b | Card do Pipeline: marcas que já abordaram o lead | Feito (tsc, `contato_marcas` gravado no envio): cada marca aparece como selo no card | `ThomasWhatsAppDesktopView.tsx` não; `KanbanCard.tsx`, `server.ts` (`/api/leads`, envio), tabela `contato_marcas` | Disparar com uma marca e ver o selo; disparar com outra e ver os dois |
 | 19 | Selo "já contatado hoje" por remessa | Feito | `GET /api/central/remessas` (`contatadosHoje`) | Central de leads |
-| 20 | Selo "já contatado" nos cards e na seleção de blocos | Parcial: cards e Central feitos; falta a seleção de blocos. 'Bloqueado' não se aplica ao Kanban (bloqueados já saem da lista) | `KanbanCard.tsx`, `AdminEstruturaView.tsx` | Central e Kanban |
+| 20 | Selo "já contatado" nos cards e na seleção de blocos | Feito (tsc): cards, Central e blocos. 'Bloqueado' não se aplica ao Kanban (bloqueados já saem da lista) | `KanbanCard.tsx`, `AdminEstruturaView.tsx`, `GET /api/central/selections` | Central de leads |
 | 21 | Linha do tempo do lead e contador de toques (aviso em 8) | Feito (tsc) | `LeadTimeline.tsx` no `LeadDetailModal.tsx` | Abrir um lead com ligações e mensagens |
 | 22 | Permissões: vendedor só vê a própria carteira | Feito no servidor (guarda em `/api/leads/:id`); central e números só admin | `server.ts` (`assertLeadAccess`), `uxRoutes.ts` | Testar com uma conta de vendedor |
+
+## Regras de contato (configuráveis)
+
+| # | Item | Estado | Onde está | Como validar |
+|---|------|--------|-----------|--------------|
+| 23 | Tabela `regras_contato` com as regras padrão | Feito (testado com Postgres) | `migrations/2026-11-ux-experiencias.sql` | `npm run test:regras` |
+| 24 | Disparo monta o filtro a partir das regras ativas | Feito (testado com Postgres, 7/7) | `src/lib/uxRoutes.ts` (`regrasDeContatoSql`), `server.ts` (`/api/campaign/dispatch`) | `npm run test:regras` |
+| 25 | Tela Configurações > Regras de contato: editar, ativar, criar, apagar e prévia | Feito (API testada; tela pendente de olhar) | `AdminEstruturaView.tsx` (aba `regras`), `GET/POST/PATCH/DELETE /api/regras-contato` | Abrir a tela e mudar uma regra |
+| 26 | Bloqueio pelo admin continua fixo no filtro (não é regra configurável) | Feito | `regrasDeContatoSql` | `npm run test:regras` |
+
+Regras padrão: "Um contato por dia (todas as marcas)" e "Não reenviar após resposta (para sempre)". Ambas reproduzem o comportamento anterior. A regra "para sempre" pode ser trocada por uma janela na tela, se você decidir relaxar.
 
 ## Fora do código (depende de você ou de terceiros)
 
