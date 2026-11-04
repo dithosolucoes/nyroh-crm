@@ -93,3 +93,12 @@ Baseado em CRMs de vendas (Pipedrive: pipeline como centro) e em boas práticas 
 
 - Telas de conexão e login (`LoginScreen`).
 - Modais de ação rápida (respostas rápidas, tags, QR code, trocar senha): continuam como modais, abertos a partir de qualquer grupo.
+
+## Estado da implementação (branch ux/organizacao-menu)
+
+- Fase 1: textos de desenvolvimento ("Railway Ready", "Mobile Mode Active") removidos da interface. Gerar leads de exemplo só aparece com a flag de exemplos.
+- Fase 2: um único menu (`src/components/MenuLateral.tsx`) para admin e vendedor, com itens filtrados por perfil. Os menus antigos (`Sidebar.tsx`, `AdminSidebar.tsx`) foram removidos. O menu do admin agora inclui Lista de leads e Relatórios.
+- Fase 3: "Conversas" abre a conversa (ThomasWhatsAppDesktopView). Antes, no admin, abria o painel da FluxoAPI. O painel da FluxoAPI foi para Configurações > Integrações. Campanhas tem um único caminho (`/admin/campanhas`). A barra interna duplicada do painel admin foi removida.
+- Fase 4: a tela segue a URL (`/pipeline`, `/lista`, `/conversas`, `/relatorios`, `/hoje`, `/admin/leads`, `/admin/campanhas`, `/admin/configuracoes`, `/admin/equipe`, `/admin/carteiras`, `/admin/vendedores`, `/admin/auditoria`). Voltar e avançar do navegador funcionam. Links `/v/<vendedor>` continuam como antes. Mapa em `src/lib/rotas.ts`.
+- Fase 5 (dividir `server.ts` e as views grandes): não executada nesta entrega. Precisa de banco de testes ativo para validar cada divisão.
+- Pendente: conferir o layout no navegador. A verificação feita foi de tipos, build de produção e testes automáticos.

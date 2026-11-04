@@ -585,76 +585,6 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
           </div>
         </div>
 
-        {/* Inner Admin Navigation Tabs */}
-        <div className="flex items-center gap-2 mt-4 pt-2 overflow-x-auto">
-          <button
-            onClick={() => {
-              setActiveSubTab('cockpit');
-              onChangeSection?.('cockpit');
-            }}
-            className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold border transition-all whitespace-nowrap ${
-              activeSubTab === 'cockpit'
-                ? 'bg-neutral-900 text-white border-neutral-900 shadow-2xs'
-                : 'bg-white text-neutral-600 hover:bg-neutral-50 border-neutral-200'
-            }`}
-          >
-            <LayoutDashboard className="w-3.5 h-3.5" />
-            <span>Cockpit Geral da Operação</span>
-          </button>
-
-          {isUiFlagOn(import.meta.env.VITE_MOSTRAR_INFRA) && (
-          <button
-            onClick={() => {
-              setActiveSubTab('blindagem');
-              onChangeSection?.('blindagem');
-            }}
-            className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold border transition-all whitespace-nowrap ${
-              activeSubTab === 'blindagem'
-                ? 'bg-neutral-900 text-white border-neutral-900 shadow-2xs'
-                : 'bg-white text-neutral-600 hover:bg-neutral-50 border-neutral-200'
-            }`}
-          >
-            <Lock className="w-3.5 h-3.5" />
-            <span>Blindagem & Infraestrutura</span>
-          </button>
-          )}
-
-          <button
-            onClick={() => {
-              setActiveSubTab('whatsapp');
-              onChangeSection?.('whatsapp');
-            }}
-            className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold border transition-all whitespace-nowrap ${
-              activeSubTab === 'whatsapp'
-                ? 'bg-emerald-950 text-white border-emerald-900 shadow-2xs'
-                : 'bg-white text-emerald-900 hover:bg-emerald-50/60 border-emerald-200'
-            }`}
-          >
-            <MessageSquare className="w-3.5 h-3.5 text-emerald-500" />
-            <span>WhatsApp Oficial (FluxoAPI)</span>
-            <span className="text-[9px] bg-emerald-500 text-white px-1.5 py-0.5 rounded-full font-bold">
-              META
-            </span>
-          </button>
-
-          <button
-            onClick={() => {
-              setActiveSubTab('disparos');
-              onChangeSection?.('disparos');
-            }}
-            className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold border transition-all whitespace-nowrap ${
-              activeSubTab === 'disparos'
-                ? 'bg-emerald-600 text-white border-emerald-600 shadow-2xs'
-                : 'bg-white text-emerald-900 hover:bg-emerald-50/60 border-emerald-200'
-            }`}
-          >
-            <Send className="w-3.5 h-3.5 text-emerald-500" />
-            <span>Disparos & Campanhas</span>
-            <span className="text-[9px] bg-emerald-500 text-white px-1.5 py-0.5 rounded-full font-bold">
-              NOVO
-            </span>
-          </button>
-        </div>
       </div>
 
       {/* Main Tab Content Area */}
@@ -1673,24 +1603,6 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
           </div>
         )}
 
-        {/* TAB 5: WHATSAPP CLOUD API OFICIAL (FLUXOAPI) */}
-        {activeSubTab === 'whatsapp' && (
-          <AdminWhatsAppFluxoView
-            currentUser={currentUser}
-            onShowToast={onShowToast}
-          />
-        )}
-
-        {/* TAB 6: DISPAROS & CAMPANHAS EM MASSA (META API & STAGING) */}
-        {activeSubTab === 'disparos' && (
-          <div className="-m-4 sm:-m-6">
-            <AdminCampaignDisparosView
-              salespeople={salespeople}
-              currentUser={currentUser}
-              onLeadsUpdated={onRefreshData}
-            />
-          </div>
-        )}
       </div>
 
       {/* Modal: Criar Novo Usuário */}

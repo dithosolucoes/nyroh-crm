@@ -1,7 +1,8 @@
 import { onRealtime, prepararNotificacoes, notificarSeEmSegundoPlano } from './lib/realtime';
 import React, { useState, useEffect, useCallback, useMemo, useDeferredValue, useRef } from 'react';
 import { Lead, ColumnStatus, CustomTag, Salesperson, User } from './types';
-import { Sidebar } from './components/Sidebar';
+import { MenuLateral } from './components/MenuLateral';
+import { caminhoDe, destinoDoCaminho, Destino, SecaoAdmin, AbaPrincipal } from './lib/rotas';
 import { KanbanBoard } from './components/KanbanBoard';
 import { CommandPalette } from './components/CommandPalette';
 import { MeuDia } from './components/MeuDia';
@@ -16,7 +17,6 @@ import { SalesTeamModal } from './components/SalesTeamModal';
 import { WhatsAppSettingsModal } from './components/WhatsAppSettingsModal';
 import { LoginScreen } from './components/LoginScreen';
 import { AdminDashboardView } from './components/AdminDashboardView';
-import { AdminSidebar, AdminViewSection } from './components/AdminSidebar';
 import { AdminSellerInspectionView } from './components/AdminSellerInspectionView';
 import { AdminCampaignDisparosView } from './components/AdminCampaignDisparosView';
 import { ThomasWhatsAppDesktopView } from './components/ThomasWhatsAppDesktopView';
@@ -34,7 +34,8 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [isAdminCockpitOpen, setIsAdminCockpitOpen] = useState(false);
-  const [adminSection, setAdminSection] = useState<AdminViewSection>('cockpit');
+  const estadoInicialDaUrl = typeof window !== 'undefined' ? destinoDoCaminho(window.location.pathname) : null;
+  const [adminSection, setAdminSection] = useState<SecaoAdmin>(estadoInicialDaUrl?.section ?? 'cockpit');
   const [inspectedSellerId, setInspectedSellerId] = useState<string>('ALL');
 
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -47,7 +48,7 @@ export default function App() {
   const [websiteFilter, setWebsiteFilter] = useState<'ALL' | 'PRIORITIZE_WITH' | 'PRIORITIZE_WITHOUT' | 'ONLY_WITH' | 'ONLY_WITHOUT'>('ALL');
   const [routeSalespersonSlug, setRouteSalespersonSlug] = useState<string | null>(null);
   const [loadingLeads, setLoadingLeads] = useState(true);
-  const [activeTab, setActiveTab] = useState<'admin' | 'kanban' | 'table' | 'dashboard' | 'whatsapp' | 'hoje'>('kanban');
+  const [activeTab, setActiveTab] = useState<AbaPrincipal>(estadoInicialDaUrl?.tab ?? 'kanban');
   const [selectedTagFilters, setSelectedTagFilters] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [whatsappInitialLeadId, setWhatsappInitialLeadId] = useState<string | undefined>();
@@ -158,10 +159,36 @@ export default function App() {
     };
   }, []);
 
+  // Fase 4: a tela segue a URL (/pipeline, /admin/leads...). Links /v/<vendedor> continuam como antes.
+  const primeiraSincronizacao = useRef(true);
+  useEffect(() => {
+    if (!currentUser) return;
+    if (currentUser.role !== 'admin' && activeTab === 'admin') {
+      setActiveTab('kanban');
+      return;
+    }
+    if (primeiraSincronizacao.current) {
+      primeiraSincronizacao.current = false;
+      return;
+    }
+    if (window.location.pathname.startsWith('/v/')) return;
+    const alvo = caminhoDe(activeTab === 'admin' ? { tab: 'admin', section: adminSection } : { tab: activeTab });
+    if (window.location.pathname !== alvo) window.history.pushState({}, '', alvo);
+  }, [activeTab, adminSection, currentUser]);
+
   // Listen to popstate (browser back/forward button)
   useEffect(() => {
     const handlePopState = () => {
       parseCurrentRoute(salespeople);
+      if (window.location.pathname.startsWith('/v/')) return;
+      const destino = destinoDoCaminho(window.location.pathname);
+      if (!destino) return;
+      if (destino.tab === 'admin') {
+        setActiveTab('admin');
+        setAdminSection(destino.section ?? 'cockpit');
+      } else {
+        setActiveTab(destino.tab);
+      }
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -700,50 +727,26 @@ export default function App() {
 
   return (
     <div className="flex flex-col xl:flex-row h-screen w-full bg-[#f8f9fa] text-neutral-900 font-sans antialiased overflow-hidden">
-      {/* Sidebar de Navegação */}
-      {currentUser?.role === 'admin' ? (
-        <AdminSidebar
-          currentSection={adminSection}
-          onChangeSection={(sec) => {
-            setAdminSection(sec);
+      {/* Menu único (Fase 2): mesmo componente para admin e vendedor */}
+      <MenuLateral
+        currentUser={currentUser!}
+        destinoAtual={activeTab === 'admin' ? { tab: 'admin', section: adminSection } : { tab: activeTab }}
+        podeVerConversas={!!(activeSalesperson?.id === 'seller-thomas' || activeSalesperson?.name === 'Thomas' || isAdmin)}
+        totalLeads={leads.length}
+        onNavigate={(d: Destino) => {
+          if (d.tab === 'admin') {
+            setAdminSection(d.section ?? 'cockpit');
             setActiveTab('admin');
-          }}
-          selectedSalespersonId={inspectedSellerId}
-          onSelectSalesperson={(id) => {
-            setInspectedSellerId(id);
-            setAdminSection('vendedores');
-            setActiveTab('admin');
-          }}
-          currentUser={currentUser}
-          salespeople={salespeople}
-          totalLeadsCount={leads.length}
-          isKanbanActive={activeTab === 'kanban'}
-          onNavigateToKanban={() => setActiveTab('kanban')}
-          onOpenChangePassword={() => setIsChangePasswordModalOpen(true)}
-          onLogout={handleLogout}
-        />
-      ) : (
-        <Sidebar
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          onOpenZipModal={() => setIsZipModalOpen(true)}
-          onOpenTagsModal={() => setIsTagsModalOpen(true)}
-          onOpenSalesTeamModal={() => setIsSalesTeamModalOpen(true)}
-          onOpenWhatsAppSettings={() => setIsWhatsAppModalOpen(true)}
-          onSeedSamples={handleSeedSamples}
-          totalLeads={leads.length}
-          salespeopleCount={salespeople.length}
-          activeSalesperson={activeSalesperson}
-          onClearSalespersonFilter={() => handleNavigateToSalesperson('ALL')}
-          currentUser={currentUser}
-          onOpenAdminCockpit={() => {
-            setActiveTab('admin');
-            setAdminSection('cockpit');
-          }}
-          onOpenChangePassword={() => setIsChangePasswordModalOpen(true)}
-          onLogout={handleLogout}
-        />
-      )}
+          } else {
+            setActiveTab(d.tab);
+          }
+        }}
+        onOpenZipModal={() => setIsZipModalOpen(true)}
+        onOpenTagsModal={() => setIsTagsModalOpen(true)}
+        onOpenWhatsAppSettings={() => setIsWhatsAppModalOpen(true)}
+        onOpenChangePassword={() => setIsChangePasswordModalOpen(true)}
+        onLogout={handleLogout}
+      />
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col h-full min-h-0 min-w-0 overflow-hidden">
@@ -780,6 +783,7 @@ export default function App() {
               ) : adminSection === 'estrutura' || adminSection === 'configuracoes' ? (
                 <AdminEstruturaView
                   key={adminSection}
+                  currentUser={currentUser!}
                   secao={adminSection === 'configuracoes' ? 'configuracoes' : 'leads'}
                   leads={leads}
                   onShowToast={showToast}
@@ -812,13 +816,11 @@ export default function App() {
                     adminSection === 'usuarios' ||
                     adminSection === 'carteiras' ||
                     adminSection === 'auditoria' ||
-                    adminSection === 'blindagem' ||
-                    adminSection === 'whatsapp' ||
-                    adminSection === 'disparos'
+                    adminSection === 'blindagem'
                       ? adminSection
                       : 'cockpit'
                   }
-                  onChangeSection={(sec) => setAdminSection(sec as AdminViewSection)}
+                  onChangeSection={(sec) => setAdminSection(sec as SecaoAdmin)}
                   onSelectSalesperson={(id) => {
                     setInspectedSellerId(id);
                     setAdminSection('vendedores');

@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Lead } from '../types';
+import { Lead, User } from '../types';
+import { AdminWhatsAppFluxoView } from './AdminWhatsAppFluxoView';
 
-type Tab = 'central' | 'marcas' | 'numeros' | 'bloqueios' | 'regras';
+type Tab = 'central' | 'marcas' | 'numeros' | 'bloqueios' | 'regras' | 'integracoes';
 
 interface Remessa { id: string; name: string; createdAt: string; leadCount: number; blockedCount: number; contatadosHoje?: number }
 interface Brand { id: string; name: string; services: string; numberIds: string[] }
@@ -18,6 +19,7 @@ const MOTIVOS: Record<string, string> = {
 
 interface Props {
   leads: Lead[];
+  currentUser: User;
   onShowToast: (msg: string) => void;
   onOpenDetails: (lead: Lead) => void;
   /** 'leads': central e bloqueios. 'configuracoes': marcas e números. */
@@ -40,14 +42,15 @@ const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'numeros', label: 'Números' },
   { id: 'bloqueios', label: 'Bloqueios pendentes' },
   { id: 'regras', label: 'Regras de contato' },
+  { id: 'integracoes', label: 'Integrações (FluxoAPI e Meta)' },
 ];
 
 const TABS_POR_SECAO: Record<'leads' | 'configuracoes', Tab[]> = {
   leads: ['central', 'bloqueios'],
-  configuracoes: ['marcas', 'numeros', 'regras'],
+  configuracoes: ['marcas', 'numeros', 'regras', 'integracoes'],
 };
 
-export const AdminEstruturaView: React.FC<Props> = ({ leads, onShowToast, onOpenDetails, secao = 'leads' }) => {
+export const AdminEstruturaView: React.FC<Props> = ({ leads, currentUser, onShowToast, onOpenDetails, secao = 'leads' }) => {
   const tabsDaSecao = TABS.filter(t => TABS_POR_SECAO[secao].includes(t.id));
   const [tab, setTab] = useState<Tab>(TABS_POR_SECAO[secao][0]);
   const [error, setError] = useState<string | null>(null);
@@ -55,11 +58,11 @@ export const AdminEstruturaView: React.FC<Props> = ({ leads, onShowToast, onOpen
   return (
     <div className="w-full max-w-6xl mx-auto flex flex-col gap-4">
       <div>
-        <h2 className="text-lg font-bold text-neutral-900">{secao === 'leads' ? 'Leads' : 'Marcas e números'}</h2>
+        <h2 className="text-lg font-bold text-neutral-900">{secao === 'leads' ? 'Leads' : 'Configurações'}</h2>
         <p className="text-sm text-neutral-500">
           {secao === 'leads'
             ? 'Central de leads, remessas, blocos salvos e bloqueios.'
-            : 'Cada marca tem seus serviços e modelos de mensagem. Cada número pertence a uma ou mais marcas.'}
+            : 'Marcas, números, regras de contato e integrações com a Meta e a FluxoAPI.'}
         </p>
       </div>
 
@@ -82,6 +85,7 @@ export const AdminEstruturaView: React.FC<Props> = ({ leads, onShowToast, onOpen
       {tab === 'numeros' && <Numeros onShowToast={onShowToast} onError={setError} />}
       {tab === 'bloqueios' && <Bloqueios onShowToast={onShowToast} onError={setError} leads={leads} onOpenDetails={onOpenDetails} />}
       {tab === 'regras' && <RegrasContato onShowToast={onShowToast} onError={setError} />}
+      {tab === 'integracoes' && <AdminWhatsAppFluxoView currentUser={currentUser} onShowToast={onShowToast} />}
     </div>
   );
 };
