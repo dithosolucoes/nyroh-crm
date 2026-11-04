@@ -374,7 +374,7 @@ export const MetricsBar: React.FC<MetricsBarProps> = ({
           {/* Filtro / Priorização por Site Antigo */}
           <div className="flex items-center gap-1.5 bg-white border border-neutral-300 rounded-lg px-2.5 py-1.5 shadow-2xs hover:bg-neutral-50 transition-colors w-full sm:w-auto">
             <Globe className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-            <span className="text-xs text-neutral-500 font-medium whitespace-nowrap">Site Antigo:</span>
+            <span className="text-xs text-neutral-500 font-medium whitespace-nowrap">Site do cliente:</span>
             <select
               value={websiteFilter}
               onChange={(e) => onWebsiteFilterChange?.(e.target.value as any)}
@@ -382,7 +382,7 @@ export const MetricsBar: React.FC<MetricsBarProps> = ({
               title="Filtrar ou priorizar no Kanban clientes que já têm site vs clientes sem site"
             >
               <option value="ALL">Todos os Leads ({websiteStats.total})</option>
-              <option value="PRIORITIZE_WITH">⚡ Topo: Com Site Antigo ({websiteStats.withCount})</option>
+              <option value="PRIORITIZE_WITH">⚡ Topo: com site do cliente ({websiteStats.withCount})</option>
               <option value="PRIORITIZE_WITHOUT">⚡ Topo: Sem Site ({websiteStats.withoutCount})</option>
               <option value="ONLY_WITH">🌐 Apenas Com Site ({websiteStats.withCount})</option>
               <option value="ONLY_WITHOUT">⚪ Apenas Sem Site ({websiteStats.withoutCount})</option>
@@ -541,7 +541,7 @@ export const MetricsBar: React.FC<MetricsBarProps> = ({
               title="Varre o banco e recupera links de sites antigos de clientes"
             >
               <Globe className="w-3.5 h-3.5 text-amber-600" />
-              <span>Restaurar Sites</span>
+              <span>Recuperar sites</span>
             </button>
 
             <button
@@ -565,7 +565,7 @@ export const MetricsBar: React.FC<MetricsBarProps> = ({
               title="Recupera números de telefone a partir de históricos"
             >
               <PhoneCall className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Restaurar Fones</span>
+              <span>Recuperar telefones</span>
             </button>
 
             <button

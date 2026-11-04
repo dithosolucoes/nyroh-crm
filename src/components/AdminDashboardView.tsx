@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { isUiFlagOn } from '../lib/uiFlags';
+const INFRA_ON = isUiFlagOn(import.meta.env.VITE_MOSTRAR_INFRA);
 import { User, Salesperson, Lead, AuditLog } from '../types';
 import { BulkCreateSalespeopleModal } from './BulkCreateSalespeopleModal';
 import { AdminWhatsAppFluxoView } from './AdminWhatsAppFluxoView';
@@ -637,6 +639,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
             <span>Caixa-Preta de Auditoria ({auditLogs.length})</span>
           </button>
 
+          {isUiFlagOn(import.meta.env.VITE_MOSTRAR_INFRA) && (
           <button
             onClick={() => {
               setActiveSubTab('blindagem');
@@ -651,6 +654,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
             <Lock className="w-3.5 h-3.5" />
             <span>Blindagem & Infraestrutura</span>
           </button>
+          )}
 
           <button
             onClick={() => {
@@ -1600,7 +1604,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
         )}
 
         {/* TAB 4: BLINDAGEM & INFRAESTRUTURA */}
-        {activeSubTab === 'blindagem' && (
+        {activeSubTab === 'blindagem' && INFRA_ON && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-white rounded-2xl border border-neutral-200 p-5 shadow-2xs space-y-3">
               <div className="flex items-center gap-2">
@@ -1617,7 +1621,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
                   <div>
                     <strong className="text-neutral-900 block">Autenticação Nativa Blindada</strong>
                     <span className="text-neutral-500">
-                      Zero Auth0/Clerk. Senhas com hash criptográfico SHA-256 e Salt de 32 bytes randômicos.
+                      Senhas com hash criptográfico SHA-256 e Salt de 32 bytes randômicos.
                     </span>
                   </div>
                 </div>

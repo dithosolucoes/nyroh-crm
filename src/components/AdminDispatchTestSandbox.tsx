@@ -565,7 +565,7 @@ export const AdminDispatchTestSandbox: React.FC<AdminDispatchTestSandboxProps> =
               </span>
             </div>
             <p className="text-xs text-neutral-300 max-w-3xl leading-relaxed">
-              Inspirado no padrão <strong>GoHighLevel</strong> e <strong>ManyChat</strong>: o sistema analisa a estrutura real do template aprovado na Meta (variáveis, cabeçalho, rodapé e botões interativos). Ele injeta a sua copy de vendas em cada slot aprovado, contornando a janela de 24h sem risco de bloqueio.
+              Inspirado no padrão <strong>GoHighLevel</strong> e <strong>ManyChat</strong>: o sistema analisa a estrutura real do template aprovado na Meta (variáveis, cabeçalho, rodapé e botões interativos). Ele injeta a sua copy de vendas em cada slot aprovado, enviando somente modelos aprovados pela Meta. Fora da janela de 24h, texto livre não é aceito.
             </p>
           </div>
 

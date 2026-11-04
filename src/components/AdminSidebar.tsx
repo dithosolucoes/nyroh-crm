@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { isUiFlagOn } from '../lib/uiFlags';
+const INFRA_ON = isUiFlagOn(import.meta.env.VITE_MOSTRAR_INFRA);
 import { User, Salesperson } from '../types';
 import {
   LayoutDashboard,
@@ -244,6 +246,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                 </div>
               </button>
 
+              {INFRA_ON && (
               <button
                 onClick={() => onChangeSection('blindagem')}
                 className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
@@ -257,6 +260,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                   <span>Infraestrutura Railway</span>
                 </div>
               </button>
+              )}
 
               <button
                 onClick={() => onChangeSection('whatsapp')}
@@ -496,6 +500,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                       <span>Caixa-Preta de Logs</span>
                     </button>
 
+                    {INFRA_ON && (
                     <button
                       onClick={() => {
                         onChangeSection('blindagem');
@@ -508,6 +513,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
                       <Database className="w-4 h-4" />
                       <span>Infraestrutura Railway</span>
                     </button>
+                    )}
 
                     <button
                       onClick={() => {

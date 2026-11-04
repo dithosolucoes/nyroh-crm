@@ -296,7 +296,7 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
                 title={`Abrir Site Antigo do Cliente: ${lead.website}`}
               >
                 <Globe className="w-2.5 h-2.5 text-amber-600 shrink-0" />
-                <span className="truncate">Site Antigo ↗</span>
+                <span className="truncate">Site do cliente ↗</span>
               </a>
             )}
           </div>

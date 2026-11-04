@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { isUiFlagOn } from '../lib/uiFlags';
+const SHOW_LAB = isUiFlagOn(import.meta.env.VITE_MOSTRAR_LAB);
 import { useRuntimeConfig, formatInstancePhone } from '../lib/useRuntimeConfig';
 import {
   MessageSquare,
@@ -1129,6 +1131,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
           </span>
         </button>
 
+        {SHOW_LAB && (
         <button
           onClick={() => setActiveSubTab('sandbox')}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
@@ -1140,6 +1143,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
           <Sparkles className="w-4 h-4" />
           <span>🧪 Laboratório de Testes & Chat Teste</span>
         </button>
+        )}
 
         <button
           onClick={() => setActiveSubTab('webhooks')}

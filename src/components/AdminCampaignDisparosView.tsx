@@ -66,6 +66,7 @@ import { ZipImportProgressModal, ImportProgressData } from './ZipImportProgressM
 import { isUiFlagOn } from '../lib/uiFlags';
 
 const SHOW_SIMULATE = isUiFlagOn(import.meta.env.VITE_MOSTRAR_SIMULAR);
+const SHOW_SANDBOX = isUiFlagOn(import.meta.env.VITE_MOSTRAR_SANDBOX);
 
 interface MetaTemplateButton {
   type: 'QUICK_REPLY' | 'URL' | 'PHONE_NUMBER';
@@ -1753,6 +1754,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
             <span>3. Montador de Copy</span>
           </button>
 
+          {SHOW_SANDBOX && (
           <button
             onClick={() => setActiveTab('teste_sandbox')}
             className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer ${
@@ -1764,10 +1766,8 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
           >
             <Send className="w-3.5 h-3.5 text-emerald-200" />
             <span>4. Teste Sandbox</span>
-            <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-emerald-200 text-emerald-950 font-bold uppercase">
-              100% REAL
-            </span>
           </button>
+          )}
 
           <button
             onClick={() => setActiveTab('quarentena')}
@@ -1949,7 +1949,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
                       className="bg-neutral-50 border border-neutral-200 text-neutral-800 text-xs font-medium rounded-xl px-2.5 py-1.5 focus:outline-none cursor-pointer"
                     >
                       <option value="ALL">Todos os Leads ({leads.length})</option>
-                      <option value="STAGING">Aguardando Disparo (Staging)</option>
+                      <option value="STAGING">Aguardando disparo</option>
                       <option value="DISPARADO">Disparados</option>
                       <option value="QUARENTENA">Em Quarentena</option>
                       <option value="INTERESSADO">🔥 Interessados (Responderam)</option>
@@ -1977,7 +1977,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
                           <th className="py-3 px-4">Telefone</th>
                           <th className="py-3 px-4">Tipo</th>
                           <th className="py-3 px-4">Site Nyroh Novo</th>
-                          <th className="py-3 px-4">Site Antigo</th>
+                          <th className="py-3 px-4">Site do cliente</th>
                           <th className="py-3 px-4">Status da Campanha</th>
                           <th className="py-3 px-4 text-right">Ações Rápidas</th>
                         </tr>
@@ -2621,7 +2621,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
                               className="w-full px-3 py-2 bg-white border border-neutral-300 rounded-lg text-xs font-bold text-neutral-800 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
                             >
                               <option value="site_novo">🌐 Site Novo do Cliente ({'{site_novo}'}) - Recomendado</option>
-                              <option value="site_antigo">🏛️ Site Antigo do Cliente ({'{site_antigo}'})</option>
+                              <option value="site_antigo">🏛️ Site do cliente ({'{site_antigo}'})</option>
                               <option value="custom">🔗 URL Personalizada Externa</option>
                             </select>
                           </div>
