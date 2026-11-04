@@ -108,6 +108,8 @@ export interface Lead {
   createdAt: string;
   updatedAt: string;
   callCount?: number;
+  /** Disparos enviados hoje (São Paulo) para o telefone deste lead. Vem de /api/leads. */
+  contatosHoje?: number;
   lastCallAt?: string;
   lastCallTag?: string;
   nextFollowUpAt?: string;

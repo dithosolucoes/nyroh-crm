@@ -65,3 +65,6 @@ CREATE INDEX IF NOT EXISTS idx_block_requests_status ON lead_block_requests(stat
 
 -- Safra (campanha) ligada a uma marca. Os números usados vêm do vínculo marca ↔ número.
 ALTER TABLE campaign_batches ADD COLUMN IF NOT EXISTS brand_id VARCHAR(255) REFERENCES brands(id);
+
+-- Contagem de disparos do dia por lead (card do Pipeline).
+CREATE INDEX IF NOT EXISTS idx_campaign_leads_sent_at ON campaign_leads (sent_at);

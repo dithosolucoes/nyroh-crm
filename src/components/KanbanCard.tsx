@@ -219,6 +219,14 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
               <span className="inline-block px-1.5 py-0.5 bg-neutral-100 text-neutral-600 rounded text-[9px] font-medium border border-neutral-200/60">
                 {getLeadNiche(lead)}
               </span>
+              {(lead.contatosHoje || 0) > 0 && (
+                <span
+                  className="inline-block px-1.5 py-0.5 bg-blue-50 text-blue-800 rounded text-[9px] font-bold border border-blue-200"
+                  title="Disparos enviados hoje para este telefone"
+                >
+                  {lead.contatosHoje} {lead.contatosHoje === 1 ? 'contato' : 'contatos'} hoje
+                </span>
+              )}
               {followUpInfo.status === 'NONE' && currentMasterCol !== 'fechados' && currentMasterCol !== 'recusados' && (
                 <span
                   className="inline-block px-1.5 py-0.5 bg-amber-50 text-amber-800 rounded text-[9px] font-bold border border-amber-200"

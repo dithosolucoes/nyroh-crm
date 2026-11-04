@@ -934,6 +934,31 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
             </div>
           </div>
         )}
+        {/* EQUIPE E CARTEIRAS: uma entrada só no menu; a troca entre as duas é feita aqui */}
+        {(activeSubTab === 'usuarios' || activeSubTab === 'carteiras') && (
+          <div className="flex gap-1.5 bg-neutral-100 p-1 rounded-xl border border-neutral-200 w-fit max-w-full overflow-x-auto no-scrollbar">
+            {([
+              { id: 'usuarios', label: 'Equipe' },
+              { id: 'carteiras', label: 'Carteiras e distribuição' },
+            ] as const).map(opcao => (
+              <button
+                key={opcao.id}
+                onClick={() => {
+                  setActiveSubTab(opcao.id);
+                  onChangeSection?.(opcao.id);
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs whitespace-nowrap ${
+                  activeSubTab === opcao.id
+                    ? 'bg-white text-neutral-900 font-bold shadow-2xs'
+                    : 'text-neutral-600 font-medium hover:text-neutral-900'
+                }`}
+              >
+                {opcao.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* TAB 1: GESTÃO DE USUÁRIOS & RBAC */}
         {activeSubTab === 'usuarios' && (
           <div className="space-y-4">

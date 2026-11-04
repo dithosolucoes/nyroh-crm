@@ -5,7 +5,6 @@ import { User, Salesperson } from '../types';
 import {
   LayoutDashboard,
   Users,
-  Share2,
   Briefcase,
   Clock,
   Database,
@@ -189,16 +188,10 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
             onClick={() => ir('configuracoes')}
           />
           <ItemMenu
-            label="Equipe"
+            label="Equipe e carteiras"
             icon={<Users className="w-4 h-4 text-neutral-400" />}
-            active={currentSection === 'usuarios'}
+            active={currentSection === 'usuarios' || currentSection === 'carteiras'}
             onClick={() => ir('usuarios')}
-          />
-          <ItemMenu
-            label="Divisão de carteiras"
-            icon={<Share2 className="w-4 h-4 text-neutral-400" />}
-            active={currentSection === 'carteiras'}
-            onClick={() => ir('carteiras')}
           />
           <ItemMenu
             label="Caixa-preta (logs)"

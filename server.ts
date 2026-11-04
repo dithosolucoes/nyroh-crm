@@ -5742,7 +5742,12 @@ app.get('/api/leads', async (req: any, res) => {
           l.last_whatsapp_message AS "lastWhatsAppMessage",
           COALESCE(cs.call_count, 0)::int AS "callCount",
           cs.last_call_at AS "lastCallAt",
-          lc.last_call_tag AS "lastCallTag"
+          lc.last_call_tag AS "lastCallTag",
+          (SELECT COUNT(*)::int FROM campaign_leads cl
+            WHERE cl.sent_at >= (date_trunc('day', now() AT TIME ZONE 'America/Sao_Paulo') AT TIME ZONE 'America/Sao_Paulo')
+              AND cl.sent_at < ((date_trunc('day', now() AT TIME ZONE 'America/Sao_Paulo') + interval '1 day') AT TIME ZONE 'America/Sao_Paulo')
+              AND regexp_replace(cl.phone_number, '[^0-9]', '', 'g') = regexp_replace(l.phone_number, '[^0-9]', '', 'g')
+          ) AS "contatosHoje"
         FROM leads l
         LEFT JOIN call_stats cs ON l.id = cs.lead_id
         LEFT JOIN latest_calls lc ON l.id = lc.lead_id
