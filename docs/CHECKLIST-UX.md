@@ -39,7 +39,7 @@ Estrutura de telas alvo: `docs/BLUEPRINT-TELAS.md`.
 |---|------|--------|-----------|--------------|
 | 17 | Card do Pipeline: "Sem próxima ação" | Feito (tsc) | `KanbanCard.tsx` | Lead aberto sem retorno agendado |
 | 18 | Card do Pipeline: contador de contatos do dia | Feito (tsc): selo 'N contatos hoje' (`contatosHoje` em `/api/leads`) | `KanbanCard.tsx`, `server.ts` (`/api/leads`), índice em `campaign_leads(sent_at)` na migração | Lead disparado hoje mostra o selo |
-| 18b | Card do Pipeline: marcas que já abordaram o lead | Feito (tsc, `contato_marcas` gravado no envio): cada marca aparece como selo no card | `ThomasWhatsAppDesktopView.tsx` não; `KanbanCard.tsx`, `server.ts` (`/api/leads`, envio), tabela `contato_marcas` | Disparar com uma marca e ver o selo; disparar com outra e ver os dois |
+| 18b | Card do Pipeline: marcas que já abordaram o lead | Feito (tsc, `contato_marcas` gravado no envio): cada marca aparece como selo no card | `KanbanCard.tsx`, `server.ts` (envio e `/api/leads`), tabela `contato_marcas` | Disparar com uma marca e ver o selo; disparar com outra e ver os dois |
 | 19 | Selo "já contatado hoje" por remessa | Feito | `GET /api/central/remessas` (`contatadosHoje`) | Central de leads |
 | 20 | Selo "já contatado" nos cards e na seleção de blocos | Feito (tsc): cards, Central e blocos. 'Bloqueado' não se aplica ao Kanban (bloqueados já saem da lista) | `KanbanCard.tsx`, `AdminEstruturaView.tsx`, `GET /api/central/selections` | Central de leads |
 | 21 | Linha do tempo do lead e contador de toques (aviso em 8) | Feito (tsc) | `LeadTimeline.tsx` no `LeadDetailModal.tsx` | Abrir um lead com ligações e mensagens |
