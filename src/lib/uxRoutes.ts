@@ -247,7 +247,13 @@ export function registerUxRoutes(app: Express, deps: UxDeps): void {
     const r = await pool.query(`
       SELECT r.id, r.name, r.created_at AS "createdAt",
              COUNT(l.id)::int AS "leadCount",
-             COUNT(l.id) FILTER (WHERE l.blocked_at IS NOT NULL)::int AS "blockedCount"
+             COUNT(l.id) FILTER (WHERE l.blocked_at IS NOT NULL)::int AS "blockedCount",
+             COUNT(l.id) FILTER (WHERE EXISTS (
+               SELECT 1 FROM campaign_leads cl
+               WHERE cl.sent_at IS NOT NULL
+                 AND (cl.sent_at AT TIME ZONE 'America/Sao_Paulo')::date = (now() AT TIME ZONE 'America/Sao_Paulo')::date
+                 AND ${digitos('cl.phone_number')} = ${digitos('l.phone_number')}
+             ))::int AS "contatadosHoje"
       FROM remessas r LEFT JOIN leads l ON l.remessa_id = r.id
       GROUP BY r.id ORDER BY r.created_at DESC`);
     const semRemessa = await pool.query(`SELECT COUNT(*)::int AS n FROM leads WHERE remessa_id IS NULL`);

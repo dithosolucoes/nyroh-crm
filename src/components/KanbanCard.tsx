@@ -215,10 +215,18 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
             <h4 className="text-xs font-semibold text-neutral-800 leading-snug group-hover:text-blue-600 transition-colors line-clamp-2">
               {lead.name}
             </h4>
-            <div className="mt-1">
+            <div className="mt-1 flex items-center gap-1 flex-wrap">
               <span className="inline-block px-1.5 py-0.5 bg-neutral-100 text-neutral-600 rounded text-[9px] font-medium border border-neutral-200/60">
                 {getLeadNiche(lead)}
               </span>
+              {followUpInfo.status === 'NONE' && currentMasterCol !== 'fechados' && currentMasterCol !== 'recusados' && (
+                <span
+                  className="inline-block px-1.5 py-0.5 bg-amber-50 text-amber-800 rounded text-[9px] font-bold border border-amber-200"
+                  title="Este lead não tem próxima ação agendada"
+                >
+                  Sem próxima ação
+                </span>
+              )}
             </div>
           </div>
 

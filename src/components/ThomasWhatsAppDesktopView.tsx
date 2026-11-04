@@ -1511,6 +1511,18 @@ export const ThomasWhatsAppDesktopView: React.FC<ThomasWhatsAppDesktopViewProps>
                           <span>Site Nyroh</span>
                         </span>
                       )}
+                      {/* Conversa com lead que respondeu, mas a janela de 24h já fechou: só modelo aprovado */}
+                      {'windowExpiresAt' in (lead as any) && (lead as any).whatsappReplied && (() => {
+                        const exp = (lead as any).windowExpiresAt ? new Date((lead as any).windowExpiresAt).getTime() : 0;
+                        return exp <= Date.now();
+                      })() && (
+                        <span
+                          className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-800 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200"
+                          title="Janela de 24h fechada. Só é possível enviar um modelo aprovado pela Meta."
+                        >
+                          Sem janela · modelo
+                        </span>
+                      )}
                       {lead.niche && (
                         <span className="text-[10px] text-neutral-600 bg-neutral-100 px-1.5 py-0.2 rounded truncate max-w-[120px]">
                           {lead.niche}

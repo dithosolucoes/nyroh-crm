@@ -3,7 +3,7 @@ import { Lead } from '../types';
 
 type Tab = 'central' | 'marcas' | 'numeros' | 'bloqueios';
 
-interface Remessa { id: string; name: string; createdAt: string; leadCount: number; blockedCount: number }
+interface Remessa { id: string; name: string; createdAt: string; leadCount: number; blockedCount: number; contatadosHoje?: number }
 interface Brand { id: string; name: string; services: string; numberIds: string[] }
 interface PhoneNumber { id: string; label: string; phoneDisplay?: string; metaPhoneNumberId?: string; fluxoInstanceId?: string; brandIds: string[] }
 interface BlockRequest { id: string; leadId: string; requestedBy?: string; reasonCode: string; reasonText?: string; requestedAt: string }
@@ -208,7 +208,11 @@ const CentralLeads: React.FC<{ leads: Lead[]; onShowToast: (m: string) => void; 
               <li key={r.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
                 <span className="font-semibold text-neutral-900">{r.name}</span>
                 <span className="flex items-center gap-2">
-                  <span className="text-xs text-neutral-500 font-mono">{r.leadCount} leads · {r.blockedCount} bloqueados · {new Date(r.createdAt).toLocaleDateString('pt-BR')}</span>
+                  <span className="text-xs text-neutral-500 font-mono">
+                    {r.leadCount} leads · {r.blockedCount} bloqueados
+                    {(r.contatadosHoje || 0) > 0 && <span className="text-amber-700"> · {r.contatadosHoje} já contatados hoje</span>}
+                    {' · '}{new Date(r.createdAt).toLocaleDateString('pt-BR')}
+                  </span>
                   <button onClick={() => direcionar('remessas', r.id, r.name)} className="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold">Direcionar para a marca</button>
                 </span>
               </li>
