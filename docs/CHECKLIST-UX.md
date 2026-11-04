@@ -29,7 +29,7 @@ Estrutura de telas alvo: `docs/BLUEPRINT-TELAS.md`.
 | 11 | Menu em 6 grupos (Hoje, Pipeline, Conversas, Leads, Disparos, Configurações) | Feito (tsc); falta ver no navegador | `src/components/AdminSidebar.tsx` | Abrir o admin e percorrer cada grupo |
 | 12 | Central de leads e bloqueios dentro de Leads | Feito | `AdminEstruturaView.tsx` (prop `secao="leads"`) | Menu Leads |
 | 13 | Marcas e números dentro de Configurações | Feito | `AdminEstruturaView.tsx` (prop `secao="configuracoes"`) | Menu Configurações > Marcas e números |
-| 14 | Equipe e Divisão de carteiras numa só tela | Parcial: agrupadas no menu, telas ainda separadas | `AdminDashboardView.tsx` (sub-abas `usuarios` e `carteiras`) | Pendente de fusão |
+| 14 | Equipe e Divisão de carteiras numa só tela | Feito (tsc): uma entrada no menu, com seletor interno Equipe / Carteiras | `AdminSidebar.tsx`, `AdminDashboardView.tsx` | Menu Configurações > Equipe e carteiras |
 | 15 | Caixa-preta de logs dentro de Configurações | Feito | `AdminSidebar.tsx` | Menu Configurações |
 | 16 | Conversas: aviso "Sem janela · modelo" na lista | Feito (tsc); falta ver no navegador | `ThomasWhatsAppDesktopView.tsx` | Conversa com janela de 24h fechada |
 
@@ -38,9 +38,10 @@ Estrutura de telas alvo: `docs/BLUEPRINT-TELAS.md`.
 | # | Item | Estado | Onde está | Como validar |
 |---|------|--------|-----------|--------------|
 | 17 | Card do Pipeline: "Sem próxima ação" | Feito (tsc) | `KanbanCard.tsx` | Lead aberto sem retorno agendado |
-| 18 | Card do Pipeline: marca e contador de contatos do dia | Pendente: o dado não chega ao card | — | — |
+| 18 | Card do Pipeline: contador de contatos do dia | Feito (tsc): selo 'N contatos hoje' (`contatosHoje` em `/api/leads`) | `KanbanCard.tsx`, `server.ts` (`/api/leads`), índice em `campaign_leads(sent_at)` na migração | Lead disparado hoje mostra o selo |
+| 18b | Card do Pipeline: marca do lead | Pendente de decisão: um lead pode estar em mais de uma marca. Falta escolher se o lead guarda uma marca principal | — | — |
 | 19 | Selo "já contatado hoje" por remessa | Feito | `GET /api/central/remessas` (`contatadosHoje`) | Central de leads |
-| 20 | Selo "já contatado" e "bloqueado" nos cards e na seleção de blocos | Pendente | — | — |
+| 20 | Selo "já contatado" nos cards e na seleção de blocos | Parcial: cards e Central feitos; falta a seleção de blocos. 'Bloqueado' não se aplica ao Kanban (bloqueados já saem da lista) | `KanbanCard.tsx`, `AdminEstruturaView.tsx` | Central e Kanban |
 | 21 | Linha do tempo do lead e contador de toques (aviso em 8) | Feito (tsc) | `LeadTimeline.tsx` no `LeadDetailModal.tsx` | Abrir um lead com ligações e mensagens |
 | 22 | Permissões: vendedor só vê a própria carteira | Feito no servidor (guarda em `/api/leads/:id`); central e números só admin | `server.ts` (`assertLeadAccess`), `uxRoutes.ts` | Testar com uma conta de vendedor |
 
