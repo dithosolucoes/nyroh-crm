@@ -52,6 +52,58 @@ export async function abrirRemessa(pool: pg.Pool | null, nome: string): Promise<
   return id;
 }
 
+const FUSO = `'America/Sao_Paulo'`;
+const digitos = (expr: string) => `regexp_replace(${expr}, '[^0-9]', '', 'g')`;
+
+/**
+ * Regra única antes de QUALQUER disparo, somando todas as marcas:
+ *  1) lead bloqueado (aprovado pelo admin) nunca entra;
+ *  2) telefone já abordado hoje (disparo de qualquer safra ou mensagem do vendedor) fica de fora.
+ * Recebe um trecho de WHERE sobre `campaign_leads`. Só usar com o schema de UX ligado.
+ */
+export function regraForaDoDisparoSql(): string {
+  const tel = digitos('campaign_leads.phone_number');
+  return `
+    AND NOT EXISTS (
+      SELECT 1 FROM leads lb
+      WHERE lb.blocked_at IS NOT NULL AND ${digitos('lb.phone_number')} = ${tel}
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM campaign_leads cj
+      WHERE cj.id <> campaign_leads.id AND cj.sent_at IS NOT NULL
+        AND (cj.sent_at AT TIME ZONE ${FUSO})::date = (now() AT TIME ZONE ${FUSO})::date
+        AND ${digitos('cj.phone_number')} = ${tel}
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM lead_messages lm JOIN leads lx ON lx.id = lm.lead_id
+      WHERE lm.sender = 'salesperson'
+        AND (lm.timestamp AT TIME ZONE ${FUSO})::date = (now() AT TIME ZONE ${FUSO})::date
+        AND ${digitos('lx.phone_number')} = ${tel}
+    )`;
+}
+
+/** Instância da FluxoAPI do número vinculado à marca da safra. Cache de 60 s por safra. */
+const cacheInstancia = new Map<string, { at: number; temMarca: boolean; instanceId: string }>();
+export async function instanciaDaSafra(pool: pg.Pool | null, batchId: string): Promise<{ temMarca: boolean; instanceId: string }> {
+  const vazio = { temMarca: false, instanceId: '' };
+  if (!pool || !uxSchemaOn() || !batchId) return vazio;
+  const hit = cacheInstancia.get(batchId);
+  if (hit && Date.now() - hit.at < 60_000) return hit;
+  const r = await pool.query(
+    `SELECT cb.brand_id,
+            (SELECT pn.fluxo_instance_id FROM brand_numbers bn
+               JOIN phone_numbers pn ON pn.id = bn.phone_number_id
+              WHERE bn.brand_id = cb.brand_id AND pn.fluxo_instance_id IS NOT NULL
+              ORDER BY pn.label LIMIT 1) AS instance_id
+       FROM campaign_batches cb WHERE cb.id = $1`,
+    [batchId]
+  );
+  const row = r.rows[0];
+  const out = { at: Date.now(), temMarca: !!row?.brand_id, instanceId: row?.instance_id || '' };
+  cacheInstancia.set(batchId, out);
+  return out;
+}
+
 export function registerUxRoutes(app: Express, deps: UxDeps): void {
   let schemaReady = false;
 
@@ -292,5 +344,87 @@ export function registerUxRoutes(app: Express, deps: UxDeps): void {
     } finally {
       client.release();
     }
+  }));
+
+  // ---------- Direcionar bloco ou remessa para uma marca ----------
+  /**
+   * Cria uma safra ligada à marca com os leads escolhidos. A central continua com os leads
+   * (quem é direcionado vira cópia na safra; o lead original não some). Bloqueados não entram.
+   * A regra de um contato por dia é aplicada de novo no disparo.
+   */
+  const direcionarParaMarca = async (pool: pg.Pool, req: Request, res: Response, origem: { sql: string; params: unknown[] }) => {
+    if (!requireAdmin(req, res)) return;
+    const brandId = String(req.body?.brandId || '');
+    if (!brandId) return res.status(400).json({ error: 'Escolha a marca.' });
+    const marca = await pool.query('SELECT id, name FROM brands WHERE id = $1', [brandId]);
+    if (!marca.rowCount) return res.status(404).json({ error: 'Marca não encontrada.' });
+
+    const batchId = newId('safra');
+    const hoje = new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+    const nome = String(req.body?.name || `${marca.rows[0].name} · ${hoje}`).trim().slice(0, 250);
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        `INSERT INTO campaign_batches (id, name, brand_id, status) VALUES ($1, $2, $3, 'draft')`,
+        [batchId, nome, brandId]
+      );
+      const ins = await client.query(
+        `INSERT INTO campaign_leads (id, batch_id, name, phone_number, is_mobile, public_url, website, niche, status)
+         SELECT 'cl_' || md5($1 || l.id), $1, l.name, l.phone_number,
+                (x.d ~ '^[0-9]{2}9[0-9]{8}$' OR x.d ~ '^55[0-9]{2}9[0-9]{8}$'),
+                l.public_url, l.website, l.niche, 'STAGING'
+           FROM leads l
+           CROSS JOIN LATERAL (SELECT ${digitos('l.phone_number')} AS d) x
+          WHERE l.blocked_at IS NULL AND ${origem.sql}
+         ON CONFLICT (id) DO NOTHING`,
+        [batchId, ...origem.params]
+      );
+      if (!ins.rowCount) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Nenhum lead elegível: bloqueados não entram.' });
+      }
+      await client.query(
+        `UPDATE campaign_batches SET
+           total_leads = (SELECT COUNT(*) FROM campaign_leads WHERE batch_id = $1),
+           valid_mobiles = (SELECT COUNT(*) FROM campaign_leads WHERE batch_id = $1 AND is_mobile),
+           landlines = (SELECT COUNT(*) FROM campaign_leads WHERE batch_id = $1 AND NOT is_mobile)
+         WHERE id = $1`,
+        [batchId]
+      );
+      await client.query('COMMIT');
+      res.status(201).json({ batchId, name: nome, brandId, total: ins.rowCount });
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
+    }
+  };
+
+  /** Blocos salvos por ID (mais recentes primeiro). */
+  app.get('/api/central/selections', withDb(async (pool, req, res) => {
+    if (!requireAdmin(req, res)) return;
+    const r = await pool.query(
+      `SELECT id, name, size, created_at AS "createdAt" FROM lead_selections ORDER BY created_at DESC LIMIT 100`
+    );
+    res.json(r.rows);
+  }));
+
+  app.post('/api/central/selections/:id/direcionar', withDb(async (pool, req, res) => {
+    if (!requireAdmin(req, res)) return;
+    const sel = await pool.query('SELECT lead_ids FROM lead_selections WHERE id = $1', [req.params.id]);
+    if (!sel.rowCount) return res.status(404).json({ error: 'Bloco não encontrado.' });
+    const raw = sel.rows[0].lead_ids;
+    const ids: string[] = Array.isArray(raw) ? raw.map(String) : JSON.parse(String(raw || '[]'));
+    await direcionarParaMarca(pool, req, res, { sql: 'l.id = ANY($2::text[])', params: [ids] });
+  }));
+
+  app.post('/api/central/remessas/:id/direcionar', withDb(async (pool, req, res) => {
+    if (!requireAdmin(req, res)) return;
+    const r = await pool.query('SELECT id FROM remessas WHERE id = $1', [req.params.id]);
+    if (!r.rowCount) return res.status(404).json({ error: 'Remessa não encontrada.' });
+    await direcionarParaMarca(pool, req, res, { sql: 'l.remessa_id = $2', params: [req.params.id] });
   }));
 }

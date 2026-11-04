@@ -148,6 +148,21 @@ async function testesApi(admin: Sessao, vendedor: Sessao, vendedorLogado: boolea
   else {
     const sel = await admin.req('POST', '/api/central/selections', { name: `QA bloco 20 ${stamp}`, size: 20, leadIds: ids20 });
     verifica('Cria bloco de 20 leads por ID', sel.status === 201, msg(sel.body));
+    if (sel.status === 201 && idA) {
+      const dir = await admin.req('POST', `/api/central/selections/${sel.body.id}/direcionar`, { brandId: idA });
+      verifica('Direciona o bloco para a marca A (cria safra)', dir.status === 201 && !!dir.body?.batchId, msg(dir.body));
+      if (dir.body?.batchId) {
+        const lista = arr((await admin.req('GET', '/api/campaign/batches')).body);
+        verifica('A safra criada aparece na lista de safras', lista.some((s) => s.id === dir.body.batchId));
+      }
+      const blocos = arr((await admin.req('GET', '/api/central/selections')).body);
+      verifica('Bloco aparece na lista de blocos salvos', blocos.some((b) => b.id === sel.body.id));
+    }
+  }
+  const remVazia = await admin.req('POST', '/api/central/remessas', { name: `QA Remessa vazia ${stamp}` });
+  if (remVazia.status === 201 && idA) {
+    const r = await admin.req('POST', `/api/central/remessas/${remVazia.body.id}/direcionar`, { brandId: idA });
+    verifica('Remessa sem leads não cria safra vazia (400)', r.status === 400, `status ${r.status}`);
   }
   const fora = await admin.req('POST', '/api/central/selections', { size: 7, leadIds: ['x1', 'x2', 'x3'] });
   verifica('Recusa tamanho de bloco fora da lista (7 com 3 IDs)', fora.status === 400, `status ${fora.status}`);
@@ -218,11 +233,11 @@ async function testesApi(admin: Sessao, vendedor: Sessao, vendedorLogado: boolea
     verifica('Todos os leads do vendedor são dele', ls.every((l) => l.salespersonId === meuSp), 'há lead de outro vendedor na lista');
   }
 
-  grupo('7. Regras pedidas e ainda não implementadas');
+  grupo('7. Regras que dependem de um disparo real');
   registrar(
     'Um contato por lead por dia, somando todas as marcas',
     'PENDENTE',
-    'não implementado: nada no servidor impede abordar o mesmo lead por duas marcas no mesmo dia'
+    'regra implementada no disparo; validar com um disparo de teste (dois lotes no mesmo dia para o mesmo telefone)'
   );
 
   grupo('8. Disparo: falhou, entregue, lido');

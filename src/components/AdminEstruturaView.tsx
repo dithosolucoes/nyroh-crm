@@ -25,6 +25,9 @@ interface Props {
 async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...init });
   const data = await res.json().catch(() => ({}));
+  if (res.status === 503) {
+    throw new Error('Esta tela ainda não está liberada neste servidor (migração de UX desligada). Peça ao administrador para ativar NYROH_APLICAR_MIGRACOES_UX.');
+  }
   if (!res.ok) throw new Error(data.error || `Erro ${res.status}`);
   return data as T;
 }
@@ -76,11 +79,21 @@ const CentralLeads: React.FC<{ leads: Lead[]; onShowToast: (m: string) => void; 
   const [tamanhos, setTamanhos] = useState<number[]>([20, 50, 100, 300, 500, 1000, 5000, 10000, 50000, 100000]);
   const [tamanho, setTamanho] = useState<number>(100);
   const [nomeRemessa, setNomeRemessa] = useState('');
+  const [blocos, setBlocos] = useState<Array<{ id: string; name: string; size: number; createdAt: string }>>([]);
+  const [marcas, setMarcas] = useState<Array<{ id: string; name: string }>>([]);
+  const [marcaDestino, setMarcaDestino] = useState('');
 
   const load = useCallback(async () => {
     try {
       const d = await jsonFetch<{ remessas: Remessa[]; semRemessa: number; tamanhosBloco: number[] }>('/api/central/remessas');
       setRemessas(d.remessas); setSemRemessa(d.semRemessa); setTamanhos(d.tamanhosBloco);
+      const [b, m] = await Promise.all([
+        jsonFetch<Array<{ id: string; name: string; size: number; createdAt: string }>>('/api/central/selections'),
+        jsonFetch<Array<{ id: string; name: string }>>('/api/brands'),
+      ]);
+      setBlocos(b);
+      setMarcas(m);
+      setMarcaDestino(atual => atual || (m[0]?.id ?? ''));
       onError(null);
     } catch (e: any) { onError(e.message); }
   }, [onError]);
@@ -106,6 +119,19 @@ const CentralLeads: React.FC<{ leads: Lead[]; onShowToast: (m: string) => void; 
     } catch (e: any) { onError(e.message); }
   };
 
+  /** Cria uma safra ligada à marca escolhida com os leads do bloco ou da remessa. */
+  const direcionar = async (tipo: 'selections' | 'remessas', id: string, nome: string) => {
+    if (!marcaDestino) { onError('Cadastre uma marca antes de direcionar.'); return; }
+    try {
+      const r = await jsonFetch<{ total: number; name: string }>(`/api/central/${tipo}/${id}/direcionar`, {
+        method: 'POST',
+        body: JSON.stringify({ brandId: marcaDestino }),
+      });
+      onError(null);
+      onShowToast(`"${nome}" direcionado: ${r.total} leads na safra "${r.name}".`);
+    } catch (e: any) { onError(e.message); }
+  };
+
   return (
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -121,11 +147,39 @@ const CentralLeads: React.FC<{ leads: Lead[]; onShowToast: (m: string) => void; 
               <button key={t} onClick={() => setTamanho(t)} className={`px-2.5 py-1 rounded-lg text-xs font-mono border ${tamanho === t ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-white text-neutral-700 border-neutral-300 hover:bg-neutral-50'}`}>{t.toLocaleString('pt-BR')}</button>
             ))}
           </div>
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            <span className="text-xs text-neutral-500">Marca de destino:</span>
+            <select value={marcaDestino} onChange={e => setMarcaDestino(e.target.value)} className="text-xs border border-neutral-300 rounded-lg px-2 py-1 bg-white">
+              {marcas.length === 0 && <option value="">Nenhuma marca cadastrada</option>}
+              {marcas.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+            </select>
+          </div>
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs text-neutral-500">Pega os primeiros {Math.min(tamanho, disponiveis.length)} leads disponíveis. Não copia os leads: guarda só os IDs.</p>
             <button onClick={criarBloco} className="shrink-0 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold">Salvar bloco</button>
           </div>
         </div>
+      </div>
+
+      <div className="bg-white border border-neutral-200 rounded-2xl overflow-hidden">
+        <div className="px-4 py-3 border-b border-neutral-100">
+          <h3 className="text-sm font-bold text-neutral-900">Blocos salvos por ID</h3>
+        </div>
+        {blocos.length === 0 ? (
+          <p className="px-4 py-6 text-sm text-neutral-500 text-center">Nenhum bloco salvo ainda.</p>
+        ) : (
+          <ul className="divide-y divide-neutral-100">
+            {blocos.map(b => (
+              <li key={b.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm">
+                <span className="font-semibold text-neutral-900">{b.name}</span>
+                <span className="flex items-center gap-2">
+                  <span className="text-xs text-neutral-500 font-mono">{b.size} leads · {new Date(b.createdAt).toLocaleDateString('pt-BR')}</span>
+                  <button onClick={() => direcionar('selections', b.id, b.name)} className="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold">Direcionar para a marca</button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       <div className="bg-white border border-neutral-200 rounded-2xl overflow-hidden">
@@ -141,7 +195,10 @@ const CentralLeads: React.FC<{ leads: Lead[]; onShowToast: (m: string) => void; 
             {remessas.map(r => (
               <li key={r.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
                 <span className="font-semibold text-neutral-900">{r.name}</span>
-                <span className="text-xs text-neutral-500 font-mono">{r.leadCount} leads · {r.blockedCount} bloqueados · {new Date(r.createdAt).toLocaleDateString('pt-BR')}</span>
+                <span className="flex items-center gap-2">
+                  <span className="text-xs text-neutral-500 font-mono">{r.leadCount} leads · {r.blockedCount} bloqueados · {new Date(r.createdAt).toLocaleDateString('pt-BR')}</span>
+                  <button onClick={() => direcionar('remessas', r.id, r.name)} className="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold">Direcionar para a marca</button>
+                </span>
               </li>
             ))}
           </ul>

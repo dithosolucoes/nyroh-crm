@@ -13,7 +13,7 @@ import JSZip from 'jszip';
 import pg from 'pg';
 import { Lead, CallLog, ColumnStatus, PIPELINE_COLUMNS, CustomTag, Salesperson, DistributeLeadsParams, User, AuditLog, QuickReply } from './src/types.js';
 import { getLeadNiche } from './src/lib/niche.js';
-import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa } from './src/lib/uxRoutes.js';
+import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regraForaDoDisparoSql, instanciaDaSafra } from './src/lib/uxRoutes.js';
 import { hashPassword, verifyPassword, generateSessionToken, DEFAULT_USERS, StoredUser, isUserAdmin } from './src/lib/serverAuth.js';
 import { performWebsiteAudit } from './src/lib/auditEngine.js';
 import { executeFluxoRequest, downloadFluxoMediaBinary, prepareOutboundMedia, fluxoInstancePath, hasFfmpeg } from './src/lib/fluxoClient.js';
@@ -5478,6 +5478,7 @@ app.get('/api/inbox', async (req: any, res) => {
   try {
     const params: any[] = [];
     const where: string[] = ['l.last_message_at IS NOT NULL'];
+    if (uxSchemaOn()) where.push('l.blocked_at IS NULL'); // bloqueados saem da caixa de entrada
 
     if (ownerFilter) {
       params.push(ownerFilter);
@@ -6704,6 +6705,7 @@ app.post('/api/leads/distribute', async (req: any, res) => {
         FROM leads l
         LEFT JOIN calls c ON l.id = c.lead_id
         WHERE l.column_status = 'Leads'
+          ${uxSchemaOn() ? 'AND l.blocked_at IS NULL' : ''}
       `;
       const params: any[] = [];
 
@@ -9779,13 +9781,16 @@ app.post('/api/campaign/dispatch', async (req: any, res) => {
       // Antes de disparar, tira do pipeline quem já foi contatado (outra safra ou CRM)
       await cortarJaContatados();
 
+      // Regra única (todas as marcas): lead bloqueado fora e um contato por telefone por dia.
+      const foraDoDisparo = uxSchemaOn() ? regraForaDoDisparoSql() : '';
+
       if (Array.isArray(leadIds) && leadIds.length > 0) {
         const updateRes = await pgPool.query(
           `UPDATE campaign_leads
            SET status = 'QUARENTENA',
                sent_at = CURRENT_TIMESTAMP,
                quarantine_expires_at = $1
-           WHERE batch_id = $2 AND id = ANY($3::text[])
+           WHERE batch_id = $2 AND id = ANY($3::text[]) ${foraDoDisparo}
            RETURNING id, name, phone_number AS "phoneNumber", is_mobile AS "isMobile", public_url AS "publicUrl", website, niche`,
           [quarantineEnds, batchId, leadIds]
         );
@@ -9805,7 +9810,7 @@ app.post('/api/campaign/dispatch', async (req: any, res) => {
                    AND cl2.status NOT IN ('STAGING', 'DESCARTADO')
                    AND (cl2.whatsapp_message_id IS NOT NULL OR cl2.status = 'INTERESSADO')
                    AND regexp_replace(cl2.phone_number, '[^0-9]', '', 'g') = regexp_replace(campaign_leads.phone_number, '[^0-9]', '', 'g')
-               )
+               ) ${foraDoDisparo}
              ORDER BY created_at ASC
              LIMIT $3
            )
@@ -9829,7 +9834,7 @@ app.post('/api/campaign/dispatch', async (req: any, res) => {
                    AND cl2.status NOT IN ('STAGING', 'DESCARTADO')
                    AND (cl2.whatsapp_message_id IS NOT NULL OR cl2.status = 'INTERESSADO')
                    AND regexp_replace(cl2.phone_number, '[^0-9]', '', 'g') = regexp_replace(campaign_leads.phone_number, '[^0-9]', '', 'g')
-               )
+               ) ${foraDoDisparo}
              ORDER BY created_at ASC
            )
            RETURNING id, name, phone_number AS "phoneNumber", is_mobile AS "isMobile", public_url AS "publicUrl", website, niche`,
@@ -12047,7 +12052,9 @@ async function main() {
     processCampaignDispatch: async (jobData, ctx) => {
       const apiKey = (memoryFluxoConfig.apiKey || '').trim();
       const apiSecret = (memoryFluxoConfig.apiSecret || '').trim();
-      const instanceId = (memoryFluxoConfig.instanceId || '').trim();
+      // Safra ligada a marca: envia pelo número vinculado à marca. Sem marca, usa a instância global.
+      const safraInst = await instanciaDaSafra(pgPool, String(jobData.batchId || jobData.campaignId || ''));
+      const instanceId = safraInst.temMarca ? safraInst.instanceId : (memoryFluxoConfig.instanceId || '').trim();
       const attempt = ctx?.attempt ?? 1;
       const maxAttempts = ctx?.maxAttempts ?? 1;
       const isLastAttempt = attempt >= maxAttempts;
