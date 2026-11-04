@@ -27,6 +27,7 @@ export type AdminViewSection =
   | 'carteiras'
   | 'vendedores'
   | 'estrutura'
+  | 'configuracoes'
   | 'auditoria'
   | 'blindagem'
   | 'whatsapp';
@@ -181,6 +182,12 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
         </Grupo>
 
         <Grupo titulo="Configurações">
+          <ItemMenu
+            label="Marcas e números"
+            icon={<Layers className="w-4 h-4 text-neutral-400" />}
+            active={currentSection === 'configuracoes'}
+            onClick={() => ir('configuracoes')}
+          />
           <ItemMenu
             label="Equipe"
             icon={<Users className="w-4 h-4 text-neutral-400" />}

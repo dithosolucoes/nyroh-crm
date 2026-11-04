@@ -777,8 +777,10 @@ export default function App() {
                     setActiveTab('whatsapp');
                   }}
                 />
-              ) : adminSection === 'estrutura' ? (
+              ) : adminSection === 'estrutura' || adminSection === 'configuracoes' ? (
                 <AdminEstruturaView
+                  key={adminSection}
+                  secao={adminSection === 'configuracoes' ? 'configuracoes' : 'leads'}
                   leads={leads}
                   onShowToast={showToast}
                   onOpenDetails={(lead) => setSelectedLeadForDetail(lead)}

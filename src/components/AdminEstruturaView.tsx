@@ -20,6 +20,8 @@ interface Props {
   leads: Lead[];
   onShowToast: (msg: string) => void;
   onOpenDetails: (lead: Lead) => void;
+  /** 'leads': central e bloqueios. 'configuracoes': marcas e números. */
+  secao?: 'leads' | 'configuracoes';
 }
 
 async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
@@ -39,19 +41,29 @@ const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'bloqueios', label: 'Bloqueios pendentes' },
 ];
 
-export const AdminEstruturaView: React.FC<Props> = ({ leads, onShowToast, onOpenDetails }) => {
-  const [tab, setTab] = useState<Tab>('central');
+const TABS_POR_SECAO: Record<'leads' | 'configuracoes', Tab[]> = {
+  leads: ['central', 'bloqueios'],
+  configuracoes: ['marcas', 'numeros'],
+};
+
+export const AdminEstruturaView: React.FC<Props> = ({ leads, onShowToast, onOpenDetails, secao = 'leads' }) => {
+  const tabsDaSecao = TABS.filter(t => TABS_POR_SECAO[secao].includes(t.id));
+  const [tab, setTab] = useState<Tab>(TABS_POR_SECAO[secao][0]);
   const [error, setError] = useState<string | null>(null);
 
   return (
     <div className="w-full max-w-6xl mx-auto flex flex-col gap-4">
       <div>
-        <h2 className="text-lg font-bold text-neutral-900">Estrutura</h2>
-        <p className="text-sm text-neutral-500">Leads, marcas, números e bloqueios. Cada marca tem seus serviços, números e modelos de mensagem.</p>
+        <h2 className="text-lg font-bold text-neutral-900">{secao === 'leads' ? 'Leads' : 'Marcas e números'}</h2>
+        <p className="text-sm text-neutral-500">
+          {secao === 'leads'
+            ? 'Central de leads, remessas, blocos salvos e bloqueios.'
+            : 'Cada marca tem seus serviços e modelos de mensagem. Cada número pertence a uma ou mais marcas.'}
+        </p>
       </div>
 
       <nav className="flex gap-1.5 overflow-x-auto no-scrollbar bg-neutral-100 p-1 rounded-xl border border-neutral-200 w-fit max-w-full">
-        {TABS.map(t => (
+        {tabsDaSecao.map(t => (
           <button
             key={t.id}
             onClick={() => { setTab(t.id); setError(null); }}
