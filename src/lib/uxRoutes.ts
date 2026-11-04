@@ -197,7 +197,8 @@ export function registerUxRoutes(app: Express, deps: UxDeps): void {
   }));
 
   // ---------- Números ----------
-  app.get('/api/phone-numbers', withDb(async (pool, _req, res) => {
+  app.get('/api/phone-numbers', withDb(async (pool, req, res) => {
+    if (!requireAdmin(req, res)) return; // números e instâncias são só do admin
     const r = await pool.query(`
       SELECT p.id, p.label, p.phone_display AS "phoneDisplay", p.meta_phone_number_id AS "metaPhoneNumberId",
              p.fluxo_instance_id AS "fluxoInstanceId",
@@ -243,7 +244,8 @@ export function registerUxRoutes(app: Express, deps: UxDeps): void {
 
   // ---------- Central de leads ----------
   /** Remessas (uploads) com quantos leads cada uma tem e quantos já estão bloqueados. */
-  app.get('/api/central/remessas', withDb(async (pool, _req, res) => {
+  app.get('/api/central/remessas', withDb(async (pool, req, res) => {
+    if (!requireAdmin(req, res)) return; // a Central de leads é só do admin
     const r = await pool.query(`
       SELECT r.id, r.name, r.created_at AS "createdAt",
              COUNT(l.id)::int AS "leadCount",

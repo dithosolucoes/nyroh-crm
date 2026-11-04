@@ -10,6 +10,7 @@ import {
 import { openWhatsApp, getStoredWhatsAppAppType, setStoredWhatsAppAppType, WhatsAppAppType, getDialerTelLink, getStoredWhatsAppTemplate, formatWhatsAppMessage } from '../lib/phone';
 import { QrCodeModal } from './QrCodeModal';
 import { BlockRequestDialog, BlockHistory } from './BlockRequestDialog';
+import { LeadTimeline } from './LeadTimeline';
 import { AuditReportModal } from './AuditReportModal';
 import { WebsiteAuditReport } from '../types/audit';
 import { getFollowUpInfo } from '../lib/followUp';
@@ -1265,6 +1266,15 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                 </div>
               )}
             </form>
+
+            {/* Linha do tempo: ligações, sugestões de bloqueio e mensagens do vendedor, com contador de toques */}
+            <div className="pt-1">
+              <h3 className="text-xs font-bold text-neutral-800 mb-2.5 flex items-center gap-1.5 uppercase tracking-wider">
+                <History className="w-3.5 h-3.5 text-neutral-600" />
+                <span>Linha do tempo</span>
+              </h3>
+              <LeadTimeline leadId={lead.id} calls={calls as any} refreshKey={blockRefresh} />
+            </div>
 
             {/* Histórico Cronológico de Ligações */}
             <div className="pt-1">
