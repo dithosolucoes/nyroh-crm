@@ -219,6 +219,15 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
               <span className="inline-block px-1.5 py-0.5 bg-neutral-100 text-neutral-600 rounded text-[9px] font-medium border border-neutral-200/60">
                 {getLeadNiche(lead)}
               </span>
+              {(lead.marcas || []).map(m => (
+                <span
+                  key={m.id}
+                  className="inline-block px-1.5 py-0.5 bg-violet-50 text-violet-800 rounded text-[9px] font-bold border border-violet-200 max-w-[110px] truncate"
+                  title={`Já abordado pela marca ${m.name}${m.lastAt ? ` em ${new Date(m.lastAt).toLocaleDateString('pt-BR')}` : ''}`}
+                >
+                  {m.name}
+                </span>
+              ))}
               {(lead.contatosHoje || 0) > 0 && (
                 <span
                   className="inline-block px-1.5 py-0.5 bg-blue-50 text-blue-800 rounded text-[9px] font-bold border border-blue-200"

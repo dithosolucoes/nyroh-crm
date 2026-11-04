@@ -68,3 +68,12 @@ ALTER TABLE campaign_batches ADD COLUMN IF NOT EXISTS brand_id VARCHAR(255) REFE
 
 -- Contagem de disparos do dia por lead (card do Pipeline).
 CREATE INDEX IF NOT EXISTS idx_campaign_leads_sent_at ON campaign_leads (sent_at);
+
+-- Historico de marcas por telefone: um lead pode ter sido abordado por mais de uma marca.
+CREATE TABLE IF NOT EXISTS contato_marcas (
+  telefone VARCHAR(100) NOT NULL,
+  marca_id VARCHAR(255) NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+  primeiro_contato TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  ultimo_contato TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (telefone, marca_id)
+);

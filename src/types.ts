@@ -110,6 +110,8 @@ export interface Lead {
   callCount?: number;
   /** Disparos enviados hoje (São Paulo) para o telefone deste lead. Vem de /api/leads. */
   contatosHoje?: number;
+  /** Marcas que já abordaram este telefone (histórico). Vem de /api/leads. */
+  marcas?: Array<{ id: string; name: string; lastAt?: string }>;
   lastCallAt?: string;
   lastCallTag?: string;
   nextFollowUpAt?: string;

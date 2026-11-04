@@ -5747,7 +5747,11 @@ app.get('/api/leads', async (req: any, res) => {
             WHERE cl.sent_at >= (date_trunc('day', now() AT TIME ZONE 'America/Sao_Paulo') AT TIME ZONE 'America/Sao_Paulo')
               AND cl.sent_at < ((date_trunc('day', now() AT TIME ZONE 'America/Sao_Paulo') + interval '1 day') AT TIME ZONE 'America/Sao_Paulo')
               AND regexp_replace(cl.phone_number, '[^0-9]', '', 'g') = regexp_replace(l.phone_number, '[^0-9]', '', 'g')
-          ) AS "contatosHoje"
+          ) AS "contatosHoje",
+          ${uxSchemaOn() ? `(SELECT COALESCE(json_agg(json_build_object('id', b.id, 'name', b.name, 'lastAt', ch.ultimo_contato) ORDER BY ch.ultimo_contato DESC), '[]'::json)
+            FROM contato_marcas ch JOIN brands b ON b.id = ch.marca_id
+            WHERE ch.telefone = regexp_replace(l.phone_number, '[^0-9]', '', 'g')
+          )` : `'[]'::json`} AS "marcas"
         FROM leads l
         LEFT JOIN call_stats cs ON l.id = cs.lead_id
         LEFT JOIN latest_calls lc ON l.id = lc.lead_id
@@ -12149,6 +12153,21 @@ async function main() {
                 WHERE id = $2`,
               [remoteId || null, jobData.leadId]
             );
+            // Histórico de marcas: registra que este telefone foi abordado pela marca da safra.
+            if (uxSchemaOn() && !opts.dryRun) {
+              try {
+                await pgPool.query(
+                  `INSERT INTO contato_marcas (telefone, marca_id, primeiro_contato, ultimo_contato)
+                   SELECT regexp_replace(cl.phone_number, '[^0-9]', '', 'g'), cb.brand_id, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                     FROM campaign_leads cl JOIN campaign_batches cb ON cb.id = cl.batch_id
+                    WHERE cl.id = $1 AND cb.brand_id IS NOT NULL
+                   ON CONFLICT (telefone, marca_id) DO UPDATE SET ultimo_contato = CURRENT_TIMESTAMP`,
+                  [jobData.leadId]
+                );
+              } catch (historicoErr: any) {
+                console.error('[contato_marcas] não gravou histórico da marca:', historicoErr?.message || historicoErr);
+              }
+            }
             await pgPool.query(
               `INSERT INTO lead_messages (id, lead_id, phone_number, sender, sender_name, text, template_name, status, status_rank, whatsapp_message_id, timestamp)
                VALUES ($1, $2, $3, 'salesperson', $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
