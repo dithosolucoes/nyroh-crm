@@ -21,6 +21,7 @@ import type { FluxoApiResult } from './src/lib/fluxoClient.js';
 import { verifyFluxoWebhook } from './src/lib/webhookAuth.js';
 import { detectOptOut, sanitizeTemplateVariable, resolveManualInterest, SEM_INTERESSE_TAG } from './src/lib/leadIntent.js';
 import { distributionByCount } from './src/lib/distribution.js';
+import { getMetaProvider, getMetaCredentials, verifyMetaSignature, metaSendText, metaSendTemplate, metaListPhoneNumbers, metaListTemplates } from './src/lib/metaClient.js';
 import { arePhonesEquivalent, normalizeE164Phone, phoneDigitVariants, formatAndValidateE164Phone } from './src/lib/phone.js';
 import { getUploadsDir, getInboxDir, INBOX_SUBDIR, isUploadsDirDurable, publicBaseUrl, saveMediaBuffer, extensionFor } from './src/lib/mediaStorage.js';
 import { statusRank, shouldApplyStatus, normalizeStatus } from './src/lib/fluxoStatus.js';
@@ -405,7 +406,7 @@ const memoryMetaConfig = {
   accessToken: process.env.META_ACCESS_TOKEN || process.env.WHATSAPP_TOKEN || '',
   wabaId: process.env.META_WABA_ID || process.env.WHATSAPP_WABA_ID || '',
   phoneNumberId: process.env.META_PHONE_NUMBER_ID || '',
-  verifyToken: process.env.META_VERIFY_TOKEN || 'crm_webhook_meta_token'
+  verifyToken: process.env.META_VERIFY_TOKEN || ''
 };
 
 const lastFluxoWebhookEvents: FluxoWebhookEvent[] = [];
@@ -3658,12 +3659,14 @@ app.post('/api/campaign/test-dispatch', async (req: any, res) => {
   const apiSecret = (memoryFluxoConfig.apiSecret || process.env.FLUXO_SECRET || '').trim();
   const instanceId = memoryFluxoConfig.instanceId || process.env.FLUXO_INSTANCE_ID || '';
 
-  if (apiKey && apiSecret) {
+  if ((apiKey && apiSecret) || getMetaProvider() === 'meta') {
     try {
       if (dispatchMode === 'direct_text') {
         // Modo de envio direto de texto puro
         const targetPath = fluxoInstancePath('/messages', instanceId);
-        const fRes = await executeFluxoRequest({
+        const fRes = getMetaProvider() === 'meta'
+          ? metaToFluxoResult(await metaSendText(formattedE164, renderedFullText))
+          : await executeFluxoRequest({
           method: 'POST',
           path: targetPath,
           body: {
@@ -3819,6 +3822,24 @@ app.get('/api/campaign/test-dispatch/status/:messageId', async (req: any, res) =
 });
 
 // GET Webhook Events
+// GET /api/admin/meta/sync: lê da Meta os números e os modelos da conta WABA (sem gravar nada)
+app.get('/api/admin/meta/sync', async (_req: any, res) => {
+  const creds = getMetaCredentials();
+  const [phones, templates] = await Promise.all([metaListPhoneNumbers(), metaListTemplates()]);
+  res.json({
+    provider: getMetaProvider(),
+    configured: {
+      accessToken: Boolean(creds.accessToken),
+      phoneNumberId: Boolean(creds.phoneNumberId),
+      wabaId: Boolean(creds.wabaId),
+      appSecret: Boolean(creds.appSecret)
+    },
+    phoneNumbers: phones.success ? (phones.data?.data || []) : [],
+    templates: templates.success ? (templates.data?.data || []) : [],
+    errors: { phoneNumbers: phones.error || null, templates: templates.error || null }
+  });
+});
+
 app.get('/api/admin/fluxo/events', (req: any, res) => {
   return res.json({
     success: true,
@@ -4840,16 +4861,10 @@ app.get(['/api/v1/webhook', '/api/webhooks/fluxo', '/api/webhooks/meta', '/api/w
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
 
-  const expectedToken = (memoryMetaConfig.verifyToken || process.env.META_VERIFY_TOKEN || 'crm_webhook_meta_token').trim();
+  const expectedToken = (memoryMetaConfig.verifyToken || process.env.META_VERIFY_TOKEN || '').trim();
 
-  if (mode === 'subscribe' && token === expectedToken) {
+  if (mode === 'subscribe' && expectedToken && token === expectedToken) {
     console.log('[Meta Webhook Verified Successfully]: hub.challenge aceito pela Meta.');
-    return res.status(200).send(challenge);
-  }
-
-  // Fallback permissivo para verificação inicial
-  if (challenge && (!token || token === expectedToken || token === 'crm_webhook_meta_token')) {
-    console.log('[Meta Webhook Verified (Fallback)]: hub.challenge aceito.');
     return res.status(200).send(challenge);
   }
 
@@ -4901,7 +4916,10 @@ app.post(['/api/v1/webhook', '/api/webhooks/fluxo', '/api/webhooks/meta', '/api/
   const rawBody = (req as any).rawBody || JSON.stringify(event);
 
   // Assinatura HMAC (§A9): HMAC-SHA256(whsec_…, `${timestamp}\n${corpo bruto}`)
-  const authCheck = verifyFluxoWebhook(rawBody, req.headers as any);
+  const metaSig = req.headers['x-hub-signature-256'];
+  const authCheck = metaSig
+    ? verifyMetaSignature(rawBody, String(metaSig))
+    : verifyFluxoWebhook(rawBody, req.headers as any);
   if (!authCheck.isValid) {
     console.warn('[Webhook Auth Failed]:', authCheck.reason);
     return res.status(401).json({ error: 'Unauthorized: Assinatura do webhook inválida.', hint: authCheck.reason });
@@ -11252,6 +11270,14 @@ async function getTemplateDefinition(
  * Envia um modelo aprovado pela FluxoAPI montando o corpo a partir da definição REAL do modelo (`fields[]`).
  * Se faltar valor obrigatório ou o modelo não for enviável, devolve um resultado de falha SEM gastar requisição.
  */
+/** Converte a resposta da Graph API (Meta) para o formato usado pelo restante do CRM. */
+function metaToFluxoResult(r: { success: boolean; status: number; data: any; error?: string }): FluxoApiResult<any> {
+  if (r.success) {
+    return { success: true, status: r.status, data: { id: r.data?.messages?.[0]?.id, ...r.data } } as FluxoApiResult<any>;
+  }
+  return { success: false, status: r.status, error: { code: 'meta_error', message: r.error || 'Erro na Meta' } } as FluxoApiResult<any>;
+}
+
 async function sendTemplateViaFluxo(opts: {
   to: string;
   name: string;
@@ -11263,6 +11289,16 @@ async function sendTemplateViaFluxo(opts: {
   creds: { instanceId: string; apiKey: string; apiSecret: string };
 }): Promise<FluxoApiResult<any>> {
   const language = opts.language || 'pt_BR';
+  if (getMetaProvider() === 'meta') {
+    const direct = await metaSendTemplate({
+      to: opts.to,
+      name: opts.name,
+      language,
+      variables: opts.variables,
+      headerImageUrl: opts.headerMediaUrl
+    });
+    return metaToFluxoResult(direct);
+  }
   const def = await getTemplateDefinition(opts.name, language, opts.creds);
   if (def && ((def.status && String(def.status).toUpperCase() !== 'APPROVED') || def.sendable === false)) {
     return {
