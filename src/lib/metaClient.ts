@@ -29,7 +29,7 @@ export function verifyMetaSignature(rawBody: string, signatureHeader: string | u
   return { isValid: true };
 }
 
-async function graphRequest(method: 'GET' | 'POST', path: string, body?: unknown): Promise<{ success: boolean; status: number; data: any; error?: string }> {
+async function graphRequest(method: 'GET' | 'POST' | 'DELETE', path: string, body?: unknown): Promise<{ success: boolean; status: number; data: any; error?: string }> {
   const { accessToken } = getMetaCredentials();
   if (!accessToken) return { success: false, status: 0, data: null, error: 'META_ACCESS_TOKEN não configurado.' };
   try {
@@ -84,7 +84,9 @@ export async function metaSendTemplate(opts: {
     components.push({ type: 'header', parameters: [{ type: 'image', image: { link: opts.headerImageUrl } }] });
   }
   const vars = opts.variables || {};
-  const keys = Object.keys(vars).sort((a, b) => Number(a) - Number(b));
+  const rawKeys = Object.keys(vars);
+  const allNumeric = rawKeys.length > 0 && rawKeys.every(k => /^\d+$/.test(k));
+  const keys = allNumeric ? rawKeys.sort((a, b) => Number(a) - Number(b)) : rawKeys;
   if (keys.length) {
     components.push({ type: 'body', parameters: keys.map(k => ({ type: 'text', text: String(vars[k] ?? '') })) });
   }
@@ -112,5 +114,56 @@ export async function metaListPhoneNumbers() {
 export async function metaListTemplates() {
   const { wabaId } = getMetaCredentials();
   if (!wabaId) return { success: false, status: 0, data: null, error: 'META_WABA_ID não configurado.' };
-  return graphRequest('GET', `/${wabaId}/message_templates?fields=name,language,status,category,components&limit=200`);
+  return graphRequest('GET', `/${wabaId}/message_templates?fields=id,name,language,status,category,components,quality_score,rejected_reason&limit=200`);
+}
+
+/** Envia mídia por link HTTPS (imagem, vídeo, áudio ou documento). */
+export async function metaSendMedia(opts: {
+  to: string;
+  kind: 'image' | 'video' | 'audio' | 'document';
+  link: string;
+  caption?: string;
+  filename?: string;
+}) {
+  const { phoneNumberId } = getMetaCredentials();
+  if (!phoneNumberId) return { success: false, status: 0, data: null, error: 'META_PHONE_NUMBER_ID não configurado.' };
+  const media: Record<string, string> = { link: opts.link };
+  if (opts.caption && opts.kind !== 'audio') media.caption = opts.caption;
+  if (opts.filename && opts.kind === 'document') media.filename = opts.filename;
+  return graphRequest('POST', `/${phoneNumberId}/messages`, {
+    messaging_product: 'whatsapp',
+    to: toMetaPhone(opts.to),
+    type: opts.kind,
+    [opts.kind]: media
+  });
+}
+
+/** Marca uma mensagem recebida como lida (aparece o "visto azul" para o cliente). */
+export async function metaMarkRead(messageId: string) {
+  const { phoneNumberId } = getMetaCredentials();
+  if (!phoneNumberId) return { success: false, status: 0, data: null, error: 'META_PHONE_NUMBER_ID não configurado.' };
+  return graphRequest('POST', `/${phoneNumberId}/messages`, {
+    messaging_product: 'whatsapp',
+    status: 'read',
+    message_id: messageId
+  });
+}
+
+/** Cria um modelo na conta WABA. O status inicial é PENDING até a Meta revisar. */
+export async function metaCreateTemplate(payload: {
+  name: string;
+  language: string;
+  category: 'MARKETING' | 'UTILITY' | 'AUTHENTICATION';
+  components: any[];
+}) {
+  const { wabaId } = getMetaCredentials();
+  if (!wabaId) return { success: false, status: 0, data: null, error: 'META_WABA_ID não configurado.' };
+  return graphRequest('POST', `/${wabaId}/message_templates`, payload);
+}
+
+/** Apaga um modelo pelo nome (apaga todas as versões de idioma com esse nome). */
+export async function metaDeleteTemplate(name: string) {
+  const { wabaId } = getMetaCredentials();
+  if (!wabaId) return { success: false, status: 0, data: null, error: 'META_WABA_ID não configurado.' };
+  return graphRequest('DELETE', `/${wabaId}/message_templates?name=${encodeURIComponent(name)}`);
 }

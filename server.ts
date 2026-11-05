@@ -21,7 +21,7 @@ import type { FluxoApiResult } from './src/lib/fluxoClient.js';
 import { verifyFluxoWebhook } from './src/lib/webhookAuth.js';
 import { detectOptOut, sanitizeTemplateVariable, resolveManualInterest, SEM_INTERESSE_TAG } from './src/lib/leadIntent.js';
 import { distributionByCount } from './src/lib/distribution.js';
-import { getMetaProvider, getMetaCredentials, verifyMetaSignature, metaSendText, metaSendTemplate, metaListPhoneNumbers, metaListTemplates } from './src/lib/metaClient.js';
+import { getMetaProvider, getMetaCredentials, verifyMetaSignature, metaSendText, metaSendTemplate, metaSendMedia, metaMarkRead, metaCreateTemplate, metaDeleteTemplate, metaListPhoneNumbers, metaListTemplates } from './src/lib/metaClient.js';
 import { arePhonesEquivalent, normalizeE164Phone, phoneDigitVariants, formatAndValidateE164Phone } from './src/lib/phone.js';
 import { getUploadsDir, getInboxDir, INBOX_SUBDIR, isUploadsDirDurable, publicBaseUrl, saveMediaBuffer, extensionFor } from './src/lib/mediaStorage.js';
 import { statusRank, shouldApplyStatus, normalizeStatus } from './src/lib/fluxoStatus.js';
@@ -2519,6 +2519,12 @@ app.post('/api/admin/fluxo/send-test-message', async (req: any, res) => {
     return res.status(400).json({ error: 'Destinatário (to) e mensagem de texto (text) são obrigatórios.' });
   }
 
+  if (getMetaProvider() === 'meta') {
+    const direct = await metaSendText(String(to), String(text));
+    if (!direct.success) return res.status(502).json({ success: false, error: { code: 'meta_error', message: direct.error } });
+    return res.json({ success: true, messageId: direct.data?.messages?.[0]?.id, provider: 'meta' });
+  }
+
   const apiKey = (memoryFluxoConfig.apiKey || process.env.FLUXO_KEY || '').trim();
   const apiSecret = (memoryFluxoConfig.apiSecret || process.env.FLUXO_SECRET || '').trim();
 
@@ -2591,6 +2597,21 @@ app.post('/api/admin/fluxo/send-test-message', async (req: any, res) => {
 // WEBHOOK FLUXOAPI & EVENT STORAGE
 // List Instances — dados REAIS da FluxoAPI (GET /v1/instances). Nunca inventa uma "linha conectada".
 app.get('/api/admin/fluxo/instances', async (req: any, res) => {
+  // Provedor Meta: lista os números da conta WABA direto da Meta, no formato que a tela já usa
+  if (getMetaProvider() === 'meta') {
+    const r = await metaListPhoneNumbers();
+    if (!r.success) return res.json({ success: false, instances: [], error: { message: r.error } });
+    const instances = (r.data?.data || []).map((n: any) => ({
+      id: n.id,
+      name: n.verified_name || n.display_phone_number,
+      phone: n.display_phone_number,
+      status: String(n.status || 'unknown').toLowerCase(),
+      quality: n.quality_rating || null,
+      messagingLimit: null,
+      coexistence: false
+    }));
+    return res.json({ success: true, instances });
+  }
   const apiKey = (memoryFluxoConfig.apiKey || '').trim();
   const apiSecret = (memoryFluxoConfig.apiSecret || '').trim();
 
@@ -2856,6 +2877,24 @@ function normalizeMetaGraphTemplate(t: any) {
 
 // List Templates
 app.get('/api/admin/fluxo/templates', async (req: any, res) => {
+  // Provedor Meta: lê os modelos da conta WABA direto da Meta, com o status de aprovação
+  if (getMetaProvider() === 'meta') {
+    const r = await metaListTemplates();
+    if (!r.success) return res.json({ success: false, templates: [], error: { message: r.error } });
+    const templates = (r.data?.data || []).map((t: any) => ({
+      id: t.id || t.name,
+      name: t.name,
+      category: t.category,
+      language: t.language,
+      status: t.status,
+      components: t.components || [],
+      usageCount: 0,
+      qualityScore: t.quality_score?.score || 'UNKNOWN',
+      rejectedReason: t.rejected_reason || null,
+      submittedToMeta: true
+    }));
+    return res.json({ success: true, templates });
+  }
   const apiKey = (memoryFluxoConfig.apiKey || process.env.FLUXO_KEY || '').trim();
   const apiSecret = (memoryFluxoConfig.apiSecret || process.env.FLUXO_SECRET || '').trim();
   const instanceId = memoryFluxoConfig.instanceId || process.env.FLUXO_INSTANCE_ID || '';
@@ -3203,10 +3242,26 @@ app.post('/api/admin/fluxo/templates', async (req: any, res) => {
   let remoteResult: any = null;
 
   if (!isSavingAsDraft) {
-    if (!apiKey || !apiSecret) {
+    if (getMetaProvider() !== 'meta' && (!apiKey || !apiSecret)) {
       return res.status(400).json({ error: 'Credenciais da FluxoAPI (Key e Secret) não configuradas.' });
     }
 
+    if (getMetaProvider() === 'meta') {
+      // Criação direta na Meta (WABA). A Meta revisa e aprova; o status chega pelo webhook.
+      const metaComponents: any[] = [{
+        type: 'BODY',
+        text: bodyText.trim(),
+        ...(resolvedExamples.length ? { example: { body_text: [resolvedExamples] } } : {})
+      }];
+      if (footerText) metaComponents.push({ type: 'FOOTER', text: String(footerText) });
+      if (formattedButtons.length > 0) metaComponents.push({ type: 'BUTTONS', buttons: formattedButtons });
+      remoteResult = metaToFluxoResult(await metaCreateTemplate({
+        name: normalizedName,
+        language: targetLanguage,
+        category: targetCategory as 'MARKETING' | 'UTILITY',
+        components: metaComponents
+      }));
+    } else {
     const targetPath = instanceId ? `/v1/instances/${instanceId}/templates` : '/v1/templates';
     remoteResult = await executeFluxoRequest({
       method: 'POST',
@@ -3215,6 +3270,7 @@ app.post('/api/admin/fluxo/templates', async (req: any, res) => {
       apiKey,
       apiSecret
     });
+    }
 
     if (!remoteResult.success) {
       console.error('[Meta/FluxoAPI Error]', remoteResult);
@@ -3346,6 +3402,14 @@ app.patch('/api/admin/fluxo/templates/:name/status', async (req: any, res) => {
 // Delete Template
 app.delete('/api/admin/fluxo/templates/:name', async (req: any, res) => {
   const { name } = req.params;
+
+  // Na Meta: apaga o modelo na conta WABA (se falhar, mantém o registro local para não perder a referência)
+  if (getMetaProvider() === 'meta') {
+    const del = await metaDeleteTemplate(String(name));
+    if (!del.success) {
+      return res.status(502).json({ success: false, error: { code: 'meta_error', message: del.error } });
+    }
+  }
 
   // Remove from memory
   const idx = memoryTemplates.findIndex(t => t.name.toLowerCase() === name.toLowerCase() || t.id === name);
@@ -11278,6 +11342,34 @@ function metaToFluxoResult(r: { success: boolean; status: number; data: any; err
   return { success: false, status: r.status, error: { code: 'meta_error', message: r.error || 'Erro na Meta' } } as FluxoApiResult<any>;
 }
 
+/** Envia um corpo (formato usado pela rota de chat) direto pela Meta. */
+async function sendBodyViaMeta(body: any): Promise<FluxoApiResult<any>> {
+  const to = String(body?.to || '');
+  if (body?.template) {
+    const t = body.template;
+    return metaToFluxoResult(await metaSendTemplate({
+      to,
+      name: String(t.name),
+      language: t.language || 'pt_BR',
+      variables: (t.body && typeof t.body === 'object') ? t.body : {},
+      headerImageUrl: t.header?.media?.link
+    }));
+  }
+  if (body?.type === 'text') {
+    return metaToFluxoResult(await metaSendText(to, String(body.text?.body || '')));
+  }
+  if (['image', 'video', 'audio', 'document'].includes(body?.type)) {
+    return metaToFluxoResult(await metaSendMedia({
+      to,
+      kind: body.type,
+      link: String(body.media?.url || ''),
+      caption: body.media?.caption,
+      filename: body.media?.filename
+    }));
+  }
+  return { success: false, status: 422, error: { code: 'unsupported_type', message: 'Tipo de mensagem não suportado pelo envio direto da Meta.' } } as any;
+}
+
 async function sendTemplateViaFluxo(opts: {
   to: string;
   name: string;
@@ -11546,11 +11638,13 @@ app.post('/api/leads/:leadId/messages', requireDatabaseReady, async (req: any, r
     if (preFailure) return await failMessage(preFailure);
 
     // ---- 3) PRÉ-REQUISITOS de envio ----
-    if (!fluxoKey || !fluxoSecret) {
-      return await failMessage(describeFluxoError({ code: 'missing_credentials' }));
-    }
-    if (!instanceId) {
-      return await failMessage(describeFluxoError({ code: 'instance_required' }));
+    if (getMetaProvider() !== 'meta') {
+      if (!fluxoKey || !fluxoSecret) {
+        return await failMessage(describeFluxoError({ code: 'missing_credentials' }));
+      }
+      if (!instanceId) {
+        return await failMessage(describeFluxoError({ code: 'instance_required' }));
+      }
     }
     const phoneCheck = formatAndValidateE164Phone(cleanPhone);
     if (!phoneCheck.isValid) {
@@ -11633,13 +11727,15 @@ app.post('/api/leads/:leadId/messages', requireDatabaseReady, async (req: any, r
     }
 
     // ---- 5) ENVIA e AGUARDA a resposta da FluxoAPI ----
-    const fRes = await executeFluxoRequest({
-      method: 'POST',
-      path: targetPath,
-      body: bodyPayload,
-      apiKey: fluxoKey,
-      apiSecret: fluxoSecret
-    });
+    const fRes = getMetaProvider() === 'meta'
+      ? await sendBodyViaMeta(bodyPayload)
+      : await executeFluxoRequest({
+          method: 'POST',
+          path: targetPath,
+          body: bodyPayload,
+          apiKey: fluxoKey,
+          apiSecret: fluxoSecret
+        });
 
     if (!fRes.success) {
       const info = describeFluxoError(fRes.error, fRes.status);
@@ -11781,7 +11877,7 @@ app.post('/api/leads/:leadId/read', async (req: any, res) => {
   if (usePostgres && pgPool) {
     const r = await pgPool.query(
       `SELECT whatsapp_message_id FROM lead_messages
-        WHERE lead_id = $1 AND sender = 'lead' AND whatsapp_message_id LIKE 'msg\\_%'
+        WHERE lead_id = $1 AND sender = 'lead' AND (whatsapp_message_id LIKE 'msg\\_%' OR whatsapp_message_id LIKE 'wamid.%')
         ORDER BY timestamp DESC LIMIT 1`,
       [leadId]
     ).catch(() => null);
@@ -11789,7 +11885,7 @@ app.post('/api/leads/:leadId/read', async (req: any, res) => {
   } else {
     const mem = memoryLeadMessagesMap.get(leadId) || [];
     for (let i = mem.length - 1; i >= 0; i--) {
-      if (mem[i].sender === 'lead' && mem[i].remoteMessageId && mem[i].remoteMessageId!.startsWith('msg_')) {
+      if (mem[i].sender === 'lead' && mem[i].remoteMessageId && (mem[i].remoteMessageId!.startsWith('msg_') || mem[i].remoteMessageId!.startsWith('wamid.'))) {
         wamid = mem[i].remoteMessageId;
         break;
       }
@@ -11799,15 +11895,17 @@ app.post('/api/leads/:leadId/read', async (req: any, res) => {
     pgPool.query(`UPDATE leads SET unread_count = 0 WHERE id = $1`, [leadId]).catch(() => {});
   }
   if (!wamid) return res.json({ success: true, marked: false, reason: 'no_inbound' });
-  if (!memoryFluxoConfig.apiKey || !memoryFluxoConfig.apiSecret) return res.json({ success: true, marked: false, reason: 'not_configured' });
+  if (getMetaProvider() !== 'meta' && (!memoryFluxoConfig.apiKey || !memoryFluxoConfig.apiSecret)) return res.json({ success: true, marked: false, reason: 'not_configured' });
 
   lastReadMarkAt.set(leadId, now);
-  const fRes = await executeFluxoRequest({
-    method: 'POST',
-    path: `/v1/messages/${encodeURIComponent(wamid)}/read`,
-    apiKey: memoryFluxoConfig.apiKey,
-    apiSecret: memoryFluxoConfig.apiSecret
-  });
+  const fRes = getMetaProvider() === 'meta'
+    ? metaToFluxoResult(await metaMarkRead(wamid))
+    : await executeFluxoRequest({
+        method: 'POST',
+        path: `/v1/messages/${encodeURIComponent(wamid)}/read`,
+        apiKey: memoryFluxoConfig.apiKey,
+        apiSecret: memoryFluxoConfig.apiSecret
+      });
   if (!fRes.success) {
     const info = describeFluxoError(fRes.error, fRes.status);
     return res.status(200).json({ success: true, marked: false, reason: info.code, message: info.message });
