@@ -137,6 +137,20 @@ export async function regrasDeContatoSql(pool: pg.Pool): Promise<string> {
            AND ${digitos('lx.phone_number')} = ${tel})`;
       sql += `
     AND ((${envios}) + ${msgs}) < ${max}`;
+    } else if (r.tipo === 'trava_entre_marcas' && r.marca_id) {
+      // Se o lead foi abordado pela marca de origem dentro da janela, nenhuma OUTRA marca pode abordá-lo.
+      // A própria marca de origem continua livre (ela decide o próprio ritmo nas regras de limite).
+      const origem = escapaTexto(r.marca_id);
+      sql += `
+    AND (
+      (SELECT cbo.brand_id FROM campaign_batches cbo WHERE cbo.id = campaign_leads.batch_id) = ${origem}
+      OR NOT EXISTS (
+        SELECT 1 FROM campaign_leads ct JOIN campaign_batches cbt ON cbt.id = ct.batch_id AND cbt.brand_id = ${origem}
+         WHERE ct.id <> campaign_leads.id AND ct.sent_at IS NOT NULL
+           AND ${janelaSql('ct.sent_at', janela)}
+           AND ${digitos('ct.phone_number')} = ${tel}
+      )
+    )`;
     } else if (r.tipo === 'apos_resposta') {
       sql += `
     AND NOT EXISTS (
@@ -247,6 +261,25 @@ export function registerUxRoutes(app: Express, deps: UxDeps): void {
     res.status(201).json({ id, name });
   }));
 
+  /** Edita nome e serviços da marca. Só os campos enviados mudam. */
+  app.patch('/api/brands/:id', withDb(async (pool, req, res) => {
+    if (!requireAdmin(req, res)) return;
+    const sets: string[] = [];
+    const vals: unknown[] = [req.params.id];
+    if (req.body?.name !== undefined) {
+      const name = String(req.body.name || '').trim();
+      if (!name) return res.status(400).json({ error: 'Nome da marca é obrigatório.' });
+      vals.push(name); sets.push(`name = $${vals.length}`);
+    }
+    if (req.body?.services !== undefined) {
+      vals.push(String(req.body.services || '')); sets.push(`services = $${vals.length}`);
+    }
+    if (!sets.length) return res.status(400).json({ error: 'Nada para alterar.' });
+    const r = await pool.query(`UPDATE brands SET ${sets.join(', ')} WHERE id = $1 RETURNING id, name, services`, vals);
+    if (!r.rowCount) return res.status(404).json({ error: 'Marca não encontrada.' });
+    res.json(r.rows[0]);
+  }));
+
   /** Vínculo N:N: define exatamente quais números a marca usa. */
   app.put('/api/brands/:id/numbers', withDb(async (pool, req, res) => {
     if (!requireAdmin(req, res)) return;
@@ -292,6 +325,24 @@ export function registerUxRoutes(app: Express, deps: UxDeps): void {
     res.status(201).json({ id, label });
   }));
 
+  /** Edita os dados de um número. Só os campos enviados mudam. */
+  app.patch('/api/phone-numbers/:id', withDb(async (pool, req, res) => {
+    if (!requireAdmin(req, res)) return;
+    const mapa: Record<string, string> = { label: 'label', phoneDisplay: 'phone_display', metaPhoneNumberId: 'meta_phone_number_id' };
+    const sets: string[] = [];
+    const vals: unknown[] = [req.params.id];
+    for (const [campo, coluna] of Object.entries(mapa)) {
+      if (req.body?.[campo] === undefined) continue;
+      const v = String(req.body[campo] ?? '').trim();
+      if (campo === 'label' && !v) return res.status(400).json({ error: 'Nome do número é obrigatório.' });
+      vals.push(v || null); sets.push(`${coluna} = $${vals.length}`);
+    }
+    if (!sets.length) return res.status(400).json({ error: 'Nada para alterar.' });
+    const r = await pool.query(`UPDATE phone_numbers SET ${sets.join(', ')} WHERE id = $1 RETURNING id, label, phone_display AS "phoneDisplay", meta_phone_number_id AS "metaPhoneNumberId"`, vals);
+    if (!r.rowCount) return res.status(404).json({ error: 'Número não encontrado.' });
+    res.json(r.rows[0]);
+  }));
+
   /** Liga a safra (campanha) a uma marca. Só admin (rota /api/campaign/ já é restrita). */
   app.put('/api/campaign/batches/:id/brand', withDb(async (pool, req, res) => {
     if (!requireAdmin(req, res)) return;
@@ -317,7 +368,7 @@ export function registerUxRoutes(app: Express, deps: UxDeps): void {
   // ---------- Central de leads ----------
   /** Remessas (uploads) com quantos leads cada uma tem e quantos já estão bloqueados. */
   // ---------------- Regras de contato (tela Configurações > Regras de contato) ----------------
-  const TIPOS_REGRA = ['limite_janela', 'apos_resposta'];
+  const TIPOS_REGRA = ['limite_janela', 'apos_resposta', 'trava_entre_marcas'];
   const ESCOPOS_REGRA = ['global', 'marca'];
 
   /** Valida e normaliza uma regra. `atual` é a regra existente (no PATCH), para completar campos. */
@@ -334,6 +385,9 @@ export function registerUxRoutes(app: Express, deps: UxDeps): void {
     if (!TIPOS_REGRA.includes(tipo)) return { erro: 'Tipo de regra inválido.' };
     if (!ESCOPOS_REGRA.includes(escopo)) return { erro: 'Escopo inválido.' };
     if (escopo === 'marca' && !marcaId) return { erro: 'Escolha a marca desta regra.' };
+    if (tipo === 'trava_entre_marcas' && (escopo !== 'marca' || !marcaId)) {
+      return { erro: 'Na trava entre marcas, escolha a marca que abordou o lead primeiro.' };
+    }
     const max = Number(maxRaw);
     if (tipo === 'limite_janela' && (!Number.isInteger(max) || max < 1 || max > 50)) {
       return { erro: 'Quantidade de contatos deve ser um número entre 1 e 50.' };
@@ -546,12 +600,17 @@ export function registerUxRoutes(app: Express, deps: UxDeps): void {
            FROM leads l
            CROSS JOIN LATERAL (SELECT ${digitos('l.phone_number')} AS d) x
           WHERE l.blocked_at IS NULL AND ${origem.sql}
+            AND NOT EXISTS (
+              SELECT 1 FROM campaign_leads cx JOIN campaign_batches cbx ON cbx.id = cx.batch_id
+               WHERE cbx.brand_id = $${origem.params.length + 2} AND cx.sent_at IS NOT NULL
+                 AND ${digitos('cx.phone_number')} = ${digitos('l.phone_number')}
+            )
          ON CONFLICT (id) DO NOTHING`,
-        [batchId, ...origem.params]
+        [batchId, ...origem.params, brandId]
       );
       if (!ins.rowCount) {
         await client.query('ROLLBACK');
-        return res.status(400).json({ error: 'Nenhum lead elegível: bloqueados não entram.' });
+        return res.status(400).json({ error: 'Nenhum lead elegível: bloqueados ou já abordados por esta marca não entram.' });
       }
       await client.query(
         `UPDATE campaign_batches SET
@@ -597,6 +656,53 @@ export function registerUxRoutes(app: Express, deps: UxDeps): void {
     const raw = sel.rows[0].lead_ids;
     const ids: string[] = Array.isArray(raw) ? raw.map(String) : JSON.parse(String(raw || '[]'));
     await direcionarParaMarca(pool, req, res, { sql: 'l.id = ANY($2::text[])', params: [ids] });
+  }));
+
+  /**
+   * Análise de um bloco ou remessa: para cada lead, quando foi abordado por cada marca.
+   * Usado pela Central de leads para mostrar "abordou há 2 dias" antes de direcionar.
+   */
+  app.get('/api/central/analise', withDb(async (pool, req, res) => {
+    if (!requireAdmin(req, res)) return;
+    const tipo = String(req.query.tipo || '');
+    const id = String(req.query.id || '');
+    let filtro: string;
+    let params: unknown[];
+    if (tipo === 'bloco') {
+      const sel = await pool.query('SELECT lead_ids FROM lead_selections WHERE id = $1', [id]);
+      if (!sel.rowCount) return res.status(404).json({ error: 'Bloco não encontrado.' });
+      const raw = sel.rows[0].lead_ids;
+      const ids: string[] = Array.isArray(raw) ? raw.map(String) : JSON.parse(String(raw || '[]'));
+      filtro = 'l.id = ANY($1::text[])';
+      params = [ids];
+    } else if (tipo === 'remessa') {
+      filtro = 'l.remessa_id = $1';
+      params = [id];
+    } else {
+      return res.status(400).json({ error: 'Informe tipo (bloco ou remessa).' });
+    }
+    const r = await pool.query(`
+      WITH base AS (
+        SELECT l.id, l.name, l.phone_number, l.blocked_at
+          FROM leads l WHERE ${filtro}
+      ),
+      hist AS (
+        SELECT regexp_replace(cl.phone_number, '[^0-9]', '', 'g') AS tel,
+               cb.brand_id, cb.name AS batch_name, MAX(cl.sent_at) AS ultimo_envio
+          FROM campaign_leads cl
+          LEFT JOIN campaign_batches cb ON cb.id = cl.batch_id
+         WHERE cl.sent_at IS NOT NULL
+         GROUP BY 1, 2, 3
+      )
+      SELECT b.id, b.name, b.phone_number AS phone, b.blocked_at AS "blockedAt",
+             COALESCE(json_agg(json_build_object('brandId', h.brand_id, 'batchName', h.batch_name, 'sentAt', h.ultimo_envio)
+                      ORDER BY h.ultimo_envio DESC) FILTER (WHERE h.tel IS NOT NULL), '[]') AS history
+        FROM base b
+        LEFT JOIN hist h ON h.tel = regexp_replace(b.phone_number, '[^0-9]', '', 'g')
+       GROUP BY b.id, b.name, b.phone_number, b.blocked_at
+       ORDER BY b.name
+       LIMIT 5000`, params);
+    res.json({ leads: r.rows, total: r.rowCount });
   }));
 
   app.post('/api/central/remessas/:id/direcionar', withDb(async (pool, req, res) => {

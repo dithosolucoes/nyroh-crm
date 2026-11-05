@@ -884,6 +884,21 @@ async function initDatabase(retries = 5, delayMs = 3000) {
             created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
           );
 
+          CREATE TABLE IF NOT EXISTS zip_uploads (
+            id VARCHAR(255) PRIMARY KEY,
+            batch_id VARCHAR(255),
+            file_name VARCHAR(500),
+            file_size_bytes BIGINT DEFAULT 0,
+            leads_in_zip INT DEFAULT 0,
+            leads_saved INT DEFAULT 0,
+            skipped_contacted INT DEFAULT 0,
+            skipped_repeated INT DEFAULT 0,
+            valid_mobiles INT DEFAULT 0,
+            landlines INT DEFAULT 0,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+          );
+          CREATE INDEX IF NOT EXISTS idx_zip_uploads_created ON zip_uploads(created_at DESC);
+
           ALTER TABLE campaign_batches ADD COLUMN IF NOT EXISTS selected_copy_id VARCHAR(255);
           ALTER TABLE campaign_batches ADD COLUMN IF NOT EXISTS copy_var1 TEXT;
           ALTER TABLE campaign_batches ADD COLUMN IF NOT EXISTS copy_var2 TEXT;
@@ -9209,6 +9224,9 @@ app.post('/api/campaign/upload-zip', diskUpload.single('zipFile') as any, async 
       });
     }
 
+    let dedupSkippedContacted = 0;
+    let dedupSkippedRepeated = 0;
+
     // DEDUP POR TELEFONE: não sobe de novo quem já recebeu disparo (outra safra ou CRM) nem quem está repetido no arquivo.
     if (pgPool) {
       const alreadyContacted = new Set<string>();
@@ -9240,6 +9258,8 @@ app.post('/api/campaign/upload-zip', diskUpload.single('zipFile') as any, async 
       if (skippedContacted || skippedRepeated) {
         console.log(`[Import] Ignorados: ${skippedContacted} já disparado(s) antes, ${skippedRepeated} repetido(s) no arquivo.`);
       }
+      dedupSkippedContacted = skippedContacted;
+      dedupSkippedRepeated = skippedRepeated;
       formattedLeadsToSave.length = 0;
       formattedLeadsToSave.push(...kept);
     }
@@ -9328,6 +9348,19 @@ app.post('/api/campaign/upload-zip', diskUpload.single('zipFile') as any, async 
       }
     }
 
+    if (usePostgres && pgPool) {
+      try {
+        await pgPool.query(
+          `INSERT INTO zip_uploads (id, batch_id, file_name, file_size_bytes, leads_in_zip, leads_saved, skipped_contacted, skipped_repeated, valid_mobiles, landlines)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+           ON CONFLICT (id) DO NOTHING`,
+          [jobId, targetBatchId, req.file.originalname, req.file.size, rawLeads.length, savedLeadsCount, dedupSkippedContacted, dedupSkippedRepeated, validMobiles, landlines]
+        );
+      } catch (histErr: any) {
+        console.warn('[Import] Histórico do ZIP não gravado:', histErr.message);
+      }
+    }
+
     await logAudit('CAMPANHA_ZIP_IMPORTADO', `Safra ID: ${targetBatchId} - ${savedLeadsCount} leads processados em lotes`, req);
 
     updateCampaignImportProgress(jobId, {
@@ -9368,6 +9401,40 @@ app.post('/api/campaign/upload-zip', diskUpload.single('zipFile') as any, async 
       await fs.promises.unlink(tempFilePath).catch(() => {});
       console.log(`🧹 [CleanUp Railway] Arquivo temporário de ZIP removido: ${tempFilePath}`);
     }
+  }
+});
+
+// Histórico dos ZIPs subidos (um registro por arquivo)
+app.get('/api/campaign/uploads', async (_req, res) => {
+  if (!usePostgres || !pgPool) return res.json({ uploads: [] });
+  try {
+    const r = await pgPool.query(
+      `SELECT u.id, u.batch_id, u.file_name, u.file_size_bytes, u.leads_in_zip, u.leads_saved,
+              u.skipped_contacted, u.skipped_repeated, u.valid_mobiles, u.landlines, u.created_at,
+              b.name AS batch_name
+         FROM zip_uploads u
+         LEFT JOIN campaign_batches b ON b.id = u.batch_id
+        ORDER BY u.created_at DESC
+        LIMIT 200`
+    );
+    res.json({
+      uploads: r.rows.map((x: any) => ({
+        id: x.id,
+        batchId: x.batch_id,
+        batchName: x.batch_name,
+        fileName: x.file_name,
+        fileSizeBytes: Number(x.file_size_bytes) || 0,
+        leadsInZip: x.leads_in_zip,
+        leadsSaved: x.leads_saved,
+        skippedContacted: x.skipped_contacted,
+        skippedRepeated: x.skipped_repeated,
+        validMobiles: x.valid_mobiles,
+        landlines: x.landlines,
+        createdAt: x.created_at,
+      })),
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
 });
 

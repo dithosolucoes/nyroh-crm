@@ -452,6 +452,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
   return (
     <div className="flex-1 flex flex-col h-full bg-[#f8f9fa] overflow-y-auto">
       {/* Top Executive Header */}
+      {activeSubTab === 'cockpit' && (
       <div className="bg-white border-b border-neutral-200 px-4 sm:px-6 py-4 shrink-0 shadow-2xs">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
@@ -586,6 +587,31 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
         </div>
 
       </div>
+      )}
+
+      {/* Cabeçalho simples para as telas de equipe, auditoria e blindagem (o cockpit tem o próprio cabeçalho) */}
+      {activeSubTab !== 'cockpit' && (
+        <div className="bg-white border-b border-neutral-200 px-4 sm:px-6 py-5 shrink-0">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">
+            {activeSubTab === 'usuarios' || activeSubTab === 'carteiras' ? 'Equipe' : 'Sistema'}
+          </p>
+          <h1 className="text-2xl font-bold text-neutral-900 mt-1">
+            {activeSubTab === 'usuarios' ? 'Usuários e acessos'
+              : activeSubTab === 'carteiras' ? 'Equipe e carteiras'
+              : activeSubTab === 'auditoria' ? 'Auditoria'
+              : activeSubTab === 'blindagem' ? 'Blindagem de dados'
+              : 'Painel'}
+          </h1>
+          <p className="text-sm text-neutral-500 mt-1">
+            {activeSubTab === 'usuarios' ? 'Quem acessa o CRM, com papel e status.'
+              : activeSubTab === 'carteiras' ? 'Vendedores, divisão de carteiras e distribuição de leads.'
+              : activeSubTab === 'auditoria' ? 'Registro de ações feitas no sistema, com autor e horário.'
+              : activeSubTab === 'blindagem' ? 'Regras de isolamento: cada vendedor vê só a própria carteira.'
+              : ''}
+          </p>
+        </div>
+      )}
+
 
       {/* Main Tab Content Area */}
       <div className="p-4 sm:p-6 space-y-6">

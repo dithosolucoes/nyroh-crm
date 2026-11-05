@@ -203,7 +203,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
         <div>
           <h2 className="text-base font-bold text-neutral-900 flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-blue-600" />
-            Dashboard de Desempenho e Indicadores do CRM
+            Indicadores de desempenho
           </h2>
           <p className="text-xs text-neutral-500 mt-0.5">
             Visão consolidada de conversão, produtividade de chamadas e retornos pendentes.

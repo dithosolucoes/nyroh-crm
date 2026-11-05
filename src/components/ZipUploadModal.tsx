@@ -1,8 +1,9 @@
 import React, { useState, useRef } from 'react';
-import { Upload, FileArchive, CheckCircle, AlertCircle, RefreshCw, X, FileCheck, Info, Users, UserCheck, Percent } from 'lucide-react';
+import { Upload, FileArchive, CheckCircle, AlertCircle, RefreshCw, X, FileCheck, Info, Users, UserCheck, Percent, ArrowLeft } from 'lucide-react';
 import JSZip from 'jszip';
 import { ImportResult, Salesperson } from '../types';
 import { ZipImportProgressModal, ImportProgressData } from './ZipImportProgressModal';
+import { HistoricoZipsAutoCarregado } from './PaginaSubirZip';
 
 interface ZipUploadModalProps {
   isOpen: boolean;
@@ -461,19 +462,14 @@ export const ZipUploadModal: React.FC<ZipUploadModalProps> = ({
   };
 
   return (
-    <div 
-      className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/40 backdrop-blur-xs p-4 animate-in fade-in duration-150"
-      onClick={onClose}
-    >
-      <div 
-        className="bg-white rounded-xl shadow-xl border border-neutral-200 max-w-lg w-full p-6 relative max-h-[90vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-neutral-50">
+      <div className="max-w-5xl mx-auto w-full p-4 md:p-8 space-y-6">
         <button
+          type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 text-neutral-400 hover:text-neutral-600 p-1 rounded-full transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-600 hover:text-neutral-900"
         >
-          <X className="w-5 h-5" />
+          <ArrowLeft className="w-3.5 h-3.5" /> Voltar para a lista
         </button>
 
         <div className="flex items-center gap-2 mb-1">
@@ -798,6 +794,9 @@ export const ZipUploadModal: React.FC<ZipUploadModalProps> = ({
               </>
             )}
           </button>
+        </div>
+        <div className="pt-2">
+          <HistoricoZipsAutoCarregado chave={JSON.stringify([campaignResult, importResult])} />
         </div>
       </div>
 

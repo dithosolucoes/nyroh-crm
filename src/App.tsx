@@ -885,10 +885,10 @@ export default function App() {
                       {activeTab === 'kanban'
                         ? 'Pipeline Kanban de Vendas'
                         : activeTab === 'table'
-                        ? 'Lista Completa de Leads'
+                        ? 'Lista de leads'
                         : activeTab === 'whatsapp'
-                        ? 'WhatsApp Atendimento Ao Vivo'
-                        : 'Dashboard Analítico de Vendas'}
+                        ? 'Conversas'
+                        : 'Relatórios'}
                     </h2>
                     {activeSalesperson && (
                       <span
@@ -1019,6 +1019,7 @@ export default function App() {
             {/* Barra de Métricas, Busca Global & Filtros de Vendas */}
             {activeTab !== 'dashboard' && activeTab !== 'whatsapp' && activeTab !== 'hoje' && (
               <MetricsBar
+                mostrarBusca={activeTab !== 'table'}
                 leads={displayedLeads}
                 allLeads={leads}
                 totalLeadsCount={leads.length}

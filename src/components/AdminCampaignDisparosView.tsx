@@ -63,6 +63,7 @@ import {
 import { CampaignBatch, CampaignLead, CampaignLeadStatus, CampaignCopyTemplate, Salesperson } from '../types';
 import { AdminDispatchTestSandbox } from './AdminDispatchTestSandbox';
 import { ZipImportProgressModal, ImportProgressData } from './ZipImportProgressModal';
+import { PaginaSubirZip, ZipUploadRegistro } from './PaginaSubirZip';
 import { isUiFlagOn } from '../lib/uiFlags';
 
 const SHOW_SIMULATE = isUiFlagOn(import.meta.env.VITE_MOSTRAR_SIMULAR);
@@ -177,6 +178,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   const [dispatchSelectedCloser, setDispatchSelectedCloser] = useState<string>('seller-thomas');
   const [dispatchSelectedClosers, setDispatchSelectedClosers] = useState<string[]>([]);
   const [dispatchModalStep, setDispatchModalStep] = useState<'config' | 'processing' | 'success'>('config');
+  const [dispatchInfo, setDispatchInfo] = useState<{ marca: string; numeros: string[]; previa: { emEspera: number; passariam: number; barrados: number } | null } | null>(null);
   const [batchDispatchStats, setBatchDispatchStats] = useState<{ total: number; dispatched: number; failed: number; sellersUsed?: string[] }>({ total: 0, dispatched: 0, failed: 0 });
 
   // Configuração da Velocidade de Disparo & Rastreamento em Tempo Real (BullMQ + Redis)
@@ -631,6 +633,26 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   const [newBatchName, setNewBatchName] = useState<string>('');
   const [newBatchHours, setNewBatchHours] = useState<number>(4);
   const [showUploadZipModal, setShowUploadZipModal] = useState<boolean>(false);
+  const [paginaSubirZip, setPaginaSubirZip] = useState<boolean>(false);
+  const [zipUploads, setZipUploads] = useState<ZipUploadRegistro[]>([]);
+  const [zipUploadsCarregando, setZipUploadsCarregando] = useState<boolean>(false);
+
+  const carregarHistoricoZips = async () => {
+    setZipUploadsCarregando(true);
+    try {
+      const r = await fetch('/api/campaign/uploads');
+      const d = await r.json();
+      setZipUploads(Array.isArray(d.uploads) ? d.uploads : []);
+    } catch {
+      setZipUploads([]);
+    } finally {
+      setZipUploadsCarregando(false);
+    }
+  };
+
+  useEffect(() => {
+    if (paginaSubirZip) carregarHistoricoZips();
+  }, [paginaSubirZip]);
   const [showImportProgressModal, setShowImportProgressModal] = useState<boolean>(false);
   const [importProgressData, setImportProgressData] = useState<ImportProgressData | null>(null);
   const importAbortRef = useRef<XMLHttpRequest | null>(null);
@@ -968,8 +990,8 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
     };
 
     setImportProgressData(initialProgress);
-    setShowImportProgressModal(true);
-    setShowUploadZipModal(false);
+    setShowImportProgressModal(false);
+    setPaginaSubirZip(true);
     setIsUploading(true);
 
     // 1. Notificar servidor e inicializar job de tracking
@@ -1063,6 +1085,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
               `Importação concluída: ${res.totalProcessed} leads processados (${res.validMobiles} celulares aptos para WhatsApp)!`
             );
             await fetchBatches();
+            carregarHistoricoZips();
             if (res.batchId) setSelectedBatchId(res.batchId);
             await fetchLeads();
           } else {
@@ -1220,6 +1243,25 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
 
     setDispatchModalStep('config');
     setIsBatchDispatchModalOpen(true);
+    carregarInfoDisparo();
+  };
+
+  /** Marca, números e previa das regras, para o admin ver o que vai acontecer antes de disparar. */
+  const carregarInfoDisparo = async () => {
+    setDispatchInfo(null);
+    try {
+      const [marcas, numeros, previa] = await Promise.all([
+        fetch('/api/brands').then(r => (r.ok ? r.json() : [])),
+        fetch('/api/phone-numbers').then(r => (r.ok ? r.json() : [])),
+        fetch('/api/regras-contato/previa', { method: 'POST' }).then(r => (r.ok ? r.json() : null)),
+      ]);
+      const marcaId = (currentBatch as any)?.brandId as string | undefined;
+      const marca = marcas.find((m: any) => m.id === marcaId);
+      const usados = marca ? numeros.filter((n: any) => marca.numberIds.includes(n.id)).map((n: any) => n.label) : [];
+      setDispatchInfo({ marca: marca?.name || 'Sem marca', numeros: usados, previa });
+    } catch {
+      setDispatchInfo({ marca: 'Não carregou', numeros: [], previa: null });
+    }
   };
 
   // Execute Batch Dispatch (Moves selected quantity from Staging -> Quarentena/Espera)
@@ -1699,35 +1741,37 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
           </button>
 
           <button
-            onClick={() => setShowUploadZipModal(true)}
+            onClick={() => setPaginaSubirZip(true)}
             className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-2xs transition cursor-pointer"
           >
             <Upload className="w-3.5 h-3.5" />
             <span>Subir ZIP</span>
           </button>
 
-          {/* Botão para devolver os não enviados pra Novos Leads */}
+          {/* Ações de manutenção da safra: ficam num menu para não poluir o cabeçalho */}
           {selectedBatchId && (
-            <button
-              onClick={handleReturnUnsent}
-              title="Devolve para Novos Leads os leads que não saíram de fato e tira as mensagens pendentes da fila"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-900 text-xs font-bold shadow-2xs transition cursor-pointer"
-            >
-              <RotateCcw className="w-3.5 h-3.5 text-emerald-700" />
-              <span className="hidden md:inline">Devolver não enviados</span>
-            </button>
-          )}
-
-          {/* Botão de Zerar Disparos e Resetar Safra */}
-          {selectedBatchId && (
-            <button
-              onClick={handleResetBatchToStaging}
-              title="Zera os disparos acumulados e restaura todos os leads da safra para a 1ª Etapa (Novos Leads / Staging)"
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 text-xs font-bold shadow-2xs transition cursor-pointer"
-            >
-              <RotateCcw className="w-3.5 h-3.5 text-amber-700" />
-              <span className="hidden md:inline">Zerar / Resetar Safra</span>
-            </button>
+            <details className="relative">
+              <summary className="list-none cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-neutral-50 border border-neutral-300 text-neutral-800 text-xs font-bold select-none">
+                <span>Mais ações</span>
+                <span className="text-neutral-400">▾</span>
+              </summary>
+              <div className="absolute right-0 mt-2 w-80 bg-white border border-neutral-200 rounded-xl shadow-xl p-2 z-30 space-y-1">
+                <button
+                  onClick={handleReturnUnsent}
+                  className="w-full text-left p-2.5 rounded-lg hover:bg-emerald-50"
+                >
+                  <p className="text-xs font-bold text-emerald-900">Devolver não enviados</p>
+                  <p className="text-[11px] text-neutral-500">Devolve para Novos Leads quem não saiu de fato e tira as mensagens pendentes da fila.</p>
+                </button>
+                <button
+                  onClick={handleResetBatchToStaging}
+                  className="w-full text-left p-2.5 rounded-lg hover:bg-amber-50"
+                >
+                  <p className="text-xs font-bold text-amber-900">Zerar / resetar safra</p>
+                  <p className="text-[11px] text-neutral-500">Zera os disparos e volta todos os leads da safra para a Etapa 1.</p>
+                </button>
+              </div>
+            </details>
           )}
 
           {/* Botão de Sincronizar com WhatsApp Web & Reciclar Não Disparados */}
@@ -1768,58 +1812,53 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
       </header>
 
       {/* PASSOS DO DISPARO: 1 Subir, 2 Montar, 3 Disparar. As telas internas continuam as mesmas. */}
+      {/* Navegação do disparo: uma só barra. Cada etapa agrupa as telas dela. */}
       {(() => {
-        const STEPS: Array<{ id: 'subir' | 'montar' | 'disparar'; label: string; icon: any; views: SubPageTab[] }> = [
-          { id: 'subir', label: '1. Subir', icon: Layers, views: ['safras'] },
-          { id: 'montar', label: '2. Montar', icon: Kanban, views: ['kanban', 'montador'] },
-          { id: 'disparar', label: '3. Disparar', icon: Send, views: ['quarentena', 'distribuicao', ...(SHOW_SANDBOX ? ['teste_sandbox' as SubPageTab] : [])] },
+        const ETAPAS: Array<{ id: string; numero: string; titulo: string; views: Array<{ v: SubPageTab; label: string }> }> = [
+          { id: 'subir', numero: '1', titulo: 'Subir', views: [{ v: 'safras', label: 'Safras' }] },
+          { id: 'montar', numero: '2', titulo: 'Montar', views: [{ v: 'kanban', label: 'Kanban de disparos' }, { v: 'montador', label: 'Montador de copy' }] },
+          {
+            id: 'disparar',
+            numero: '3',
+            titulo: 'Disparar',
+            views: [
+              { v: 'quarentena', label: 'Quarentena' },
+              { v: 'distribuicao', label: 'Distribuição' },
+              ...(SHOW_SANDBOX ? [{ v: 'teste_sandbox' as SubPageTab, label: 'Teste Sandbox' }] : []),
+            ],
+          },
         ];
-        const currentStep = STEPS.find(st => st.views.includes(activeTab)) ?? STEPS[0];
-        const VIEW_LABEL: Partial<Record<SubPageTab, string>> = {
-          kanban: 'Kanban de disparos',
-          montador: 'Montador de copy',
-          quarentena: 'Quarentena',
-          distribuicao: 'Distribuição',
-          teste_sandbox: 'Teste Sandbox',
-        };
         return (
-          <div className="w-full bg-white border-b border-neutral-200 px-4 sm:px-6 py-2 flex flex-col gap-2 shrink-0">
-            <div className="flex items-center gap-1.5 p-1 bg-neutral-100 rounded-xl border border-neutral-200 shadow-2xs w-fit max-w-full overflow-x-auto no-scrollbar">
-              {STEPS.map(st => {
-                const active = st.id === currentStep.id;
-                const Icon = st.icon;
+          <div className="w-full bg-white border-b border-neutral-200 px-4 sm:px-6 shrink-0">
+            <nav className="flex items-stretch gap-6 overflow-x-auto no-scrollbar">
+              {ETAPAS.map((etapa, idx) => {
+                const etapaAtiva = etapa.views.some(v => v.v === activeTab);
                 return (
-                  <button
-                    key={st.id}
-                    onClick={() => setActiveTab(st.views[0])}
-                    className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs whitespace-nowrap transition-all cursor-pointer ${
-                      active ? 'bg-emerald-600 text-white font-bold shadow-2xs' : 'text-neutral-700 hover:text-neutral-900 font-semibold'
-                    }`}
-                  >
-                    <Icon className="w-3.5 h-3.5" />
-                    <span>{st.label}</span>
-                  </button>
+                  <div key={etapa.id} className={`flex items-stretch gap-1 ${idx > 0 ? 'pl-6 border-l border-neutral-200' : ''}`}>
+                    <span className={`self-center mr-1 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap ${etapaAtiva ? 'text-emerald-700' : 'text-neutral-400'}`}>
+                      {etapa.numero}. {etapa.titulo}
+                    </span>
+                    {etapa.views.map(view => {
+                      const ativa = activeTab === view.v;
+                      return (
+                        <button
+                          key={view.v}
+                          onClick={() => setActiveTab(view.v)}
+                          className={`pt-3 pb-3 -mb-px px-1 text-sm whitespace-nowrap border-b-2 transition-colors cursor-pointer ${
+                            ativa ? 'border-neutral-900 text-neutral-900 font-semibold' : 'border-transparent text-neutral-500 hover:text-neutral-800'
+                          }`}
+                        >
+                          {view.label}
+                          {view.v === 'quarentena' && currentBatch?.status === 'quarantine' && (
+                            <span className="inline-block w-2 h-2 ml-1.5 rounded-full bg-amber-500 animate-ping" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
                 );
               })}
-            </div>
-            {currentStep.views.length > 1 && (
-              <div className="flex items-center gap-1.5 text-xs">
-                {currentStep.views.map(v => (
-                  <button
-                    key={v}
-                    onClick={() => setActiveTab(v)}
-                    className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
-                      activeTab === v ? 'bg-neutral-900 text-white font-bold' : 'text-neutral-600 hover:bg-neutral-100 font-medium'
-                    }`}
-                  >
-                    {VIEW_LABEL[v]}
-                    {v === 'quarentena' && currentBatch?.status === 'quarantine' && (
-                      <span className="inline-block w-2 h-2 ml-1.5 rounded-full bg-amber-500 animate-ping" />
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
+            </nav>
           </div>
         );
       })()}
@@ -1842,7 +1881,19 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
         {/* ========================================================= */}
         {/* TAB 1: SAFRAS & CAMPANHAS (Staging de Importação) */}
         {/* ========================================================= */}
-        {activeTab === 'safras' && (
+        {activeTab === 'safras' && paginaSubirZip && (
+          <PaginaSubirZip
+            onVoltar={() => setPaginaSubirZip(false)}
+            onEscolherArquivo={(f) => handleUploadZip(f)}
+            progresso={importProgressData}
+            enviando={isUploading}
+            historico={zipUploads}
+            carregandoHistorico={zipUploadsCarregando}
+            onAtualizarHistorico={carregarHistoricoZips}
+            onAbrirSafra={(bId) => { setSelectedBatchId(bId); setPaginaSubirZip(false); fetchLeads(); }}
+          />
+        )}
+        {activeTab === 'safras' && !paginaSubirZip && (
           <div className="flex flex-col gap-6">
             {/* KPI Metrics Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -1903,7 +1954,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
                     + Criar Primeira Campanha
                   </button>
                   <button
-                    onClick={() => setShowUploadZipModal(true)}
+                    onClick={() => setPaginaSubirZip(true)}
                     className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition shadow-2xs cursor-pointer flex items-center gap-1.5"
                   >
                     <Upload className="w-3.5 h-3.5" />
@@ -3263,26 +3314,6 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
                   className="hidden"
                 />
 
-                <button
-                  onClick={() => stagingZipInputRef.current?.click()}
-                  className="flex-1 md:flex-none flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-xs font-bold border border-neutral-200 transition cursor-pointer"
-                >
-                  <Upload className="w-3.5 h-3.5 text-neutral-600" />
-                  <span>Subir ZIP (+ Leads)</span>
-                </button>
-
-                <button
-                  onClick={() => handleOpenDispatchModal()}
-                  disabled={leads.filter(l => l.status === 'STAGING').length === 0}
-                  className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-2 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer ${
-                    leads.filter(l => l.status === 'STAGING').length > 0
-                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                      : 'bg-neutral-200 text-neutral-400 cursor-not-allowed'
-                  }`}
-                >
-                  <Send className="w-4 h-4" />
-                  <span>🚀 Fazer Disparo ({leads.filter(l => l.status === 'STAGING').length} Prontos)</span>
-                </button>
               </div>
             </div>
 
@@ -3700,6 +3731,32 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
               {/* Step 1: Configuration Form */}
               {dispatchModalStep === 'config' && (
                 <div className="p-6 space-y-6">
+                  {/* Resumo: quem envia e o que as regras deixam passar */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-neutral-200 border border-neutral-200 rounded-xl overflow-hidden">
+                    <div className="bg-white px-4 py-3">
+                      <p className="text-[11px] text-neutral-500">Marca</p>
+                      <p className={`text-sm font-bold truncate ${dispatchInfo?.marca === 'Sem marca' ? 'text-amber-700' : 'text-neutral-900'}`}>{dispatchInfo?.marca ?? '…'}</p>
+                      {dispatchInfo?.marca === 'Sem marca' && <p className="text-[11px] text-amber-700 mt-0.5">Escolha a marca no seletor do topo</p>}
+                    </div>
+                    <div className="bg-white px-4 py-3">
+                      <p className="text-[11px] text-neutral-500">Número(s) de envio</p>
+                      <p className="text-sm font-bold text-neutral-900 truncate">{dispatchInfo ? (dispatchInfo.numeros.length ? dispatchInfo.numeros.join(', ') : 'Nenhum vinculado') : '…'}</p>
+                    </div>
+                    <div className="bg-white px-4 py-3">
+                      <p className="text-[11px] text-neutral-500">Passam nas regras</p>
+                      <p className="text-sm font-bold text-emerald-700">{dispatchInfo?.previa ? dispatchInfo.previa.passariam.toLocaleString('pt-BR') : '—'}</p>
+                    </div>
+                    <div className="bg-white px-4 py-3">
+                      <p className="text-[11px] text-neutral-500">Barrados pelas regras</p>
+                      <p className="text-sm font-bold text-amber-700">{dispatchInfo?.previa ? dispatchInfo.previa.barrados.toLocaleString('pt-BR') : '—'}</p>
+                    </div>
+                  </div>
+                  {dispatchInfo?.previa && (
+                    <p className="text-xs text-neutral-500 -mt-3">
+                      A prévia considera a fila inteira de espera. Regras de contato e lista de bloqueios são aplicadas de novo no envio.
+                    </p>
+                  )}
+
                   {/* Quantity Selection */}
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">

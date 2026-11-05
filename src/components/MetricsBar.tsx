@@ -14,6 +14,8 @@ interface CallLogItem {
 }
 
 interface MetricsBarProps {
+  /** Na Lista de leads a busca e os filtros já ficam na própria tabela: esconde esta linha. */
+  mostrarBusca?: boolean;
   leads: Lead[];
   allLeads?: Lead[];
   totalLeadsCount?: number;
@@ -32,6 +34,7 @@ interface MetricsBarProps {
 }
 
 export const MetricsBar: React.FC<MetricsBarProps> = ({
+  mostrarBusca = true,
   leads,
   allLeads,
   totalLeadsCount = 0,
@@ -282,6 +285,7 @@ export const MetricsBar: React.FC<MetricsBarProps> = ({
       </div>
 
       {/* Barra de Busca e Filtros Inteligentes (Compacta e ergonômica no Mobile) */}
+      {mostrarBusca && (
       <div className="pt-2 border-t border-neutral-100 space-y-2">
         {/* Linha Principal: Busca + Botão Filtros no Mobile + Ações Rápidas */}
         <div className="flex items-center gap-2">
@@ -599,6 +603,7 @@ export const MetricsBar: React.FC<MetricsBarProps> = ({
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 };

@@ -1280,7 +1280,7 @@ export const ThomasWhatsAppDesktopView: React.FC<ThomasWhatsAppDesktopViewProps>
       {/* ========================================================================= */}
       {/* 1. LEFT COLUMN: Leads / Conversations List                                */}
       {/* ========================================================================= */}
-      <div className="w-full xl:w-96 flex flex-col bg-white border-b xl:border-b-0 xl:border-r border-neutral-200 shrink-0 h-full">
+      <div className="w-full xl:w-[420px] 2xl:w-[460px] flex flex-col bg-white border-b xl:border-b-0 xl:border-r border-neutral-200 shrink-0 h-full">
         {/* User Identity & Real-time Indicator Header */}
         <div className="p-4 border-b border-neutral-200 bg-neutral-50/70 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -2179,7 +2179,7 @@ export const ThomasWhatsAppDesktopView: React.FC<ThomasWhatsAppDesktopViewProps>
       {/* 3. RIGHT COLUMN: Collapsible Lead Dossier & CRM Pipeline Actions           */}
       {/* ========================================================================= */}
       {isDossierOpen && activeLead && (
-        <div className="w-full xl:w-80 bg-white border-t xl:border-t-0 xl:border-l border-neutral-200 flex flex-col shrink-0 h-full overflow-y-auto animate-in slide-in-from-right-4 duration-150">
+        <div className="w-full xl:w-[300px] 2xl:w-[340px] bg-white border-t xl:border-t-0 xl:border-l border-neutral-200 flex flex-col shrink-0 h-full overflow-y-auto animate-in slide-in-from-right-4 duration-150">
           {/* Header */}
           <div className="p-4 border-b border-neutral-200 bg-neutral-50/70 flex items-center justify-between">
             <div className="flex items-center gap-2">
