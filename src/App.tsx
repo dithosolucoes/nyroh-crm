@@ -757,7 +757,23 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col h-full min-h-0 min-w-0 overflow-hidden">
-        {activeTab === 'admin' && currentUser?.role === 'admin' ? (
+        {isZipModalOpen ? (
+          <ZipUploadModal
+            isOpen={isZipModalOpen}
+            onClose={() => setIsZipModalOpen(false)}
+            salespeople={salespeople}
+            onImportComplete={() => {
+              fetchLeads();
+              fetchSalespeople();
+            }}
+            onShowToast={showToast}
+            onNavigateToDisparos={() => {
+              setIsZipModalOpen(false);
+              setActiveTab('admin');
+              setAdminSection('disparos');
+            }}
+          />
+        ) : activeTab === 'admin' && currentUser?.role === 'admin' ? (
           <div className="flex-1 flex flex-col h-full min-h-0 overflow-y-auto overflow-x-hidden">
             <ErrorBoundary
               fallbackTitle="Erro ao carregar visão administrativa"
@@ -1143,20 +1159,6 @@ export default function App() {
         onShowToast={showToast}
       />
 
-      <ZipUploadModal
-        isOpen={isZipModalOpen}
-        onClose={() => setIsZipModalOpen(false)}
-        salespeople={salespeople}
-        onImportComplete={() => {
-          fetchLeads();
-          fetchSalespeople();
-        }}
-        onShowToast={showToast}
-        onNavigateToDisparos={() => {
-          setActiveTab('admin');
-          setAdminSection('disparos');
-        }}
-      />
 
       <JsonBatchUpdateModal
         isOpen={isJsonModalOpen}

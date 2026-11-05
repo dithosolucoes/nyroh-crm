@@ -32,6 +32,7 @@ const numero = (n: number | undefined | null) => (Number(n) || 0).toLocaleString
 
 const tamanho = (bytes: number) => {
   if (!bytes) return '—';
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
@@ -57,7 +58,7 @@ export const PaginaSubirZip: React.FC<Props> = ({
   const erro = progresso?.stage === 'error';
 
   return (
-    <div className="w-full min-h-full bg-neutral-50 p-4 md:p-6 space-y-5">
+    <div className="w-full min-h-full bg-[#f8f9fa] p-4 sm:p-6 space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <button
@@ -67,7 +68,7 @@ export const PaginaSubirZip: React.FC<Props> = ({
           >
             <ArrowLeft className="w-3.5 h-3.5" /> Voltar para safras
           </button>
-          <h2 className="text-lg font-bold text-neutral-900">Subir ZIP de leads</h2>
+          <h2 className="text-lg sm:text-xl font-bold text-neutral-900 tracking-tight">Subir ZIP de leads</h2>
           <p className="text-xs text-neutral-500 mt-0.5">
             Cada arquivo vira uma safra. Abaixo fica o histórico de tudo que já foi subido.
           </p>
@@ -113,7 +114,7 @@ export const PaginaSubirZip: React.FC<Props> = ({
 
       {/* Andamento / resultado do envio atual */}
       {progresso && (
-        <div className="rounded-2xl border border-neutral-200 bg-white p-5">
+        <div className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-2xs">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <p className="text-xs text-neutral-500">Arquivo</p>
@@ -183,7 +184,7 @@ interface TabelaProps {
 }
 
 export const TabelaHistoricoZips: React.FC<TabelaProps> = ({ historico, carregando, onAtualizar, onAbrirSafra }) => (
-  <div className="rounded-2xl border border-neutral-200 bg-white">
+  <div className="rounded-2xl border border-neutral-200 bg-white shadow-2xs">
     <div className="flex items-center justify-between px-5 py-3 border-b border-neutral-100">
       <div>
         <h3 className="text-sm font-bold text-neutral-900">Histórico de ZIPs subidos</h3>
@@ -269,6 +270,75 @@ export const HistoricoZipsAutoCarregado: React.FC<{ chave?: string; onAbrirSafra
   useEffect(() => { carregar(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [chave]);
 
   return <TabelaHistoricoZips historico={historico} carregando={carregando} onAtualizar={carregar} onAbrirSafra={onAbrirSafra} />;
+};
+
+// Cartão de andamento/resultado (usado dentro da própria tela, sem popup)
+export const CartaoProgressoZip: React.FC<{
+  progresso: ImportProgressData;
+  onCancelar?: () => void;
+  onFechar: () => void;
+  onAbrirSafra?: (batchId: string) => void;
+}> = ({ progresso, onCancelar, onFechar, onAbrirSafra }) => {
+  const terminou = progresso.stage === 'completed';
+  const erro = progresso.stage === 'error';
+  return (
+    <div className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-2xs">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-xs text-neutral-500">Arquivo</p>
+          <p className="text-sm font-bold text-neutral-900">{progresso.fileName || '—'}</p>
+        </div>
+        {terminou && (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">
+            <CheckCircle2 className="w-3.5 h-3.5" /> Concluído
+          </span>
+        )}
+        {erro && (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-3 py-1 text-xs font-bold text-red-800">
+            <AlertTriangle className="w-3.5 h-3.5" /> Erro
+          </span>
+        )}
+      </div>
+
+      {!terminou && !erro && (
+        <>
+          <p className="mt-3 text-xs text-neutral-600">{progresso.statusText}</p>
+          <div className="mt-2 h-2 w-full rounded-full bg-neutral-100 overflow-hidden">
+            <div className="h-full bg-blue-600 transition-all" style={{ width: `${Math.min(100, progresso.percent || 0)}%` }} />
+          </div>
+        </>
+      )}
+
+      {erro && <p className="mt-3 text-sm text-red-700">{progresso.error || 'Não foi possível importar este arquivo.'}</p>}
+
+      {terminou && (
+        <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+          <Resumo titulo="Leads no ZIP" valor={numero(progresso.totalLeadsFound)} />
+          <Resumo titulo="Gravados na safra" valor={numero(progresso.savedLeads)} destaque />
+          <Resumo titulo="Celulares" valor={numero(progresso.validMobiles)} />
+          <Resumo titulo="Fixos / comerciais" valor={numero(progresso.landlines)} />
+        </div>
+      )}
+
+      <div className="mt-4 flex flex-wrap justify-end gap-2">
+        {!terminou && !erro && onCancelar && (
+          <button type="button" onClick={onCancelar} className="rounded-lg border border-neutral-200 bg-white px-4 py-2 text-xs font-semibold text-neutral-700 hover:bg-neutral-50">
+            Cancelar envio
+          </button>
+        )}
+        {terminou && progresso.batchId && onAbrirSafra && (
+          <button type="button" onClick={() => onAbrirSafra(progresso.batchId as string)} className="rounded-lg bg-neutral-900 px-4 py-2 text-xs font-semibold text-white hover:bg-neutral-800">
+            Abrir esta safra
+          </button>
+        )}
+        {(terminou || erro) && (
+          <button type="button" onClick={onFechar} className="rounded-lg border border-neutral-200 bg-white px-4 py-2 text-xs font-semibold text-neutral-700 hover:bg-neutral-50">
+            Fechar
+          </button>
+        )}
+      </div>
+    </div>
+  );
 };
 
 const Resumo: React.FC<{ titulo: string; valor: string; destaque?: boolean }> = ({ titulo, valor, destaque }) => (

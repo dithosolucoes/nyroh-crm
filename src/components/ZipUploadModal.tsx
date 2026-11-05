@@ -2,8 +2,8 @@ import React, { useState, useRef } from 'react';
 import { Upload, FileArchive, CheckCircle, AlertCircle, RefreshCw, X, FileCheck, Info, Users, UserCheck, Percent, ArrowLeft } from 'lucide-react';
 import JSZip from 'jszip';
 import { ImportResult, Salesperson } from '../types';
-import { ZipImportProgressModal, ImportProgressData } from './ZipImportProgressModal';
-import { HistoricoZipsAutoCarregado } from './PaginaSubirZip';
+import type { ImportProgressData } from './ZipImportProgressModal';
+import { HistoricoZipsAutoCarregado, CartaoProgressoZip } from './PaginaSubirZip';
 
 interface ZipUploadModalProps {
   isOpen: boolean;
@@ -462,31 +462,29 @@ export const ZipUploadModal: React.FC<ZipUploadModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-neutral-50">
-      <div className="max-w-5xl mx-auto w-full p-4 md:p-8 space-y-6">
+    <div className="flex-1 flex flex-col h-full min-h-0 bg-[#f8f9fa] overflow-y-auto">
+      <div className="bg-white border-b border-neutral-200 px-4 sm:px-6 py-4 shrink-0 shadow-2xs">
         <button
           type="button"
           onClick={onClose}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-600 hover:text-neutral-900"
+          className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-neutral-500 hover:text-neutral-900 mb-2"
         >
-          <ArrowLeft className="w-3.5 h-3.5" /> Voltar para a lista
+          <ArrowLeft className="w-3.5 h-3.5" /> Voltar
         </button>
-
-        <div className="flex items-center gap-2 mb-1">
+        <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-neutral-100 text-neutral-800">
             <FileArchive className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-base font-semibold text-neutral-900">
-              Importar Leads via .ZIP
-            </h3>
-            <p className="text-xs text-neutral-500">
-              Varredura recursiva de arquivos JSON e divisão automática por vendedor
-            </p>
+            <h1 className="text-lg sm:text-xl font-bold text-neutral-900 tracking-tight">Importar leads via .ZIP</h1>
+            <p className="text-xs text-neutral-500 mt-0.5">Varredura recursiva de arquivos JSON e divisão automática por vendedor</p>
           </div>
         </div>
+      </div>
+      <div className="p-4 sm:p-6 max-w-5xl w-full mx-auto space-y-5">
 
-        <div className="mt-4 space-y-4">
+        <div className="bg-white rounded-2xl border border-neutral-200 shadow-2xs p-5">
+        <div className="space-y-4">
           {/* Destino da Importação */}
           <div className="flex p-1 bg-neutral-100 rounded-xl border border-neutral-200">
             <button
@@ -795,38 +793,34 @@ export const ZipUploadModal: React.FC<ZipUploadModalProps> = ({
             )}
           </button>
         </div>
-        <div className="pt-2">
-          <HistoricoZipsAutoCarregado chave={JSON.stringify([campaignResult, importResult])} />
         </div>
+        {showCampaignProgressModal && campaignProgressData && (
+          <CartaoProgressoZip
+            progresso={campaignProgressData}
+            onCancelar={() => {
+              if (campaignAbortRef.current) {
+                campaignAbortRef.current.abort();
+                campaignAbortRef.current = null;
+              }
+              setIsUploading(false);
+              setShowCampaignProgressModal(false);
+              setCampaignProgressData(null);
+            }}
+            onFechar={() => {
+              setShowCampaignProgressModal(false);
+              setCampaignProgressData(null);
+              if (campaignProgressData?.stage === 'completed') onClose();
+            }}
+            onAbrirSafra={() => {
+              setShowCampaignProgressModal(false);
+              onClose();
+              if (onNavigateToDisparos) onNavigateToDisparos();
+            }}
+          />
+        )}
+        <HistoricoZipsAutoCarregado chave={JSON.stringify([campaignResult, importResult])} />
       </div>
 
-      <ZipImportProgressModal
-        isOpen={showCampaignProgressModal}
-        onClose={() => {
-          setShowCampaignProgressModal(false);
-          setCampaignProgressData(null);
-          if (campaignProgressData?.stage === 'completed') {
-            onClose();
-          }
-        }}
-        progressData={campaignProgressData}
-        onCancelUpload={() => {
-          if (campaignAbortRef.current) {
-            campaignAbortRef.current.abort();
-            campaignAbortRef.current = null;
-          }
-          setIsUploading(false);
-          setShowCampaignProgressModal(false);
-          setCampaignProgressData(null);
-        }}
-        onViewBatch={() => {
-          setShowCampaignProgressModal(false);
-          onClose();
-          if (onNavigateToDisparos) {
-            onNavigateToDisparos();
-          }
-        }}
-      />
     </div>
   );
 };
