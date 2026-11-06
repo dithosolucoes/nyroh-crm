@@ -56,6 +56,8 @@ interface AdminWhatsAppFluxoViewProps {
 interface MetaTemplateItem {
   id: string;
   name: string;
+  accountId?: string;
+  accountName?: string;
   category: 'MARKETING' | 'UTILITY';
   language: string;
   status: 'DRAFT' | 'APPROVED' | 'PENDING' | 'REJECTED';
@@ -162,6 +164,15 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
   // Template Creator State (Initialized with the proven 8x cheaper Utility camouflage structure)
   const [tplName, setTplName] = useState('notificacao_pedido_atendimento');
   const [tplCategory, setTplCategory] = useState<'MARKETING' | 'UTILITY'>('UTILITY');
+  const [tplAccountId, setTplAccountId] = useState<string>('env');
+  const [bmAccounts, setBmAccounts] = useState<Array<{ id: string; name: string }>>([]);
+  const fetchBmAccounts = async () => {
+    try {
+      const res = await fetch('/api/admin/meta/accounts');
+      const data = await res.json();
+      if (res.ok && data.success) setBmAccounts(data.accounts || []);
+    } catch { /* lista de BMs é opcional */ }
+  };
   const [tplHeader, setTplHeader] = useState('');
   const [tplBody, setTplBody] = useState(
     'Ei, {{1}}\n\n{{2}}\n\n{{3}}\n\nClique no botão abaixo para acessar:'
@@ -367,6 +378,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
     fetchInstances();
     fetchTemplates();
     fetchWebhookEvents();
+    fetchBmAccounts();
   }, []);
 
   // Status de aprovação chega pelo webhook da Meta (APPROVED / REJECTED): atualiza a lista sem recarregar a página
@@ -513,6 +525,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
           name: tplName.trim(),
           category: tplCategory,
           language: 'pt_BR',
+          accountId: tplAccountId,
           components,
           examples: tplExamples,
           isDraft: false
@@ -566,6 +579,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
           name: tplName.trim(),
           category: tplCategory,
           language: 'pt_BR',
+          accountId: tplAccountId,
           components,
           isDraft: true
         })
@@ -606,10 +620,10 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
   };
 
   // Delete Template
-  const handleDeleteTemplate = async (templateName: string) => {
+  const handleDeleteTemplate = async (templateName: string, accountId?: string) => {
     if (!confirm(`Deseja realmente excluir o template "${templateName}"?`)) return;
     try {
-      const res = await fetch(`/api/admin/fluxo/templates/${encodeURIComponent(templateName)}`, {
+      const res = await fetch(`/api/admin/fluxo/templates/${encodeURIComponent(templateName)}?accountId=${encodeURIComponent(accountId || 'env')}`, {
         method: 'DELETE'
       });
       if (res.ok) {
@@ -1027,7 +1041,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
     <div className="space-y-6 animate-in fade-in duration-200">
       <MetaAccountsPanel
         onShowToast={onShowToast}
-        onAccountsChanged={() => { fetchInstances(); fetchTemplates(); }}
+        onAccountsChanged={() => { fetchInstances(); fetchTemplates(); fetchBmAccounts(); }}
       />
       {/* Top Banner Oficial */}
       <div className="bg-gradient-to-r from-emerald-900 via-emerald-850 to-neutral-900 rounded-2xl p-6 text-white border border-emerald-800 shadow-md">
@@ -1735,7 +1749,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
                           >
                             <div className="flex items-start justify-between gap-2">
                               <span className="font-mono text-xs font-bold text-neutral-900 break-all">
-                                {tpl.name}
+                                {tpl.name}{tpl.accountName ? <span className="ml-1 text-[9px] font-bold text-emerald-700 bg-emerald-50 rounded px-1">{tpl.accountName}</span> : null}
                               </span>
                               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-600 uppercase shrink-0">
                                 {tpl.category}
@@ -1764,7 +1778,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
                                   Enviar
                                 </button>
                                 <button
-                                  onClick={() => handleDeleteTemplate(tpl.name)}
+                                  onClick={() => handleDeleteTemplate(tpl.name, tpl.accountId)}
                                   className="p-1 rounded text-neutral-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
                                   title="Excluir"
                                 >
@@ -1807,7 +1821,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
                           >
                             <div className="flex items-start justify-between gap-2">
                               <span className="font-mono text-xs font-bold text-neutral-900 break-all">
-                                {tpl.name}
+                                {tpl.name}{tpl.accountName ? <span className="ml-1 text-[9px] font-bold text-emerald-700 bg-emerald-50 rounded px-1">{tpl.accountName}</span> : null}
                               </span>
                               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 shrink-0">
                                 Aguardando
@@ -1837,7 +1851,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
                                   Rejeitar
                                 </button>
                                 <button
-                                  onClick={() => handleDeleteTemplate(tpl.name)}
+                                  onClick={() => handleDeleteTemplate(tpl.name, tpl.accountId)}
                                   className="p-1 rounded text-neutral-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
                                 >
                                   <Trash2 className="w-3 h-3" />
@@ -1881,7 +1895,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
                             >
                               <div className="flex items-start justify-between gap-2">
                                 <span className="font-mono text-xs font-bold text-neutral-900 break-all">
-                                  {tpl.name}
+                                  {tpl.name}{tpl.accountName ? <span className="ml-1 text-[9px] font-bold text-emerald-700 bg-emerald-50 rounded px-1">{tpl.accountName}</span> : null}
                                 </span>
                                 <span
                                   className={`text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0 ${
@@ -1962,7 +1976,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
                                     Editar
                                   </button>
                                   <button
-                                    onClick={() => handleDeleteTemplate(tpl.name)}
+                                    onClick={() => handleDeleteTemplate(tpl.name, tpl.accountId)}
                                     className="p-1 rounded text-neutral-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
                                     title="Excluir"
                                   >
@@ -2006,7 +2020,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
                           >
                             <div className="flex items-start justify-between gap-2">
                               <span className="font-mono text-xs font-bold text-neutral-900 break-all">
-                                {tpl.name}
+                                {tpl.name}{tpl.accountName ? <span className="ml-1 text-[9px] font-bold text-emerald-700 bg-emerald-50 rounded px-1">{tpl.accountName}</span> : null}
                               </span>
                               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-red-100 text-red-800 shrink-0">
                                 Rejeitado
@@ -2031,7 +2045,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
                                 Corrigir no Criador
                               </button>
                               <button
-                                onClick={() => handleDeleteTemplate(tpl.name)}
+                                onClick={() => handleDeleteTemplate(tpl.name, tpl.accountId)}
                                 className="p-1 rounded text-neutral-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
                               >
                                 <Trash2 className="w-3 h-3" />
@@ -2228,7 +2242,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
                                   Editar
                                 </button>
                                 <button
-                                  onClick={() => handleDeleteTemplate(tpl.name)}
+                                  onClick={() => handleDeleteTemplate(tpl.name, tpl.accountId)}
                                   className="text-neutral-400 hover:text-red-600 cursor-pointer"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
@@ -2350,6 +2364,21 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
                       >
                         <option value="UTILITY">UTILITY (Menor custo • R$ ~0,08 • Confirmações & Rastreios)</option>
                         <option value="MARKETING">MARKETING (Tarifa cheia • R$ ~0,65 • Prospecção comercial)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                        BM onde criar o modelo:
+                      </label>
+                      <select
+                        value={tplAccountId}
+                        onChange={(e) => setTplAccountId(e.target.value)}
+                        className="w-full text-xs px-3 py-2 border border-neutral-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white font-medium"
+                      >
+                        <option value="env">Ambiente (padrão)</option>
+                        {bmAccounts.map((a) => (
+                          <option key={a.id} value={a.id}>{a.name}</option>
+                        ))}
                       </select>
                     </div>
                   </div>

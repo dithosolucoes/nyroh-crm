@@ -158,6 +158,17 @@ export async function metaDownloadMedia(mediaId: string, phoneNumberId?: string 
   }
 }
 
+/** Token + WABA de uma conta: 'env' (ou vazio) = variáveis do ambiente; outro id = BM cadastrada no CRM. */
+export function resolveMetaAccount(accountId?: string | null): { accountId: string; name: string; accessToken: string; wabaId: string } | null {
+  const id = String(accountId || '').trim();
+  if (!id || id === 'env') {
+    const env = getMetaCredentials();
+    return { accountId: 'env', name: 'Ambiente (padrão)', accessToken: env.accessToken, wabaId: env.wabaId };
+  }
+  const acc = metaAccountsById.get(id);
+  return acc ? { accountId: acc.id, name: acc.name, accessToken: acc.accessToken, wabaId: acc.wabaId } : null;
+}
+
 /** Busca os números e modelos de UMA conta (BM) direto da Meta, para sincronizar. */
 export async function metaSyncAccount(account: MetaAccountRecord) {
   const [phones, templates] = await Promise.all([
@@ -230,10 +241,11 @@ export async function metaListPhoneNumbers() {
 }
 
 /** Lista os modelos de mensagem da conta WABA com o status de aprovação. */
-export async function metaListTemplates() {
-  const { wabaId } = getMetaCredentials();
-  if (!wabaId) return { success: false, status: 0, data: null, error: 'META_WABA_ID não configurado.' };
-  return graphRequest('GET', `/${wabaId}/message_templates?fields=id,name,language,status,category,components,quality_score,rejected_reason&limit=200`);
+export async function metaListTemplates(accountId?: string) {
+  const acc = resolveMetaAccount(accountId);
+  if (!acc) return { success: false, status: 0, data: null, error: 'Conta da Meta não encontrada.' };
+  if (!acc.wabaId) return { success: false, status: 0, data: null, error: 'META_WABA_ID não configurado.' };
+  return graphRequest('GET', `/${acc.wabaId}/message_templates?fields=id,name,language,status,category,components,quality_score,rejected_reason&limit=200`, undefined, acc.accessToken);
 }
 
 /** Envia mídia por link HTTPS (imagem, vídeo, áudio ou documento). */
@@ -275,15 +287,28 @@ export async function metaCreateTemplate(payload: {
   language: string;
   category: 'MARKETING' | 'UTILITY' | 'AUTHENTICATION';
   components: any[];
-}) {
-  const { wabaId } = getMetaCredentials();
-  if (!wabaId) return { success: false, status: 0, data: null, error: 'META_WABA_ID não configurado.' };
-  return graphRequest('POST', `/${wabaId}/message_templates`, payload);
+}, accountId?: string) {
+  const acc = resolveMetaAccount(accountId);
+  if (!acc) return { success: false, status: 0, data: null, error: 'Conta da Meta não encontrada.' };
+  if (!acc.wabaId) return { success: false, status: 0, data: null, error: 'META_WABA_ID não configurado.' };
+  return graphRequest('POST', `/${acc.wabaId}/message_templates`, payload, acc.accessToken);
 }
 
 /** Apaga um modelo pelo nome (apaga todas as versões de idioma com esse nome). */
-export async function metaDeleteTemplate(name: string) {
-  const { wabaId } = getMetaCredentials();
-  if (!wabaId) return { success: false, status: 0, data: null, error: 'META_WABA_ID não configurado.' };
-  return graphRequest('DELETE', `/${wabaId}/message_templates?name=${encodeURIComponent(name)}`);
+export async function metaDeleteTemplate(name: string, accountId?: string) {
+  const acc = resolveMetaAccount(accountId);
+  if (!acc) return { success: false, status: 0, data: null, error: 'Conta da Meta não encontrada.' };
+  if (!acc.wabaId) return { success: false, status: 0, data: null, error: 'META_WABA_ID não configurado.' };
+  return graphRequest('DELETE', `/${acc.wabaId}/message_templates?name=${encodeURIComponent(name)}`, undefined, acc.accessToken);
+}
+
+/** Número que recebeu a mensagem, segundo o evento do webhook (metadata.phone_number_id). */
+export function receivingPhoneNumberId(event: any): string | undefined {
+  for (const entry of event?.entry || []) {
+    for (const change of entry?.changes || []) {
+      const pid = change?.value?.metadata?.phone_number_id;
+      if (pid) return String(pid).trim();
+    }
+  }
+  return undefined;
 }
