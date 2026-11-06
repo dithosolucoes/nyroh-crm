@@ -206,6 +206,19 @@ export async function metaExchangeSignupCode(code: string): Promise<{ success: b
   }
 }
 
+/** Descobre a(s) WABA(s) que o token do login da Meta pode acessar (fallback quando a Meta não manda o ID). */
+export async function metaDiscoverWabaIds(accessToken: string): Promise<string[]> {
+  const r = await graphRequest('GET', '/me/businesses?fields=owned_whatsapp_business_accounts{id,name}', undefined, accessToken);
+  if (!r.success) return [];
+  const ids: string[] = [];
+  for (const biz of r.data?.data || []) {
+    for (const waba of biz?.owned_whatsapp_business_accounts?.data || []) {
+      if (waba?.id) ids.push(String(waba.id));
+    }
+  }
+  return ids;
+}
+
 /** Assina o app nos webhooks da WABA recém-conectada (sem isso a Meta não envia mensagens ao CRM). */
 export async function metaSubscribeWaba(wabaId: string, accessToken: string) {
   return graphRequest('POST', `/${wabaId}/subscribed_apps`, undefined, accessToken);
