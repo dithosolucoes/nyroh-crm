@@ -190,20 +190,30 @@ export function getEmbeddedSignupConfig() {
   return { appId, configId, ready: Boolean(appId && configId && (process.env.META_APP_SECRET || '').trim()) };
 }
 
-/** Troca o código do login (Embedded Signup) por um token de acesso. */
+/** Troca o código do login (Embedded Signup) por um token de acesso.
+ * O código dura ~30s. Testa as variações de redirect_uri que a Meta aceita no login pelo SDK do JS. */
 export async function metaExchangeSignupCode(code: string): Promise<{ success: boolean; token?: string; error?: string }> {
   const { appId } = getEmbeddedSignupConfig();
   const appSecret = (process.env.META_APP_SECRET || '').trim();
   if (!appId || !appSecret) return { success: false, error: 'META_APP_ID ou META_APP_SECRET não configurado.' };
-  try {
-    const qs = new URLSearchParams({ client_id: appId, client_secret: appSecret, code });
-    const res = await fetch(`${GRAPH_BASE}/oauth/access_token?${qs.toString()}`);
-    const data: any = await res.json().catch(() => ({}));
-    if (!res.ok || !data.access_token) return { success: false, error: data?.error?.message || `HTTP ${res.status}` };
-    return { success: true, token: data.access_token };
-  } catch (err: any) {
-    return { success: false, error: err?.message || 'Falha de rede ao trocar o código.' };
+  const variants: Array<string | null> = [null, '', 'https://www.facebook.com/connect/login_success.html', 'https://nyroh-crm-production-fedd.up.railway.app/'];
+  let lastError = 'Falha desconhecida ao trocar o código.';
+  for (const redirect of variants) {
+    try {
+      const params: Record<string, string> = { client_id: appId, client_secret: appSecret, code };
+      if (redirect !== null) params.redirect_uri = redirect;
+      const res = await fetch(`${GRAPH_BASE}/oauth/access_token?${new URLSearchParams(params).toString()}`);
+      const data: any = await res.json().catch(() => ({}));
+      if (res.ok && data.access_token) return { success: true, token: data.access_token };
+      lastError = data?.error?.message || `HTTP ${res.status}`;
+      console.error('[Meta Signup Exchange]', redirect === null ? '(sem redirect_uri)' : `redirect_uri="${redirect}"`, JSON.stringify(data));
+      if (!/redirect_uri|verification code/i.test(lastError)) break;
+    } catch (err: any) {
+      lastError = err?.message || 'Falha de rede ao trocar o código.';
+      break;
+    }
   }
+  return { success: false, error: lastError };
 }
 
 /** Descobre a(s) WABA(s) que o token do login da Meta pode acessar (fallback quando a Meta não manda o ID). */
