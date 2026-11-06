@@ -24,6 +24,7 @@ import { detectOptOut, sanitizeTemplateVariable, resolveManualInterest, SEM_INTE
 import { distributionByCount } from './src/lib/distribution.js';
 import { getMetaProvider, getMetaCredentials, verifyMetaSignature, metaSendText, metaSendTemplate, metaSendMedia, metaMarkRead, metaCreateTemplate, metaDeleteTemplate, metaListPhoneNumbers, metaListTemplates } from './src/lib/metaClient.js';
 import { resolveLeadTokens, TOKEN_NAMES } from './src/lib/leadTokens.js';
+import { validateTemplateCategory, buildMetaButtons, defaultExamples as neutralExamples, validateTemplateVariables } from './src/lib/templateRules.js';
 import { arePhonesEquivalent, normalizeE164Phone, phoneDigitVariants, formatAndValidateE164Phone } from './src/lib/phone.js';
 import { getUploadsDir, getInboxDir, INBOX_SUBDIR, isUploadsDirDurable, publicBaseUrl, saveMediaBuffer, extensionFor } from './src/lib/mediaStorage.js';
 import { statusRank, shouldApplyStatus, normalizeStatus } from './src/lib/fluxoStatus.js';
@@ -2642,7 +2643,8 @@ app.get('/api/admin/fluxo/instances', async (req: any, res) => {
         status: String(n.status || 'unknown').toLowerCase(),
         quality: n.quality_rating || null,
         messagingLimit: null,
-        coexistence: false,
+        // null = não verificado: a sincronização ainda não lê se o número está no app WhatsApp Business
+        coexistence: null,
         accountId: 'env'
       });
     }
@@ -2657,7 +2659,7 @@ app.get('/api/admin/fluxo/instances', async (req: any, res) => {
         status: String(n.status || 'unknown').toLowerCase(),
         quality: n.qualityRating || null,
         messagingLimit: null,
-        coexistence: false,
+        coexistence: null,
         accountId: n.accountId
       });
     }
@@ -3151,16 +3153,28 @@ app.post('/api/admin/fluxo/templates/sync-meta', async (req: any, res) => {
   }
 
   try {
-    const metaRes = await fetchMetaGraphTemplates(metaToken, metaWabaId);
-    if (!metaRes.success || !metaRes.templates) {
+    // Sincroniza o ambiente E todas as BMs cadastradas (cada uma com o próprio token e WABA)
+    const sources: Array<{ token: string; waba: string }> = [{ token: metaToken, waba: metaWabaId }];
+    for (const acc of listMetaRegistry().accounts) {
+      const resolved = resolveMetaAccount(acc.id);
+      if (resolved?.accessToken && resolved?.wabaId) sources.push({ token: resolved.accessToken, waba: resolved.wabaId });
+    }
+    const allRawTemplates: any[] = [];
+    const syncErrors: string[] = [];
+    for (const src of sources) {
+      const r = await fetchMetaGraphTemplates(src.token, src.waba);
+      if (r.success && r.templates) allRawTemplates.push(...r.templates);
+      else syncErrors.push(r.error || `WABA ${src.waba}: falha ao consultar`);
+    }
+    if (allRawTemplates.length === 0 && syncErrors.length > 0) {
       return res.status(502).json({
         success: false,
-        error: metaRes.error || 'Falha ao consultar Meta Graph API.'
+        error: syncErrors[0]
       });
     }
 
     const syncedList: any[] = [];
-    for (const rawTpl of metaRes.templates) {
+    for (const rawTpl of allRawTemplates) {
       const normalized = normalizeMetaGraphTemplate(rawTpl);
       syncedList.push(normalized);
 
@@ -3220,7 +3234,11 @@ app.post('/api/admin/fluxo/templates', async (req: any, res) => {
   }
 
   const normalizedName = String(name).trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
-  const targetCategory = category === 'MARKETING' ? 'MARKETING' : 'UTILITY';
+  const categoryCheck = validateTemplateCategory(category);
+  if (!categoryCheck.ok) {
+    return res.status(400).json({ error: categoryCheck.error });
+  }
+  const targetCategory = categoryCheck.value;
   const targetLanguage = language || 'pt_BR';
   const isSavingAsDraft = Boolean(isDraft || initialStatus === 'DRAFT');
 
@@ -3259,30 +3277,12 @@ app.post('/api/admin/fluxo/templates', async (req: any, res) => {
 
   // If there are variables but examples are missing or incomplete, auto-populate realistic examples required by Meta
   if (uniqueVars.length > 0 && resolvedExamples.length < uniqueVars.length) {
-    const defaultExamples = targetCategory === 'UTILITY' ? [
-      'Caio',
-      'Seu pedido foi confirmado com sucesso e em breve estará no seu destino.',
-      'O link para rastreio da viagem já está disponível para acesso, conforme solicitado.',
-      'Código de rastreio #883921',
-      'Central de Atendimento ao Cliente'
-    ] : [
-      'Marcelo',
-      'Confira a proposta comercial exclusiva preparada para a sua empresa',
-      'https://nyroh.com.br/demo',
-      'Segunda-feira às 15:00',
-      'Equipe Comercial'
-    ];
-    resolvedExamples = uniqueVars.map((_, i) => resolvedExamples[i] || defaultExamples[i] || `Exemplo ${i + 1}`);
+    const examplePool = neutralExamples(targetCategory, uniqueVars.length);
+    resolvedExamples = uniqueVars.map((_, i) => resolvedExamples[i] || examplePool[i]);
   }
 
   // Format buttons as QUICK_REPLY
-  const formattedButtons = buttonsList.map((b: any) => {
-    const textVal = typeof b === 'string' ? b : (b.text || b.label || String(b));
-    return {
-      type: 'QUICK_REPLY',
-      text: String(textVal).trim()
-    };
-  }).filter(b => b.text.length > 0);
+  const formattedButtons: any[] = buildMetaButtons(buttonsList);
 
   // Build real FluxoAPI / Meta Payload
   const fluxoPayload: any = {
@@ -5305,7 +5305,10 @@ async function processWebhookEventAsync(event: any) {
 
               console.log(`[Meta Template Status Update]: ${tplName} -> ${newStatus}`);
 
-              const memTpl = memoryTemplates.find(t => t.name.toLowerCase() === String(tplName).toLowerCase());
+              // Prefere o ID do modelo (único por BM). Só cai no nome quando o evento não traz ID.
+              const tplId = val.message_template_id ? String(val.message_template_id) : null;
+              const memTpl = (tplId ? memoryTemplates.find(t => String(t.id) === tplId) : undefined)
+                || memoryTemplates.find(t => t.name.toLowerCase() === String(tplName).toLowerCase());
               if (memTpl) {
                 memTpl.status = newStatus as any;
                 if (reason) memTpl.rejectedReason = reason;
@@ -5314,12 +5317,10 @@ async function processWebhookEventAsync(event: any) {
               if (usePostgres && pgPool && tplName) {
                 try {
                   await pgPool.query(
-                    `UPDATE meta_templates SET 
-                       status = $1, 
-                       rejected_reason = COALESCE($2, rejected_reason),
-                       updated_at = CURRENT_TIMESTAMP
-                     WHERE LOWER(name) = LOWER($3)`,
-                    [newStatus, reason, tplName]
+                    tplId
+                      ? `UPDATE meta_templates SET status = $1, rejected_reason = COALESCE($2, rejected_reason), updated_at = CURRENT_TIMESTAMP WHERE id = $3`
+                      : `UPDATE meta_templates SET status = $1, rejected_reason = COALESCE($2, rejected_reason), updated_at = CURRENT_TIMESTAMP WHERE LOWER(name) = LOWER($3)`,
+                    [newStatus, reason, tplId || tplName]
                   );
                 } catch (pgErr) {
                   console.warn('[PostgreSQL] Erro ao atualizar status de template via webhook:', pgErr);
@@ -10375,6 +10376,10 @@ app.post('/api/campaign/dispatch', async (req: any, res) => {
           if (emptyFields.length > 0) {
             // Lead sem dado exigido pela copy: não enfileira (a Meta recusaria o parâmetro vazio)
             console.warn(`[Disparo] lead ${dLead.id} sem dado para: ${emptyFields.join(', ')}. Não enfileirado.`);
+            await pgPool.query(
+              `UPDATE campaign_leads SET status = 'ERRO_VARIAVEL', notes = $2 WHERE id = $1`,
+              [dLead.id, `Não enviado: sem dado para ${emptyFields.join(', ')}`]
+            ).catch(() => {});
             continue;
           }
           leadVar1 = resolved[0].text;
@@ -10540,6 +10545,8 @@ app.post('/api/campaign/dispatch', async (req: any, res) => {
           if (emptyFields.length > 0) {
             // Lead sem dado exigido pela copy: não enfileira (a Meta recusaria o parâmetro vazio)
             console.warn(`[Disparo] lead ${lead.id} sem dado para: ${emptyFields.join(', ')}. Não enfileirado.`);
+            (lead as any).status = 'ERRO_VARIAVEL';
+            (lead as any).notes = `Não enviado: sem dado para ${emptyFields.join(', ')}`;
             continue;
           }
           leadVar1 = resolved[0].text;
@@ -11706,13 +11713,31 @@ async function sendTemplateViaFluxo(opts: {
 }): Promise<FluxoApiResult<any>> {
   const language = opts.language || 'pt_BR';
   if (getMetaProvider() === 'meta') {
+    // Confere as variáveis contra o corpo do modelo, antes de gastar uma chamada na Meta
+    const stored = memoryTemplates.find(t => String(t.name).toLowerCase() === String(opts.name).toLowerCase());
+    const bodyComp: any = (stored?.components as any[] | undefined)?.find((c: any) => c.type === 'BODY');
+    if (bodyComp?.text) {
+      const check = validateTemplateVariables(String(bodyComp.text), opts.variables || {});
+      if (!check.ok) {
+        return {
+          success: false,
+          status: 422,
+          error: { code: 'invalid_input', message: `O modelo "${opts.name}" exige valores não informados: ${check.missing.join(', ')}.` }
+        } as any;
+      }
+    }
+    // Botões de URL dinâmica: o valor vem em opts.buttons, índice -> sufixo do link
+    const urlButtonValues = Object.entries(opts.buttons || {})
+      .filter(([k]) => /^\d+$/.test(k))
+      .map(([k, v]) => ({ index: Number(k), value: String(v || '') }));
     const direct = await metaSendTemplate({
       to: opts.to,
       name: opts.name,
       language,
       variables: opts.variables,
       headerImageUrl: opts.headerMediaUrl,
-      phoneNumberId: opts.phoneNumberId
+      phoneNumberId: opts.phoneNumberId,
+      urlButtonValues
     });
     return metaToFluxoResult(direct);
   }

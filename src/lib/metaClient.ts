@@ -205,6 +205,8 @@ export async function metaSendTemplate(opts: {
   variables?: Record<string, string>;
   headerImageUrl?: string;
   phoneNumberId?: string;
+  /** Valores dos botões de URL dinâmica (índice do botão no modelo -> sufixo do link). */
+  urlButtonValues?: Array<{ index: number; value: string }>;
 }) {
   const sender = resolveMetaSender(opts.phoneNumberId);
   if (!sender.phoneNumberId) return { success: false, status: 0, data: null, error: 'META_PHONE_NUMBER_ID não configurado.' };
@@ -219,6 +221,10 @@ export async function metaSendTemplate(opts: {
   const keys = allNumeric ? rawKeys.sort((a, b) => Number(a) - Number(b)) : rawKeys;
   if (keys.length) {
     components.push({ type: 'body', parameters: keys.map(k => ({ type: 'text', text: String(vars[k] ?? '') })) });
+  }
+  for (const b of opts.urlButtonValues || []) {
+    if (!Number.isInteger(b.index) || b.index < 0 || !String(b.value || '').trim()) continue;
+    components.push({ type: 'button', sub_type: 'url', index: String(b.index), parameters: [{ type: 'text', text: String(b.value).trim() }] });
   }
 
   return graphRequest('POST', `/${sender.phoneNumberId}/messages`, {
