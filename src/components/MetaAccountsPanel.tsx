@@ -12,14 +12,22 @@ interface MetaAccount {
 interface Props {
   onShowToast: (msg: string) => void;
   onAccountsChanged?: () => void;
+  /** Números já carregados pela tela (cada um com accountId). */
+  numbers: any[];
+  selectedId: string | null;
+  onSelect: (id: string | null) => void;
+  onOpenModels: (id: string) => void;
 }
 
-/** Contas da Meta (BMs) em tabela. Cadastrar abre um modal, para a tela não ficar com formulário aberto. */
-export default function MetaAccountsPanel({ onShowToast, onAccountsChanged }: Props) {
+type DetailTab = 'numbers' | 'config';
+
+/** Lista de BMs (uma tabela) + detalhe da BM selecionada com sub-abas Números e Configuração. */
+export default function MetaAccountsPanel({ onShowToast, onAccountsChanged, numbers, selectedId, onSelect, onOpenModels }: Props) {
   const [accounts, setAccounts] = useState<MetaAccount[]>([]);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [detailTab, setDetailTab] = useState<DetailTab>('numbers');
   const [name, setName] = useState('');
   const [wabaId, setWabaId] = useState('');
   const [businessId, setBusinessId] = useState('');
@@ -59,6 +67,7 @@ export default function MetaAccountsPanel({ onShowToast, onAccountsChanged }: Pr
       onShowToast(`BM cadastrada: ${data.sync?.numbers ?? 0} número(s) sincronizado(s).`);
       await load();
       onAccountsChanged?.();
+      onSelect(data.account?.id || null);
     } catch (err: any) {
       setError(err?.message || 'Falha de conexão ao cadastrar.');
     } finally {
@@ -85,6 +94,7 @@ export default function MetaAccountsPanel({ onShowToast, onAccountsChanged }: Pr
     try {
       await fetch(`/api/admin/meta/accounts/${encodeURIComponent(id)}`, { method: 'DELETE' });
       onShowToast('BM removida do CRM.');
+      onSelect(null);
       await load();
       onAccountsChanged?.();
     } finally {
@@ -92,60 +102,162 @@ export default function MetaAccountsPanel({ onShowToast, onAccountsChanged }: Pr
     }
   };
 
+  const selected = accounts.find(a => a.id === selectedId) || null;
+  const selectedNumbers = selectedId ? numbers.filter(n => (n.accountId || 'env') === selectedId) : [];
+
   const inputCls = 'w-full px-3 py-2 rounded-lg border border-neutral-700 bg-neutral-950 text-neutral-100 placeholder:text-neutral-500 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500';
   const labelCls = 'block text-xs font-semibold text-neutral-300 mb-1';
 
   return (
-    <section className="rounded-2xl border border-neutral-800 bg-neutral-900 text-neutral-100 overflow-hidden">
-      <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-neutral-800">
-        <div>
-          <h3 className="text-sm font-bold text-white">Contas da Meta (BMs)</h3>
-          <p className="text-[11px] text-neutral-400">Cada BM guarda o próprio token, criptografado. Os números herdam o token da BM.</p>
+    <div className="space-y-4">
+      <section className="rounded-2xl border border-neutral-800 bg-neutral-900 text-neutral-100 overflow-hidden">
+        <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-neutral-800">
+          <div>
+            <h3 className="text-sm font-bold text-white">Contas da Meta (BMs)</h3>
+            <p className="text-[11px] text-neutral-400">Clique numa BM para ver os números e configurações dela.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={load} disabled={loading} className="text-xs px-2.5 py-1.5 rounded-lg border border-neutral-700 text-neutral-200 flex items-center gap-1.5" aria-label="Atualizar lista">
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+            <button onClick={() => { setError(null); setOpen(true); }} className="text-xs px-3 py-1.5 rounded-lg bg-white text-neutral-900 font-semibold flex items-center gap-1.5">
+              <Plus className="w-3.5 h-3.5" /> Cadastrar BM
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={load} disabled={loading} className="text-xs px-2.5 py-1.5 rounded-lg border border-neutral-700 text-neutral-200 flex items-center gap-1.5">
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-          <button onClick={() => { setError(null); setOpen(true); }} className="text-xs px-3 py-1.5 rounded-lg bg-white text-neutral-900 font-semibold flex items-center gap-1.5">
-            <Plus className="w-3.5 h-3.5" /> Cadastrar BM
-          </button>
-        </div>
-      </div>
 
-      {accounts.length === 0 ? (
-        <div className="px-4 py-6 text-center text-xs text-neutral-400">
-          Nenhuma BM cadastrada. Os números do ambiente (META_*) continuam funcionando sem cadastro.
-        </div>
-      ) : (
-        <table className="w-full text-xs">
-          <thead className="text-neutral-400 text-left">
-            <tr className="border-b border-neutral-800">
-              <th className="px-4 py-2 font-medium">BM</th>
-              <th className="px-4 py-2 font-medium">WABA</th>
-              <th className="px-4 py-2 font-medium">Números</th>
-              <th className="px-4 py-2 font-medium text-right">Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {accounts.map(a => (
-              <tr key={a.id} className="border-b border-neutral-800/60 last:border-0">
-                <td className="px-4 py-2.5 font-semibold text-white">{a.name}</td>
-                <td className="px-4 py-2.5 font-mono text-neutral-400">{a.wabaId}</td>
-                <td className="px-4 py-2.5 text-neutral-300">{a.numbers}</td>
-                <td className="px-4 py-2.5">
-                  <div className="flex justify-end gap-2">
-                    <button onClick={() => syncAccount(a.id)} disabled={busy === a.id} className="px-2.5 py-1 rounded-md bg-emerald-600 text-white font-semibold disabled:opacity-50">
-                      Sincronizar
-                    </button>
-                    <button onClick={() => removeAccount(a.id, a.name)} disabled={busy === a.id} className="px-2 py-1 rounded-md border border-red-800 text-red-400 disabled:opacity-50" aria-label="Remover BM">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </td>
+        {accounts.length === 0 ? (
+          <div className="px-4 py-6 text-center text-xs text-neutral-400">
+            Nenhuma BM cadastrada. Clique em "Cadastrar BM" para começar.
+          </div>
+        ) : (
+          <table className="w-full text-xs">
+            <thead className="text-neutral-400 text-left">
+              <tr className="border-b border-neutral-800">
+                <th className="px-4 py-2 font-medium">BM</th>
+                <th className="px-4 py-2 font-medium">WABA</th>
+                <th className="px-4 py-2 font-medium">Números</th>
+                <th className="px-4 py-2 font-medium text-right">Ações</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {accounts.map(a => {
+                const isSel = a.id === selectedId;
+                return (
+                  <tr
+                    key={a.id}
+                    onClick={() => { onSelect(isSel ? null : a.id); setDetailTab('numbers'); }}
+                    className={`border-b border-neutral-800/60 last:border-0 cursor-pointer ${isSel ? 'bg-emerald-950/50' : 'hover:bg-neutral-800/50'}`}
+                  >
+                    <td className="px-4 py-2.5 font-semibold text-white">{a.name}</td>
+                    <td className="px-4 py-2.5 font-mono text-neutral-400">{a.wabaId}</td>
+                    <td className="px-4 py-2.5 text-neutral-300">{a.numbers}</td>
+                    <td className="px-4 py-2.5">
+                      <div className="flex justify-end gap-2" onClick={e => e.stopPropagation()}>
+                        <button onClick={() => syncAccount(a.id)} disabled={busy === a.id} className="px-2.5 py-1 rounded-md bg-emerald-600 text-white font-semibold disabled:opacity-50">
+                          Sincronizar
+                        </button>
+                        <button onClick={() => removeAccount(a.id, a.name)} disabled={busy === a.id} className="px-2 py-1 rounded-md border border-red-800 text-red-400 disabled:opacity-50" aria-label="Remover BM">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </section>
+
+      {selected && (
+        <section className="rounded-2xl border border-neutral-800 bg-neutral-900 text-neutral-100 overflow-hidden">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 border-b border-neutral-800">
+            <div>
+              <h4 className="text-sm font-bold text-white">{selected.name}</h4>
+              <p className="text-[11px] text-neutral-400 font-mono">WABA {selected.wabaId}</p>
+            </div>
+            <div className="flex gap-1 p-1 bg-neutral-950 rounded-lg">
+              {([['numbers', 'Números'], ['config', 'Configuração']] as Array<[DetailTab, string]>).map(([id, label]) => (
+                <button
+                  key={id}
+                  onClick={() => setDetailTab(id)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-semibold ${detailTab === id ? 'bg-white text-neutral-900' : 'text-neutral-300 hover:text-white'}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {detailTab === 'numbers' && (
+            <div>
+              {selectedNumbers.length === 0 ? (
+                <div className="px-4 py-6 text-center text-xs text-neutral-400 space-y-2">
+                  <p>Nenhum número sincronizado nesta BM.</p>
+                  <button onClick={() => syncAccount(selected.id)} disabled={busy === selected.id} className="px-3 py-1.5 rounded-md bg-emerald-600 text-white font-semibold disabled:opacity-50">
+                    Sincronizar agora
+                  </button>
+                </div>
+              ) : (
+                <table className="w-full text-xs">
+                  <thead className="text-neutral-400 text-left">
+                    <tr className="border-b border-neutral-800">
+                      <th className="px-4 py-2 font-medium">Número</th>
+                      <th className="px-4 py-2 font-medium">Nome verificado</th>
+                      <th className="px-4 py-2 font-medium">Qualidade</th>
+                      <th className="px-4 py-2 font-medium">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedNumbers.map(n => (
+                      <tr key={n.id} className="border-b border-neutral-800/60 last:border-0">
+                        <td className="px-4 py-2.5 font-mono text-white">{n.phone || n.id}</td>
+                        <td className="px-4 py-2.5 text-neutral-300">{n.name || '—'}</td>
+                        <td className="px-4 py-2.5 text-neutral-300">{n.quality || '—'}</td>
+                        <td className="px-4 py-2.5 text-neutral-300">{n.status || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+              <div className="px-4 py-3 border-t border-neutral-800">
+                <button onClick={() => onOpenModels(selected.id)} className="text-xs px-3 py-1.5 rounded-lg border border-neutral-700 text-neutral-200 hover:bg-neutral-800">
+                  Ver modelos desta BM
+                </button>
+              </div>
+            </div>
+          )}
+
+          {detailTab === 'config' && (
+            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              <div>
+                <div className="text-neutral-400 mb-1">Nome</div>
+                <div className="text-white font-semibold">{selected.name}</div>
+              </div>
+              <div>
+                <div className="text-neutral-400 mb-1">ID da conta do WhatsApp (WABA)</div>
+                <div className="text-white font-mono">{selected.wabaId}</div>
+              </div>
+              <div>
+                <div className="text-neutral-400 mb-1">ID do Business Manager</div>
+                <div className="text-white font-mono">{selected.businessId || '—'}</div>
+              </div>
+              <div>
+                <div className="text-neutral-400 mb-1">Token</div>
+                <div className="text-neutral-300">Guardado criptografado. Para trocar, remova a BM e cadastre de novo com o novo token.</div>
+              </div>
+              <div className="sm:col-span-2 flex flex-wrap gap-2 pt-2 border-t border-neutral-800">
+                <button onClick={() => syncAccount(selected.id)} disabled={busy === selected.id} className="px-3 py-1.5 rounded-md bg-emerald-600 text-white font-semibold disabled:opacity-50">
+                  Sincronizar com a Meta
+                </button>
+                <button onClick={() => removeAccount(selected.id, selected.name)} disabled={busy === selected.id} className="px-3 py-1.5 rounded-md border border-red-800 text-red-400 disabled:opacity-50">
+                  Remover BM do CRM
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
       )}
 
       {open && (
@@ -192,6 +304,6 @@ export default function MetaAccountsPanel({ onShowToast, onAccountsChanged }: Pr
           </form>
         </div>
       )}
-    </section>
+    </div>
   );
 }
