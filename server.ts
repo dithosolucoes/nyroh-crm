@@ -17,7 +17,7 @@ import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regrasDeC
 import { hashPassword, verifyPassword, generateSessionToken, DEFAULT_USERS, StoredUser, isUserAdmin } from './src/lib/serverAuth.js';
 import { performWebsiteAudit } from './src/lib/auditEngine.js';
 import { executeFluxoRequest, downloadFluxoMediaBinary, prepareOutboundMedia, fluxoInstancePath, hasFfmpeg } from './src/lib/fluxoClient.js';
-import { setMetaRegistry, listMetaRegistry, encryptMetaToken, decryptMetaToken, metaDownloadMedia, metaSyncAccount, metaValidateToken, resolveMetaAccount, receivingPhoneNumberId, type MetaAccountRecord, type MetaNumberRecord } from './src/lib/metaClient.js';
+import { setMetaRegistry, listMetaRegistry, encryptMetaToken, decryptMetaToken, metaDownloadMedia, metaSyncAccount, metaValidateToken, resolveMetaAccount, receivingPhoneNumberId, parseCoexistenceEchoes, type MetaAccountRecord, type MetaNumberRecord } from './src/lib/metaClient.js';
 import type { FluxoApiResult } from './src/lib/fluxoClient.js';
 import { verifyFluxoWebhook } from './src/lib/webhookAuth.js';
 import { detectOptOut, sanitizeTemplateVariable, resolveManualInterest, SEM_INTERESSE_TAG } from './src/lib/leadIntent.js';
@@ -5333,6 +5333,21 @@ async function processWebhookEventAsync(event: any) {
             }
 
             // 1.2 Mensagens e Status de Entrega da Meta
+            // 1.3 Coexistência: mensagens enviadas pelo APP do celular (WhatsApp Business), espelhadas pela Meta.
+            // Sem isso o CRM não vê o que o vendedor respondeu pelo celular no mesmo número.
+            else if (field === 'smb_message_echoes') {
+              for (const echo of parseCoexistenceEchoes(val)) {
+                eventType = 'message_sent_from_phone';
+                await processOutboundPhoneMessage({
+                  phone: echo.phone,
+                  text: echo.text,
+                  messageId: echo.messageId,
+                  eventTimestamp: echo.eventTimestamp
+                });
+                summary = `Vendedor respondeu pelo celular para ${echo.phone}`;
+              }
+            }
+
             else if (field === 'messages') {
               // Número que recebeu (multi-número): define qual token/BM usar para baixar mídia e marcar leitura
               const receivingPhoneId = String(val.metadata?.phone_number_id || '').trim() || undefined;

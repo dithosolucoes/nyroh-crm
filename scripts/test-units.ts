@@ -22,7 +22,7 @@ import { isPubliclyFetchableUrl } from '../src/lib/auditEngine';
 import {
   verifyMetaSignature, metaSendText, metaSendTemplate, metaMarkRead, metaDownloadMedia,
   encryptMetaToken, decryptMetaToken, setMetaRegistry, resolveMetaSender,
-  metaCreateTemplate, metaDeleteTemplate, metaListTemplates, receivingPhoneNumberId
+  metaCreateTemplate, metaDeleteTemplate, metaListTemplates, receivingPhoneNumberId, parseCoexistenceEchoes
 } from '../src/lib/metaClient';
 
 let passed = 0;
@@ -653,6 +653,21 @@ async function main() {
       setMetaRegistry([], []);
       assert.equal(receivingPhoneNumberId({ entry: [{ changes: [{ value: {} }] }] }), undefined);
       assert.equal(resolveMetaSender(undefined).accountId, 'env');
+    }],
+    ['coexistência: echo de texto vira mensagem enviada pelo celular, com o número do cliente', () => {
+      const out = parseCoexistenceEchoes({ message_echoes: [{ from: '5531000000000', to: '+55 31 99999-9999', id: 'wamid.E1', timestamp: '1700000000', type: 'text', text: { body: 'oi, tudo bem?' } }] });
+      assert.equal(out.length, 1);
+      assert.equal(out[0].phone, '5531999999999');
+      assert.equal(out[0].text, 'oi, tudo bem?');
+      assert.equal(out[0].messageId, 'wamid.E1');
+      assert.equal(out[0].eventTimestamp, new Date(1700000000 * 1000).toISOString());
+    }],
+    ['coexistência: echo de mídia vira rótulo de texto (o arquivo não vem nesse evento)', () => {
+      const out = parseCoexistenceEchoes({ message_echoes: [{ to: '5531999999999', id: 'wamid.E2', type: 'image' }] });
+      assert.equal(out[0].text, '[Imagem enviada pelo celular]');
+    }],
+    ['coexistência: sem echoes não gera nada', () => {
+      assert.deepEqual(parseCoexistenceEchoes({}), []);
     }],
     ['erro da Meta vira falha com a mensagem dela (não derruba)', async () => {
       withMetaEnv();
