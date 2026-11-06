@@ -1169,10 +1169,11 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
               {instances.map((inst, index) => {
                 const connected = inst.status === 'connected';
                 const coexistence = inst.coexistence === true;
+                const coexistenceUnknown = inst.coexistence === null || inst.coexistence === undefined;
                 const quality = String(inst.quality || 'UNKNOWN').toUpperCase();
                 const qualityLabel = quality === 'GREEN' ? 'Alta (Verde)' : quality === 'YELLOW' ? 'Atenção (Amarela)' : quality === 'RED' ? 'Baixa (Vermelha)' : 'Desconhecida';
                 const qualityColor = quality === 'GREEN' ? 'text-emerald-700' : quality === 'YELLOW' ? 'text-amber-700' : quality === 'RED' ? 'text-red-700' : 'text-neutral-500';
-                const statusLabel: Record<string, string> = { connected: 'Conectada', pending: 'Aguardando conexão', disconnected: 'Desconectada', suspended: 'Suspensa' };
+                const statusLabel: Record<string, string> = { connected: 'Conectada', pending: 'Aguardando conexão', disconnected: 'Desconectada', suspended: 'Suspensa', flagged: 'Sinalizada pela Meta', restricted: 'Restrita pela Meta', migrated: 'Migrada', unknown: 'Status não informado' };
                 return (
                   <div
                     key={inst.id || index}
@@ -1202,8 +1203,8 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
                       </div>
                       <div>
                         <span className="text-neutral-500 block text-[10px]">Coexistência:</span>
-                        <span className={`font-bold ${coexistence ? 'text-emerald-700' : 'text-red-700'}`}>
-                          {coexistence ? 'Ativa (celular + CRM)' : 'DESLIGADA (somente API)'}
+                        <span className={`font-bold ${coexistenceUnknown ? 'text-neutral-600' : coexistence ? 'text-emerald-700' : 'text-red-700'}`}>
+                          {coexistenceUnknown ? 'Não verificado (a Meta não informou)' : coexistence ? 'Ativa (celular + CRM)' : 'DESLIGADA (somente API)'}
                         </span>
                       </div>
                       <div>

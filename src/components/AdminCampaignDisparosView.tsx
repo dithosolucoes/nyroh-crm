@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { resolveLeadTokens } from '../lib/leadTokens';
 import { useRuntimeConfig, formatInstancePhone } from '../lib/useRuntimeConfig';
 import { onRealtime } from '../lib/realtime';
 import {
@@ -2405,7 +2406,6 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
                             { tag: '{empresa}', desc: 'Razão social ou fantasia' },
                             { tag: '{site_novo}', desc: 'Link do site criado no Nyroh' },
                             { tag: '{vendedor}', desc: 'Nome do closer ou admin' },
-                            { tag: '{cidade}', desc: 'Cidade da marcenaria/lead' },
                             { tag: '{telefone}', desc: 'Telefone do lead' },
                             { tag: '{site_antigo}', desc: 'Site antigo (se tiver)' },
                             { tag: '{data}', desc: 'Data do disparo' }
@@ -2846,35 +2846,23 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
 
                         {/* Official Template Render Mesclando Variáveis */}
                         {(() => {
-                          const leadName = activeSimulatorLead?.name || 'Marcelo';
+                          const leadName = activeSimulatorLead?.name || 'Cliente';
                           const firstName = leadName.split(' ')[0];
                           const companyName = activeSimulatorLead?.name || 'Sua Empresa';
                           const siteUrl = activeSimulatorLead?.publicUrl || 'https://sua-empresa.nyroh.com.br';
                           const sellerName = currentUser?.name || 'Thomas';
 
-                          const resolvedVar1 = templateVar1
-                            .replace(/\{nome\}/gi, firstName)
-                            .replace(/\{empresa\}/gi, companyName)
-                            .replace(/\{vendedor\}/gi, sellerName)
-                            .replace(/\{site_novo\}/gi, siteUrl)
-                            .replace(/\{cidade\}/gi, 'São Paulo')
-                            .replace(/\{site_antigo\}/gi, activeSimulatorLead?.website || 'https://empresa.com.br');
-
-                          const resolvedVar2 = templateVar2
-                            .replace(/\{nome\}/gi, firstName)
-                            .replace(/\{empresa\}/gi, companyName)
-                            .replace(/\{vendedor\}/gi, sellerName)
-                            .replace(/\{site_novo\}/gi, siteUrl)
-                            .replace(/\{cidade\}/gi, 'São Paulo')
-                            .replace(/\{site_antigo\}/gi, activeSimulatorLead?.website || 'https://empresa.com.br');
-
-                          const resolvedVar3 = templateVar3
-                            .replace(/\{nome\}/gi, firstName)
-                            .replace(/\{empresa\}/gi, companyName)
-                            .replace(/\{vendedor\}/gi, sellerName)
-                            .replace(/\{site_novo\}/gi, siteUrl)
-                            .replace(/\{cidade\}/gi, 'São Paulo')
-                            .replace(/\{site_antigo\}/gi, activeSimulatorLead?.website || 'https://empresa.com.br');
+                          const tokenCtx = {
+                            leadName: activeSimulatorLead?.name || '',
+                            phoneNumber: (activeSimulatorLead as any)?.phoneNumber || '',
+                            publicUrl: activeSimulatorLead?.publicUrl || '',
+                            website: (activeSimulatorLead as any)?.website || '',
+                            niche: (activeSimulatorLead as any)?.niche || '',
+                            sellerName
+                          };
+                          const resolvedVar1 = resolveLeadTokens(templateVar1, tokenCtx).text;
+                          const resolvedVar2 = resolveLeadTokens(templateVar2, tokenCtx).text;
+                          const resolvedVar3 = resolveLeadTokens(templateVar3, tokenCtx).text;
 
                           const resolvedButtonUrl =
                             buttonDestinationType === 'site_novo'
