@@ -16,6 +16,7 @@ import { getLeadNiche } from './src/lib/niche.js';
 import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regrasDeContatoSql, instanciaDaSafra } from './src/lib/uxRoutes.js';
 import { hashPassword, verifyPassword, generateSessionToken, DEFAULT_USERS, StoredUser, isUserAdmin } from './src/lib/serverAuth.js';
 import { performWebsiteAudit } from './src/lib/auditEngine.js';
+import { missingFluxoVars, summarizeFluxoInstance } from './src/lib/fluxoInstanceStatus.js';
 import { executeFluxoRequest, downloadFluxoMediaBinary, prepareOutboundMedia, fluxoInstancePath, hasFfmpeg } from './src/lib/fluxoClient.js';
 import { setMetaRegistry, listMetaRegistry, encryptMetaToken, decryptMetaToken, metaDownloadMedia, metaSyncAccount, metaValidateToken, resolveMetaAccount, receivingPhoneNumberId, parseCoexistenceEchoes, getEmbeddedSignupConfig, metaExchangeSignupCode, metaSubscribeWaba, metaDiscoverWabaIds, type MetaAccountRecord, type MetaNumberRecord } from './src/lib/metaClient.js';
 import type { FluxoApiResult } from './src/lib/fluxoClient.js';
@@ -2538,6 +2539,48 @@ app.post('/api/admin/fluxo/test-connection', async (req: any, res) => {
 });
 
 // POST send-test-message
+// GET status (somente leitura): diz quais variáveis faltam e se a instância está "No ar" na FluxoAPI.
+// Não envia mensagem nenhuma: só chama GET /v1/instances.
+app.get('/api/admin/fluxo/status', async (req: any, res) => {
+  if (!isUserAdmin(req.user)) {
+    return res.status(403).json({ error: 'Acesso restrito ao Administrador.' });
+  }
+  const apiKey = (memoryFluxoConfig.apiKey || process.env.FLUXO_KEY || '').trim();
+  const apiSecret = (memoryFluxoConfig.apiSecret || process.env.FLUXO_SECRET || '').trim();
+  const instanceId = (memoryFluxoConfig.instanceId || process.env.FLUXO_INSTANCE_ID || '').trim();
+  const missing = missingFluxoVars({
+    key: Boolean(apiKey),
+    secret: Boolean(apiSecret),
+    instanceId: Boolean(instanceId),
+    webhookSecret: Boolean((process.env.FLUXO_WEBHOOK_SECRET || '').trim())
+  });
+  const base = {
+    provider: getMetaProvider(),
+    missing,
+    source: (process.env.FLUXO_KEY && process.env.FLUXO_SECRET) ? 'railway' : (memoryFluxoConfig.apiKey ? 'sistema' : 'nenhuma'),
+    webhookPath: '/api/webhooks/fluxo'
+  };
+  if (!apiKey || !apiSecret) {
+    return res.json({ ...base, connected: false, instance: summarizeFluxoInstance([], instanceId), message: 'Faltam credenciais da FluxoAPI.' });
+  }
+  try {
+    const r = await executeFluxoRequest({ method: 'GET', path: '/v1/instances', apiKey, apiSecret });
+    if (!r.success) {
+      return res.json({ ...base, connected: false, instance: summarizeFluxoInstance([], instanceId), message: r.error?.message || 'FluxoAPI não respondeu com sucesso.' });
+    }
+    const list = Array.isArray(r.data) ? r.data : (r.data?.instances || r.data?.data || []);
+    const instance = summarizeFluxoInstance(list, instanceId);
+    return res.json({
+      ...base,
+      connected: instance.found && instance.status === 'no_ar',
+      instance,
+      message: instance.status === 'no_ar' ? 'FluxoAPI conectada e instância No ar.' : 'Instância encontrada, mas não está No ar.'
+    });
+  } catch (err: any) {
+    return res.status(500).json({ ...base, connected: false, message: err?.message || 'Erro ao consultar a FluxoAPI.' });
+  }
+});
+
 app.post('/api/admin/fluxo/send-test-message', async (req: any, res) => {
   const isAdmin = isUserAdmin(req.user); // antes: liberava anônimo fora de produção
   if (!isAdmin) {

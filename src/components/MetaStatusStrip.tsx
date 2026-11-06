@@ -12,6 +12,15 @@ interface MetaStatus {
   numbers: number;
 }
 
+interface FluxoStatus {
+  provider: 'meta' | 'fluxo';
+  connected: boolean;
+  missing: string[];
+  source: string;
+  message: string;
+  instance: { found: boolean; status: string; name: string | null; phone: string | null };
+}
+
 interface Props {
   onShowToast: (msg: string) => void;
   onChanged?: () => void;
@@ -21,11 +30,16 @@ interface Props {
 export default function MetaStatusStrip({ onShowToast, onChanged }: Props) {
   const [status, setStatus] = useState<MetaStatus | null>(null);
   const [busy, setBusy] = useState(false);
+  const [fluxo, setFluxo] = useState<FluxoStatus | null>(null);
 
   const load = useCallback(async () => {
     try {
       const res = await fetch('/api/admin/meta/status');
       if (res.ok) setStatus(await res.json());
+    } catch { /* faixa é informativa */ }
+    try {
+      const res = await fetch('/api/admin/fluxo/status');
+      if (res.ok) setFluxo(await res.json());
     } catch { /* faixa é informativa */ }
   }, []);
 
@@ -49,7 +63,11 @@ export default function MetaStatusStrip({ onShowToast, onChanged }: Props) {
   const tokenOk = status.envToken || status.accounts > 0;
   let next: string | null = null;
   if (status.provider !== 'meta') {
-    next = 'O envio está no modo FluxoAPI (standby). Para usar a Meta direto, defina WHATSAPP_PROVIDER=meta no Railway.';
+    next = fluxo && fluxo.missing.length
+      ? `Faltam no Railway: ${fluxo.missing.join(', ')}.`
+      : fluxo && !fluxo.connected
+        ? `FluxoAPI configurada, mas a instância não está No ar (${fluxo.instance.status}). Confira na FluxoAPI.`
+        : null;
   } else if (!tokenOk) {
     next = 'Falta o token da Meta. Crie a variável META_ACCESS_TOKEN no Railway ou cadastre uma BM abaixo.';
   } else if (!status.appSecret) {
@@ -70,7 +88,13 @@ export default function MetaStatusStrip({ onShowToast, onChanged }: Props) {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-sm font-bold text-white mr-1">WhatsApp Meta</span>
-          <Chip ok={status.provider === 'meta'} label={status.provider === 'meta' ? 'Meta direta' : 'FluxoAPI (standby)'} />
+          <Chip ok={status.provider === 'meta'} label={status.provider === 'meta' ? 'Meta direta' : 'FluxoAPI ativa'} />
+          {status.provider !== 'meta' && fluxo && (
+            <>
+              <Chip ok={fluxo.missing.length === 0} label={fluxo.missing.length === 0 ? 'Variáveis OK' : `Faltam ${fluxo.missing.length} variável(is)`} />
+              <Chip ok={fluxo.connected} label={fluxo.connected ? 'Instância No ar' : `Instância: ${fluxo.instance.found ? fluxo.instance.status : 'não encontrada'}`} />
+            </>
+          )}
           <Chip ok={tokenOk} label={tokenOk ? 'Token OK' : 'Sem token'} />
           <Chip ok={status.accounts > 0 || status.envPhoneNumberId} label={`${status.numbers} número(s)`} />
           <Chip ok={status.accounts > 0} label={`${status.accounts} BM(s)`} />
