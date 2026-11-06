@@ -4,6 +4,7 @@ const SHOW_LAB = isUiFlagOn(import.meta.env.VITE_MOSTRAR_LAB);
 import { useRuntimeConfig, formatInstancePhone } from '../lib/useRuntimeConfig';
 import { onRealtime } from '../lib/realtime';
 import MetaAccountsPanel from './MetaAccountsPanel';
+import MetaStatusStrip from './MetaStatusStrip';
 import {
   MessageSquare,
   CheckCircle2,
@@ -154,6 +155,10 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
   const [savingAsDraft, setSavingAsDraft] = useState(false);
   const [templateSubView, setTemplateSubView] = useState<'kanban' | 'list' | 'creator'>('kanban');
   const [templateSearchTerm, setTemplateSearchTerm] = useState('');
+  const [templateAccountFilter, setTemplateAccountFilter] = useState<string>('ALL');
+  const visibleTemplates = templateAccountFilter === 'ALL'
+    ? templates
+    : templates.filter((t) => (t.accountId || 'env') === templateAccountFilter);
   const [templateCategoryFilter, setTemplateCategoryFilter] = useState<'ALL' | 'UTILITY' | 'MARKETING'>('ALL');
 
   // JSON Import Modal State
@@ -1039,95 +1044,10 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
-      <MetaAccountsPanel
+      <MetaStatusStrip
         onShowToast={onShowToast}
-        onAccountsChanged={() => { fetchInstances(); fetchTemplates(); fetchBmAccounts(); }}
+        onChanged={() => { fetchInstances(); fetchTemplates(); fetchBmAccounts(); }}
       />
-      {/* Top Banner Oficial */}
-      <div className="bg-gradient-to-r from-emerald-900 via-emerald-850 to-neutral-900 rounded-2xl p-6 text-white border border-emerald-800 shadow-md">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                Meta Cloud API Oficial • Coexistência
-              </span>
-              <span className="text-xs text-neutral-400 font-mono">
-                Autenticação HMAC-SHA256
-              </span>
-            </div>
-            <h2 className="text-xl font-extrabold tracking-tight text-white flex items-center gap-2">
-              <MessageSquare className="w-6 h-6 text-emerald-400" />
-              WhatsApp Oficial da Nyroh Tech (FluxoAPI)
-            </h2>
-            <p className="text-xs text-neutral-300 max-w-2xl leading-relaxed">
-              Hub executivo de governança, instâncias e templates oficiais da Meta. Configure chaves, submeta novos modelos de mensagens, audite webhooks e monitore a integridade do seu canal oficial.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => handleTestConnection()}
-              disabled={testingConnection}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-bold text-xs shadow-sm transition-all cursor-pointer disabled:opacity-50"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${testingConnection ? 'animate-spin' : ''}`} />
-              <span>{testingConnection ? 'Testando Conexão...' : 'Testar Conexão Oficial'}</span>
-            </button>
-            <a
-              href="https://fluxoapi.com.br/app"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-medium border border-neutral-700 transition-colors"
-            >
-              <span>Painel FluxoAPI</span>
-              <ExternalLink className="w-3.5 h-3.5 text-neutral-400" />
-            </a>
-          </div>
-        </div>
-
-        {/* Live Status Row */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-4 border-t border-emerald-800/60">
-          <div className="p-3 bg-neutral-900/60 rounded-xl border border-emerald-750/50">
-            <div className="text-[11px] text-neutral-400">Instância Conectada</div>
-            <div className="text-sm font-bold text-white mt-0.5">NYROH TECH 1</div>
-            <div className="text-[10px] text-emerald-400 mt-0.5 flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              No ar (Conectada)
-            </div>
-          </div>
-
-          <div className="p-3 bg-neutral-900/60 rounded-xl border border-emerald-750/50">
-            <div className="text-[11px] text-neutral-400">Número de WhatsApp</div>
-            <div className="text-sm font-bold text-white font-mono mt-0.5">{instanceLabel}</div>
-            <div className="text-[10px] text-neutral-400 mt-0.5">Operacional Oficial</div>
-          </div>
-
-          <div className="p-3 bg-neutral-900/60 rounded-xl border border-emerald-750/50">
-            <div className="text-[11px] text-neutral-400">Vazão & Limite</div>
-            <div className="text-sm font-bold text-white mt-0.5">Até 80 msg/s</div>
-            <div className="text-[10px] text-emerald-400 mt-0.5">Tier 1K (Meta Cloud)</div>
-          </div>
-
-          <div className="p-3 bg-neutral-900/60 rounded-xl border border-emerald-750/50">
-            <div className="text-[11px] text-neutral-400">Status da Autenticação</div>
-            <div className="text-sm font-bold mt-0.5 flex items-center gap-1.5">
-              {config.isConfigured ? (
-                <span className="text-emerald-400 flex items-center gap-1">
-                  <CheckCircle2 className="w-4 h-4" /> Configurada
-                </span>
-              ) : (
-                <span className="text-amber-400 flex items-center gap-1">
-                  <AlertCircle className="w-4 h-4" /> Aguardando Chaves
-                </span>
-              )}
-            </div>
-            <div className="text-[10px] text-neutral-400 mt-0.5">
-              Origem: {config.source === 'env' ? 'Variáveis de Ambiente' : config.source === 'database' ? 'Banco de Dados' : 'Chaves no Servidor'}
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* Sub-Aba Navigation */}
       <div className="flex items-center gap-2 border-b border-neutral-200 pb-2 overflow-x-auto">
@@ -1140,7 +1060,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
           }`}
         >
           <Radio className="w-4 h-4" />
-          <span>📡 Instâncias & Conexão</span>
+          <span>📡 Contas & Números</span>
           <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-800 text-white font-mono">
             {instances.length}
           </span>
@@ -1155,7 +1075,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
           }`}
         >
           <FileText className="w-4 h-4" />
-          <span>🎨 Modelos & Templates Meta</span>
+          <span>🎨 Modelos</span>
           <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-neutral-200 text-neutral-800 font-mono">
             {templates.length}
           </span>
@@ -1184,7 +1104,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
           }`}
         >
           <Zap className="w-4 h-4" />
-          <span>⚡ Webhooks & Logs em Tempo Real</span>
+          <span>⚡ Diagnóstico (webhooks & logs)</span>
           {webhookEvents.length > 0 && (
             <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-amber-500 text-neutral-950 font-mono font-bold">
               {webhookEvents.length}
@@ -1198,6 +1118,10 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
       {/* ========================================================================= */}
       {activeSubTab === 'instances' && (
         <div className="space-y-6">
+          <MetaAccountsPanel
+            onShowToast={onShowToast}
+            onAccountsChanged={() => { fetchInstances(); fetchTemplates(); fetchBmAccounts(); }}
+          />
           {/* Card de Instâncias Conectadas */}
           <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-2xs space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-neutral-100 pb-3">
@@ -1224,7 +1148,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {instancesError && (
                 <div className="md:col-span-2 p-4 rounded-xl border-2 border-amber-300 bg-amber-50 space-y-1">
-                  <p className="text-xs font-bold text-amber-900">Não foi possível ler as linhas da FluxoAPI</p>
+                  <p className="text-xs font-bold text-amber-900">Não foi possível listar os números</p>
                   <p className="text-[11px] text-amber-800">{instancesError.message}</p>
                   {instancesError.action && <p className="text-[11px] text-amber-700">→ {instancesError.action}</p>}
                 </div>
@@ -1232,7 +1156,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
 
               {!instancesError && !loadingInstances && instances.length === 0 && (
                 <div className="md:col-span-2 p-4 rounded-xl border border-dashed border-neutral-300 bg-neutral-50 text-[11px] text-neutral-600">
-                  Nenhuma instância encontrada para esta credencial. Conecte um número no painel da FluxoAPI.
+                  Nenhum número encontrado. Confira o token da Meta ou cadastre uma BM acima.
                 </div>
               )}
 
@@ -1326,6 +1250,14 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
             </div>
           </div>
 
+          {/* Avançado: recolhido por padrão (configuração inicial e standby da FluxoAPI) */}
+          <details className="group rounded-2xl border border-neutral-200 bg-white shadow-2xs">
+            <summary className="cursor-pointer select-none list-none flex items-center justify-between px-5 py-4 text-sm font-bold text-neutral-800">
+              <span>Avançado: FluxoAPI (standby) e configuração por variáveis</span>
+              <span className="text-xs font-normal text-neutral-500 group-open:hidden">Mostrar</span>
+              <span className="text-xs font-normal text-neutral-500 hidden group-open:inline">Ocultar</span>
+            </summary>
+            <div className="p-5 pt-0 space-y-6">
           {/* Grid de Credenciais e Diagnóstico */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Coluna 1: Chaves da API */}
@@ -1586,6 +1518,8 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
               </div>
             </form>
           </div>
+            </div>
+          </details>
         </div>
       )}
 
@@ -1596,6 +1530,21 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
         <div className="space-y-6">
           {/* Sub-menu interno de Templates & Ações Globais */}
           <div className="bg-white p-4 rounded-2xl border border-neutral-200 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+            {/* Filtro de BM: vale para Kanban e lista */}
+            <div className="flex items-center gap-2 order-first md:order-last">
+              <span className="text-xs font-semibold text-neutral-600">BM:</span>
+              <select
+                value={templateAccountFilter}
+                onChange={(e) => setTemplateAccountFilter(e.target.value)}
+                className="text-xs border border-neutral-200 rounded-xl px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              >
+                <option value="ALL">Todas</option>
+                <option value="env">Ambiente (padrão)</option>
+                {bmAccounts.map((a) => (
+                  <option key={a.id} value={a.id}>{a.name}</option>
+                ))}
+              </select>
+            </div>
             {/* Abas internas */}
             <div className="flex items-center gap-1.5 p-1 bg-neutral-100 rounded-xl">
               <button
@@ -1730,12 +1679,12 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
                       </h4>
                     </div>
                     <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-full bg-neutral-200 text-neutral-700">
-                      {templates.filter((t) => t.status === 'DRAFT').length}
+                      {visibleTemplates.filter((t) => t.status === 'DRAFT').length}
                     </span>
                   </div>
 
                   <div className="space-y-3 flex-1 overflow-y-auto">
-                    {templates.filter((t) => t.status === 'DRAFT').length === 0 ? (
+                    {visibleTemplates.filter((t) => t.status === 'DRAFT').length === 0 ? (
                       <div className="text-center py-10 px-4 text-neutral-400 text-xs border-2 border-dashed border-neutral-200 rounded-xl">
                         Nenhum rascunho local pendente.
                       </div>
@@ -1802,12 +1751,12 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
                       </h4>
                     </div>
                     <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">
-                      {templates.filter((t) => t.status === 'PENDING').length}
+                      {visibleTemplates.filter((t) => t.status === 'PENDING').length}
                     </span>
                   </div>
 
                   <div className="space-y-3 flex-1 overflow-y-auto">
-                    {templates.filter((t) => t.status === 'PENDING').length === 0 ? (
+                    {visibleTemplates.filter((t) => t.status === 'PENDING').length === 0 ? (
                       <div className="text-center py-10 px-4 text-amber-700/60 text-xs border-2 border-dashed border-amber-200 rounded-xl">
                         Nenhum template em análise no momento.
                       </div>
@@ -1874,12 +1823,12 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
                       </h4>
                     </div>
                     <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                      {templates.filter((t) => t.status === 'APPROVED').length}
+                      {visibleTemplates.filter((t) => t.status === 'APPROVED').length}
                     </span>
                   </div>
 
                   <div className="space-y-3 flex-1 overflow-y-auto">
-                    {templates.filter((t) => t.status === 'APPROVED').length === 0 ? (
+                    {visibleTemplates.filter((t) => t.status === 'APPROVED').length === 0 ? (
                       <div className="text-center py-10 px-4 text-emerald-800/60 text-xs border-2 border-dashed border-emerald-200 rounded-xl">
                         Nenhum template aprovado ainda. Crie um novo ou importe via JSON!
                       </div>
@@ -2001,12 +1950,12 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
                       </h4>
                     </div>
                     <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-800">
-                      {templates.filter((t) => t.status === 'REJECTED').length}
+                      {visibleTemplates.filter((t) => t.status === 'REJECTED').length}
                     </span>
                   </div>
 
                   <div className="space-y-3 flex-1 overflow-y-auto">
-                    {templates.filter((t) => t.status === 'REJECTED').length === 0 ? (
+                    {visibleTemplates.filter((t) => t.status === 'REJECTED').length === 0 ? (
                       <div className="text-center py-10 px-4 text-red-700/60 text-xs border-2 border-dashed border-red-200 rounded-xl">
                         Nenhum template rejeitado pela Meta!
                       </div>
@@ -2081,7 +2030,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
                     Aprovados & Prontos
                   </span>
                   <span className="text-xl font-bold text-emerald-800 mt-1 block">
-                    {templates.filter((t) => t.status === 'APPROVED').length}
+                    {visibleTemplates.filter((t) => t.status === 'APPROVED').length}
                   </span>
                 </div>
 
@@ -2090,7 +2039,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
                     Em Análise / Rascunhos
                   </span>
                   <span className="text-xl font-bold text-amber-800 mt-1 block">
-                    {templates.filter((t) => t.status === 'PENDING' || t.status === 'DRAFT').length}
+                    {visibleTemplates.filter((t) => t.status === 'PENDING' || t.status === 'DRAFT').length}
                   </span>
                 </div>
 
@@ -2151,7 +2100,8 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
                           const matchesSearch = t.name.toLowerCase().includes(templateSearchTerm.toLowerCase());
                           const matchesCategory =
                             templateCategoryFilter === 'ALL' || t.category === templateCategoryFilter;
-                          return matchesSearch && matchesCategory;
+                          const matchesAccount = templateAccountFilter === 'ALL' || (t.accountId || 'env') === templateAccountFilter;
+                          return matchesSearch && matchesCategory && matchesAccount;
                         })
                         .map((tpl) => (
                           <tr key={tpl.id || tpl.name} className="hover:bg-neutral-50/60 transition-colors">

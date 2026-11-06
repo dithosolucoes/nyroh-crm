@@ -2660,7 +2660,12 @@ app.get('/api/admin/fluxo/instances', async (req: any, res) => {
         accountId: n.accountId
       });
     }
-    if (!r.success && instances.length === 0) return res.json({ success: false, instances: [], error: { message: r.error } });
+    if (!r.success && instances.length === 0) {
+      const friendly = String(r.error || '').includes('META_ACCESS_TOKEN')
+        ? 'Token da Meta não encontrado no servidor. Confira se a variável no Railway se chama exatamente META_ACCESS_TOKEN.'
+        : (r.error || 'Não foi possível listar os números da Meta.');
+      return res.json({ success: false, instances: [], error: { message: friendly } });
+    }
     return res.json({ success: true, instances, accounts: reg.accounts });
   }
   const apiKey = (memoryFluxoConfig.apiKey || '').trim();
@@ -4036,6 +4041,23 @@ async function syncMetaAccountIntoDb(accountId: string): Promise<{ success: bool
   await loadMetaRegistryFromDb();
   return { success: true, numbers: list.length, templates: tplCount };
 }
+
+// Status consolidado da integração Meta, para a faixa do topo da tela (sem expor segredos)
+app.get('/api/admin/meta/status', (_req: any, res) => {
+  const env = getMetaCredentials();
+  const reg = listMetaRegistry();
+  const verifyToken = String(memoryMetaConfig.verifyToken || process.env.META_VERIFY_TOKEN || '').trim();
+  return res.json({
+    provider: getMetaProvider(),
+    envToken: Boolean(env.accessToken),
+    envPhoneNumberId: Boolean(env.phoneNumberId),
+    appSecret: Boolean(env.appSecret),
+    verifyToken: Boolean(verifyToken),
+    webhookReady: Boolean(env.appSecret && verifyToken),
+    accounts: reg.accounts.length,
+    numbers: reg.numbers.length + (env.accessToken ? 1 : 0)
+  });
+});
 
 // Lista as contas cadastradas (sem token) e quantos números cada uma tem
 app.get('/api/admin/meta/accounts', async (_req: any, res) => {
