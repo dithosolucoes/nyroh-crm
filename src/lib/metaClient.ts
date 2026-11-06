@@ -172,7 +172,7 @@ export function resolveMetaAccount(accountId?: string | null): { accountId: stri
 /** Busca os números e modelos de UMA conta (BM) direto da Meta, para sincronizar. */
 export async function metaSyncAccount(account: MetaAccountRecord) {
   const [phones, templates] = await Promise.all([
-    graphRequest('GET', `/${account.wabaId}/phone_numbers?fields=id,display_phone_number,verified_name,quality_rating,status,name_status&limit=100`, undefined, account.accessToken),
+    graphRequest('GET', `/${account.wabaId}/phone_numbers?fields=id,display_phone_number,verified_name,quality_rating,status,name_status,is_on_biz_app,platform_type&limit=100`, undefined, account.accessToken),
     graphRequest('GET', `/${account.wabaId}/message_templates?fields=id,name,language,status,category,components,quality_score,rejected_reason&limit=200`, undefined, account.accessToken)
   ]);
   return { phones, templates };
@@ -243,7 +243,7 @@ export async function metaSendTemplate(opts: {
 export async function metaListPhoneNumbers() {
   const { wabaId } = getMetaCredentials();
   if (!wabaId) return { success: false, status: 0, data: null, error: 'META_WABA_ID não configurado.' };
-  return graphRequest('GET', `/${wabaId}/phone_numbers?fields=id,display_phone_number,verified_name,quality_rating,status,name_status&limit=100`);
+  return graphRequest('GET', `/${wabaId}/phone_numbers?fields=id,display_phone_number,verified_name,quality_rating,status,name_status,is_on_biz_app,platform_type&limit=100`);
 }
 
 /** Lista os modelos de mensagem da conta WABA com o status de aprovação. */

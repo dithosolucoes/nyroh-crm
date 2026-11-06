@@ -70,8 +70,9 @@ import { isUiFlagOn } from '../lib/uiFlags';
 const SHOW_SIMULATE = isUiFlagOn(import.meta.env.VITE_MOSTRAR_SIMULAR);
 /** Estado real do disparo: falhou (com motivo), lido/respondeu, ou ainda sem confirmação de entrega. */
 const DispatchStateLine: React.FC<{ lead: CampaignLead }> = ({ lead }) => {
-  const motivoFalha = (lead.deliveryError || (lead.failureNote || '').replace(/^\s*\[?Falha[^:]*:\s*/i, '').replace(/\]\s*$/, '')).trim();
-  const estado = lead.status === 'FALHA' || lead.deliveryStatus === 'failed' ? 'falhou'
+  const motivoFalha = (lead.deliveryError || (lead.failureNote || '').replace(/^\s*\[?Falha[^:]*:\s*/i, '').replace(/\]\s*$/, '') || (lead as any).notes || '').trim();
+  // ERRO_VARIAVEL = lead pulado porque a copy pedia um dado que ele não tem (ver server.ts, disparo)
+  const estado = lead.status === 'FALHA' || lead.status === 'ERRO_VARIAVEL' || lead.deliveryStatus === 'failed' ? 'falhou'
     : lead.deliveryStatus === 'read' || lead.respondedAt ? 'lido'
     : lead.deliveryStatus === 'delivered' ? 'entregue'
     : 'enviado';
@@ -186,6 +187,15 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   // A vazão é limitada pelo plano da FluxoAPI, que mede por MINUTO (Starter 60/min, Pro 300, Escala 1.200...).
   // Os valores reais vêm do servidor (FLUXO_PLAN_RPM); aqui só guardamos o que ele devolve. Unidade interna: msgs/segundo.
   const [dispatchSpeed, setDispatchSpeed] = useState<number>(0.8);
+  // Número de envio do disparo (vazio = padrão do ambiente). Sem isso o servidor escolhe o primeiro número cadastrado.
+  const [dispatchPhoneNumberId, setDispatchPhoneNumberId] = useState<string>('');
+  const [dispatchNumbers, setDispatchNumbers] = useState<Array<{ id: string; name: string; phone: string }>>([]);
+  useEffect(() => {
+    fetch('/api/admin/fluxo/instances')
+      .then(r => r.json())
+      .then(d => { if (d?.success && Array.isArray(d.instances)) setDispatchNumbers(d.instances); })
+      .catch(() => { /* seletor é opcional */ });
+  }, []);
   const [speedLimits, setSpeedLimits] = useState<{ maxSpeed: number; maxPerMinute: number; planRpm: number }>({ maxSpeed: 0.8, maxPerMinute: 48, planRpm: 60 });
   const [speedPresets, setSpeedPresets] = useState<Array<{ label: string; speed: number; description: string }>>([]);
   const [liveBatchProgress, setLiveBatchProgress] = useState<{
@@ -1167,6 +1177,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
           batchId: selectedBatchId,
           templateName: selectedTemplate,
           quarantineHours: dispatchQuarantineHours,
+          phoneNumberId: dispatchPhoneNumberId || undefined,
           variableValues: {
             var1: templateVar1,
             var2: templateVar2,
@@ -1312,6 +1323,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
           batchId: selectedBatchId,
           templateName: dispatchSelectedTemplate,
           quarantineHours: dispatchQuarantineHours,
+          phoneNumberId: dispatchPhoneNumberId || undefined,
           speedPerSecond: dispatchSpeed,
           limit: stagingSelectedLeadIds.length > 0 ? undefined : limitParam,
           allowAll: limitParam === 'ALL',
@@ -2032,6 +2044,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
                       <option value="STAGING">Aguardando disparo</option>
                       <option value="DISPARADO">Disparados</option>
                       <option value="QUARENTENA">Em Quarentena</option>
+                      <option value="ERRO_VARIAVEL">⚠️ Não enviados (dado faltando na copy)</option>
                       <option value="INTERESSADO">🔥 Interessados (Responderam)</option>
                       <option value="FRIO">❄️ Frios (Sem Resposta)</option>
                       <option value="DESCARTADO">🛑 Descartados (Opt-out / Inválidos)</option>
@@ -4113,6 +4126,17 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
                       Cancelar
                     </button>
 
+                    <select
+                      value={dispatchPhoneNumberId}
+                      onChange={e => setDispatchPhoneNumberId(e.target.value)}
+                      className="px-3 py-2 rounded-xl border border-neutral-300 bg-white text-xs text-neutral-800"
+                      title="Número que vai enviar o disparo"
+                    >
+                      <option value="">Número: padrão do ambiente</option>
+                      {dispatchNumbers.map(n => (
+                        <option key={n.id} value={n.id}>{n.name} ({n.phone})</option>
+                      ))}
+                    </select>
                     <button
                       type="button"
                       onClick={handleExecuteBatchDispatch}

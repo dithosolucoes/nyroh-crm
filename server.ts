@@ -2643,8 +2643,12 @@ app.get('/api/admin/fluxo/instances', async (req: any, res) => {
         status: String(n.status || 'unknown').toLowerCase(),
         quality: n.quality_rating || null,
         messagingLimit: null,
-        // null = não verificado: a sincronização ainda não lê se o número está no app WhatsApp Business
-        coexistence: null,
+        // Campo oficial da Meta (is_on_biz_app): true = número também está no app WhatsApp Business.
+        // Sem o campo (versão antiga da resposta) cai no eco do celular; senão null (não verificado).
+        coexistence: typeof n.is_on_biz_app === 'boolean'
+          ? (n.is_on_biz_app || coexistenceSeen.has(String(n.id)))
+          : (coexistenceSeen.has(String(n.id)) ? true : null),
+        coexistenceSeenAt: coexistenceSeen.get(String(n.id)) || null,
         accountId: 'env'
       });
     }
@@ -2659,7 +2663,8 @@ app.get('/api/admin/fluxo/instances', async (req: any, res) => {
         status: String(n.status || 'unknown').toLowerCase(),
         quality: n.qualityRating || null,
         messagingLimit: null,
-        coexistence: null,
+        coexistence: coexistenceSeen.has(String(n.phoneNumberId)) ? true : null,
+        coexistenceSeenAt: coexistenceSeen.get(String(n.phoneNumberId)) || null,
         accountId: n.accountId
       });
     }
@@ -5338,6 +5343,9 @@ async function processWebhookEventAsync(event: any) {
             // 1.3 Coexistência: mensagens enviadas pelo APP do celular (WhatsApp Business), espelhadas pela Meta.
             // Sem isso o CRM não vê o que o vendedor respondeu pelo celular no mesmo número.
             else if (field === 'smb_message_echoes') {
+              // Eco de mensagem enviada pelo celular prova que o número está em coexistência
+              const echoPid = String(val?.metadata?.phone_number_id || '');
+              if (echoPid) coexistenceSeen.set(echoPid, Date.now());
               for (const echo of parseCoexistenceEchoes(val)) {
                 eventType = 'message_sent_from_phone';
                 await processOutboundPhoneMessage({
@@ -11788,6 +11796,8 @@ function realCaption(text: string): string {
 }
 
 const inFlightClientSends = new Set<string>();
+/** phone_number_id -> última vez que chegou eco do celular (prova de coexistência). Em memória. */
+const coexistenceSeen = new Map<string, number>();
 
 // POST /api/leads/:leadId/messages (Enviar mensagem de WhatsApp para o lead)
 //  - AGUARDA a resposta da FluxoAPI: a rota só diz "ok" (202 queued) quando a API aceitou de fato;

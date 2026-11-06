@@ -219,7 +219,9 @@ export type CampaignLeadStatus =
   | 'FRIO'
   | 'DESCARTADO'
   /** A FluxoAPI/Meta recusou o envio (telefone inválido, sem WhatsApp, modelo reprovado...). */
-  | 'FALHA';
+  | 'FALHA'
+  /** Não enviado: a copy pedia um dado que o lead não tem (ex.: site antigo vazio). */
+  | 'ERRO_VARIAVEL';
 
 export interface CampaignLead {
   id: string;
