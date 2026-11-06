@@ -17,6 +17,7 @@ import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regrasDeC
 import { hashPassword, verifyPassword, generateSessionToken, DEFAULT_USERS, StoredUser, isUserAdmin } from './src/lib/serverAuth.js';
 import { performWebsiteAudit } from './src/lib/auditEngine.js';
 import { missingFluxoVars, summarizeFluxoInstance } from './src/lib/fluxoInstanceStatus.js';
+import { buildFluxoAudioMedia, isFluxoAudioVoiceEnabled } from './src/lib/fluxoAudio.js';
 import { executeFluxoRequest, downloadFluxoMediaBinary, prepareOutboundMedia, fluxoInstancePath, hasFfmpeg } from './src/lib/fluxoClient.js';
 import { setMetaRegistry, listMetaRegistry, encryptMetaToken, decryptMetaToken, metaDownloadMedia, metaSyncAccount, metaValidateToken, resolveMetaAccount, receivingPhoneNumberId, parseCoexistenceEchoes, getEmbeddedSignupConfig, metaExchangeSignupCode, metaSubscribeWaba, metaDiscoverWabaIds, type MetaAccountRecord, type MetaNumberRecord } from './src/lib/metaClient.js';
 import type { FluxoApiResult } from './src/lib/fluxoClient.js';
@@ -12161,7 +12162,7 @@ app.post('/api/leads/:leadId/messages', requireDatabaseReady, async (req: any, r
     } else if (effectiveKind === 'audio') {
       targetPath = fluxoInstancePath('/messages', instanceId);
       // Em áudio a Meta NÃO aceita legenda (a FluxoAPI ignora)
-      bodyPayload = { to: e164, type: 'audio', media: { url: preparedMediaUrl }, idempotency_key: idempotencyKey };
+      bodyPayload = { to: e164, type: 'audio', media: buildFluxoAudioMedia(preparedMediaUrl, isFluxoAudioVoiceEnabled()), idempotency_key: idempotencyKey };
     } else if (effectiveKind === 'document') {
       targetPath = fluxoInstancePath('/messages', instanceId);
       const caption = realCaption(text);

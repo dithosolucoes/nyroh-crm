@@ -15,6 +15,7 @@ import { isWindowOpen, windowExpiryFromInbound, latestExpiry, WINDOW_MS } from '
 import { arePhonesEquivalent, phoneDigitVariants, normalizeE164Phone, formatAndValidateE164Phone } from '../src/lib/phone';
 import { verifyFluxoWebhook } from '../src/lib/webhookAuth';
 import { missingFluxoVars, summarizeFluxoInstance } from '../src/lib/fluxoInstanceStatus';
+import { buildFluxoAudioMedia, isFluxoAudioVoiceEnabled } from '../src/lib/fluxoAudio';
 import { buildFluxoAuthHeaders, fluxoInstancePath, prepareOutboundMedia } from '../src/lib/fluxoClient';
 import { extensionFor, saveMediaBuffer } from '../src/lib/mediaStorage';
 import { effectiveSpeedPerSecond, dispatchRpm, planRpm, delayForIndex, maxDispatchPerSecond, FluxoRateLimitedError } from '../src/lib/dispatchRate';
@@ -424,6 +425,13 @@ async function main() {
   group('Tokens da copy: campos do lead e do vendedor (resolvidos antes do envio)');
   {
     const ctx = { leadName: 'Marcelo Silva', sellerName: 'Thomas', publicUrl: 'https://p.nyroh.com.br/x', website: 'https://antigo.com.br', phoneNumber: '+5531999990000', niche: 'Marcenaria', now: new Date(2026, 10, 6, 9, 30) };
+
+    test('áudio FluxoAPI: nota de voz só com a flag ligada', () => {
+      assert.deepEqual(buildFluxoAudioMedia('https://x/a.ogg', false), { url: 'https://x/a.ogg' });
+      assert.deepEqual(buildFluxoAudioMedia('https://x/a.ogg', true), { url: 'https://x/a.ogg', voice: true });
+      assert.equal(isFluxoAudioVoiceEnabled({ FLUXO_AUDIO_VOICE: 'true' } as any), true);
+      assert.equal(isFluxoAudioVoiceEnabled({} as any), false);
+    });
 
     test('status FluxoAPI: lista variáveis faltando na ordem certa', () => {
       assert.deepEqual(missingFluxoVars({ key: true, secret: true, instanceId: true, webhookSecret: true }), []);
