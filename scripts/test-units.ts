@@ -19,6 +19,10 @@ import { extensionFor, saveMediaBuffer } from '../src/lib/mediaStorage';
 import { effectiveSpeedPerSecond, dispatchRpm, planRpm, delayForIndex, maxDispatchPerSecond, FluxoRateLimitedError } from '../src/lib/dispatchRate';
 import { detectOptOut, sanitizeTemplateVariable } from '../src/lib/leadIntent';
 import { isPubliclyFetchableUrl } from '../src/lib/auditEngine';
+import {
+  verifyMetaSignature, metaSendText, metaSendTemplate, metaMarkRead, metaDownloadMedia,
+  encryptMetaToken, decryptMetaToken, setMetaRegistry, resolveMetaSender
+} from '../src/lib/metaClient';
 
 let passed = 0;
 let failed = 0;
@@ -466,6 +470,147 @@ async function main() {
       if (savedRailway !== undefined) process.env.RAILWAY_ENVIRONMENT = savedRailway;
     }]
   ]);
+
+
+  // ---------------------------------------------------------------------------
+  group('WhatsApp Cloud API direta da Meta (metaClient)');
+  const fetchCalls: Array<{ url: string; init: any }> = [];
+  const realFetch = globalThis.fetch;
+  const mockFetch = (handler: (url: string, init: any) => any) => {
+    (globalThis as any).fetch = async (url: string, init: any = {}) => {
+      fetchCalls.push({ url, init });
+      const r = handler(url, init);
+      return new Response(r.body === undefined ? '' : (typeof r.body === 'string' ? r.body : JSON.stringify(r.body)), {
+        status: r.status ?? 200,
+        headers: r.headers || { 'content-type': 'application/json' }
+      });
+    };
+  };
+  const resetFetch = () => { fetchCalls.length = 0; (globalThis as any).fetch = realFetch; };
+  const envBackup = { ...process.env };
+  const setEnv = (k: string, v: string | undefined) => { if (v === undefined) delete process.env[k]; else process.env[k] = v; };
+  const withMetaEnv = () => {
+    setEnv('META_ACCESS_TOKEN', 'TOKEN_ENV');
+    setEnv('META_PHONE_NUMBER_ID', '111');
+    setEnv('META_WABA_ID', 'WABA_ENV');
+    setEnv('META_APP_SECRET', 'SEGREDO_APP');
+    setEnv('META_TOKEN_ENCRYPTION_KEY', 'chave-de-teste-com-tamanho-suficiente');
+  };
+
+  await sequential([
+    ['assinatura do webhook: HMAC correto passa, adulterado não', () => {
+      const body = '{"entry":[]}';
+      const sig = 'sha256=' + crypto.createHmac('sha256', 'SEGREDO_APP').update(body, 'utf8').digest('hex');
+      assert.equal(verifyMetaSignature(body, sig, 'SEGREDO_APP').isValid, true);
+      assert.equal(verifyMetaSignature(body + ' ', sig, 'SEGREDO_APP').isValid, false);
+    }],
+    ['assinatura do webhook: sem App Secret, recusa (falha fechada)', () => {
+      const r = verifyMetaSignature('{}', 'sha256=abc', '');
+      assert.equal(r.isValid, false);
+    }],
+    ['token criptografado: ida e volta, e texto cifrado não contém o token', () => {
+      setEnv('META_TOKEN_ENCRYPTION_KEY', 'chave-de-teste-com-tamanho-suficiente');
+      const enc = encryptMetaToken('EAAG_token_secreto_123');
+      assert.ok(!enc.includes('EAAG_token_secreto_123'));
+      assert.equal(decryptMetaToken(enc), 'EAAG_token_secreto_123');
+    }],
+    ['token criptografado: adulterar o texto cifrado é detectado', () => {
+      setEnv('META_TOKEN_ENCRYPTION_KEY', 'chave-de-teste-com-tamanho-suficiente');
+      const enc = encryptMetaToken('abc');
+      const parts = enc.split(':');
+      parts[3] = Buffer.from('lixo').toString('base64');
+      assert.throws(() => decryptMetaToken(parts.join(':')));
+    }],
+    ['token criptografado: sem chave configurada, recusa guardar', () => {
+      setEnv('META_TOKEN_ENCRYPTION_KEY', undefined);
+      assert.throws(() => encryptMetaToken('abc'), /META_TOKEN_ENCRYPTION_KEY/);
+      setEnv('META_TOKEN_ENCRYPTION_KEY', 'chave-de-teste-com-tamanho-suficiente');
+    }],
+    ['envio de texto: vai para o número do ambiente com o token do ambiente', async () => {
+      withMetaEnv();
+      setMetaRegistry([], []);
+      mockFetch(() => ({ body: { messages: [{ id: 'wamid.X' }] } }));
+      const r = await metaSendText('+55 (31) 98765-4321', 'oi');
+      assert.equal(r.success, true);
+      assert.ok(fetchCalls[0].url.endsWith('/111/messages'));
+      assert.equal(fetchCalls[0].init.headers.Authorization, 'Bearer TOKEN_ENV');
+      const body = JSON.parse(fetchCalls[0].init.body);
+      assert.equal(body.to, '5531987654321');
+      assert.equal(body.text.body, 'oi');
+      resetFetch();
+    }],
+    ['roteamento: número de outra BM usa o token DESSA BM', async () => {
+      withMetaEnv();
+      setMetaRegistry(
+        [{ id: 'bm_2', name: 'Outra BM', wabaId: 'WABA_2', accessToken: 'TOKEN_BM2' }],
+        [{ phoneNumberId: '222', accountId: 'bm_2', displayPhoneNumber: '+55 31 0000-0000' }]
+      );
+      mockFetch(() => ({ body: { messages: [{ id: 'wamid.Y' }] } }));
+      await metaSendText('5531999999999', 'olá', '222');
+      assert.ok(fetchCalls[0].url.endsWith('/222/messages'));
+      assert.equal(fetchCalls[0].init.headers.Authorization, 'Bearer TOKEN_BM2');
+      assert.equal(resolveMetaSender('222').accountId, 'bm_2');
+      setMetaRegistry([], []);
+      resetFetch();
+    }],
+    ['roteamento: número desconhecido cai no ambiente', () => {
+      withMetaEnv();
+      setMetaRegistry([], []);
+      const r = resolveMetaSender('999');
+      assert.equal(r.accountId, 'env');
+      assert.equal(r.accessToken, 'TOKEN_ENV');
+    }],
+    ['template: variáveis numéricas viram parâmetros do corpo em ordem', async () => {
+      withMetaEnv();
+      setMetaRegistry([], []);
+      mockFetch(() => ({ body: { messages: [{ id: 'wamid.T' }] } }));
+      await metaSendTemplate({ to: '5531999999999', name: 'promo', variables: { '2': 'b', '1': 'a' } });
+      const body = JSON.parse(fetchCalls[0].init.body);
+      assert.equal(body.type, 'template');
+      assert.deepEqual(body.template.components[0].parameters.map((p: any) => p.text), ['a', 'b']);
+      resetFetch();
+    }],
+    ['marcar como lido: envia status read com o id da mensagem', async () => {
+      withMetaEnv();
+      setMetaRegistry([], []);
+      mockFetch(() => ({ body: { success: true } }));
+      await metaMarkRead('wamid.Z');
+      const body = JSON.parse(fetchCalls[0].init.body);
+      assert.equal(body.status, 'read');
+      assert.equal(body.message_id, 'wamid.Z');
+      resetFetch();
+    }],
+    ['download de mídia: pega a URL na Graph API e baixa com o token da conta', async () => {
+      withMetaEnv();
+      setMetaRegistry([], []);
+      let step = 0;
+      mockFetch((url) => {
+        step++;
+        if (url.includes('/media_123')) return { body: { url: 'https://lookaside.fbsbx.com/arquivo', mime_type: 'image/jpeg' } };
+        return { body: 'BINARIO', headers: { 'content-type': 'image/jpeg' } };
+      });
+      const r = await metaDownloadMedia('media_123');
+      assert.equal(r.success, true);
+      assert.equal(r.contentType, 'image/jpeg');
+      assert.equal(fetchCalls[1].init.headers.Authorization, 'Bearer TOKEN_ENV');
+      assert.equal(step, 2);
+      resetFetch();
+    }],
+    ['erro da Meta vira falha com a mensagem dela (não derruba)', async () => {
+      withMetaEnv();
+      setMetaRegistry([], []);
+      mockFetch(() => ({ status: 400, body: { error: { message: 'Template não aprovado' } } }));
+      const r = await metaSendTemplate({ to: '5531999999999', name: 'x' });
+      assert.equal(r.success, false);
+      assert.equal(r.error, 'Template não aprovado');
+      resetFetch();
+    }]
+  ]);
+
+  // Restaura o ambiente depois dos testes da Meta
+  for (const k of Object.keys(process.env)) if (!(k in envBackup)) delete process.env[k];
+  Object.assign(process.env, envBackup);
+  void realFetch;
 
   await Promise.all(pending);
 
