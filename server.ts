@@ -23,6 +23,7 @@ import { verifyFluxoWebhook } from './src/lib/webhookAuth.js';
 import { detectOptOut, sanitizeTemplateVariable, resolveManualInterest, SEM_INTERESSE_TAG } from './src/lib/leadIntent.js';
 import { distributionByCount } from './src/lib/distribution.js';
 import { getMetaProvider, getMetaCredentials, verifyMetaSignature, metaSendText, metaSendTemplate, metaSendMedia, metaMarkRead, metaCreateTemplate, metaDeleteTemplate, metaListPhoneNumbers, metaListTemplates } from './src/lib/metaClient.js';
+import { resolveLeadTokens, TOKEN_NAMES } from './src/lib/leadTokens.js';
 import { arePhonesEquivalent, normalizeE164Phone, phoneDigitVariants, formatAndValidateE164Phone } from './src/lib/phone.js';
 import { getUploadsDir, getInboxDir, INBOX_SUBDIR, isUploadsDirDurable, publicBaseUrl, saveMediaBuffer, extensionFor } from './src/lib/mediaStorage.js';
 import { statusRank, shouldApplyStatus, normalizeStatus } from './src/lib/fluxoStatus.js';
@@ -10161,6 +10162,20 @@ app.post('/api/campaign/dispatch', async (req: any, res) => {
     return res.status(400).json({ error: 'ID da safra é obrigatório para disparo.' });
   }
 
+  // Flag CAMPAIGN_GENERIC_TOKENS (desligada por padrão): copy com campo desconhecido não sai para o cliente.
+  // Bloqueia ANTES de qualquer alteração no banco.
+  if (process.env.CAMPAIGN_GENERIC_TOKENS === 'true') {
+    const unknownInCopy = new Set<string>();
+    for (const t of [variableValues?.var1, variableValues?.var2, variableValues?.var3]) {
+      if (t) resolveLeadTokens(String(t), {}).unknown.forEach(u => unknownInCopy.add(u));
+    }
+    if (unknownInCopy.size > 0) {
+      return res.status(400).json({
+        error: `Campos desconhecidos na copy: ${[...unknownInCopy].map(u => `{${u}}`).join(', ')}. Campos disponíveis: ${TOKEN_NAMES.map(t => `{${t}}`).join(', ')}.`
+      });
+    }
+  }
+
   // Resolver lista de vendedores para distribuição (round-robin)
   let rawSellerIds: string[] = [];
   if (Array.isArray(salespersonIds) && salespersonIds.length > 0) {
@@ -10334,23 +10349,38 @@ app.post('/api/campaign/dispatch', async (req: any, res) => {
         const rawVar2 = variableValues?.var2 || 'Eu sou {vendedor} e queria te fazer uma pergunta: você ficaria chateado se eu tivesse criado um site para a {empresa} sem pedir? 😂';
         const rawVar3 = variableValues?.var3 || 'Desenvolvi uma prévia exclusiva para vocês: 🔗 {site_novo}';
 
-        const leadVar1 = rawVar1
+        let leadVar1 = rawVar1
           .replace(/\{nome\}/gi, firstName)
           .replace(/\{empresa\}/gi, company)
           .replace(/\{vendedor\}/gi, sellerName)
           .replace(/\{site_novo\}/gi, nyrohUrl);
 
-        const leadVar2 = rawVar2
+        let leadVar2 = rawVar2
           .replace(/\{nome\}/gi, firstName)
           .replace(/\{empresa\}/gi, company)
           .replace(/\{vendedor\}/gi, sellerName)
           .replace(/\{site_novo\}/gi, nyrohUrl);
 
-        const leadVar3 = rawVar3
+        let leadVar3 = rawVar3
           .replace(/\{nome\}/gi, firstName)
           .replace(/\{empresa\}/gi, company)
           .replace(/\{vendedor\}/gi, sellerName)
           .replace(/\{site_novo\}/gi, nyrohUrl);
+
+        // Flag CAMPAIGN_GENERIC_TOKENS: resolve qualquer campo do lead/vendedor (ver src/lib/leadTokens.ts)
+        if (process.env.CAMPAIGN_GENERIC_TOKENS === 'true') {
+          const tokenCtx = { leadName: dLead.name, phoneNumber: dLead.phoneNumber, publicUrl: dLead.publicUrl, website: dLead.website, niche: dLead.niche, sellerName };
+          const resolved = [rawVar1, rawVar2, rawVar3].map(t => resolveLeadTokens(String(t), tokenCtx));
+          const emptyFields = [...new Set(resolved.flatMap(r => r.empty))];
+          if (emptyFields.length > 0) {
+            // Lead sem dado exigido pela copy: não enfileira (a Meta recusaria o parâmetro vazio)
+            console.warn(`[Disparo] lead ${dLead.id} sem dado para: ${emptyFields.join(', ')}. Não enfileirado.`);
+            continue;
+          }
+          leadVar1 = resolved[0].text;
+          leadVar2 = resolved[1].text;
+          leadVar3 = resolved[2].text;
+        }
 
         // Sem corte por tamanho: os limites de 100/160/120 caracteres cortavam o valor no meio
         // e o link do site do cliente chegava quebrado (a variável {{2}} costuma ser a URL).
@@ -10484,23 +10514,38 @@ app.post('/api/campaign/dispatch', async (req: any, res) => {
         const rawVar2 = variableValues?.var2 || 'Eu sou {vendedor} e queria te fazer uma pergunta: você ficaria chateado se eu tivesse criado um site para a {empresa} sem pedir? 😂';
         const rawVar3 = variableValues?.var3 || 'Desenvolvi uma prévia exclusiva para vocês: 🔗 {site_novo}';
 
-        const leadVar1 = rawVar1
+        let leadVar1 = rawVar1
           .replace(/\{nome\}/gi, firstName)
           .replace(/\{empresa\}/gi, company)
           .replace(/\{vendedor\}/gi, sellerName)
           .replace(/\{site_novo\}/gi, nyrohUrl);
 
-        const leadVar2 = rawVar2
+        let leadVar2 = rawVar2
           .replace(/\{nome\}/gi, firstName)
           .replace(/\{empresa\}/gi, company)
           .replace(/\{vendedor\}/gi, sellerName)
           .replace(/\{site_novo\}/gi, nyrohUrl);
 
-        const leadVar3 = rawVar3
+        let leadVar3 = rawVar3
           .replace(/\{nome\}/gi, firstName)
           .replace(/\{empresa\}/gi, company)
           .replace(/\{vendedor\}/gi, sellerName)
           .replace(/\{site_novo\}/gi, nyrohUrl);
+
+        // Flag CAMPAIGN_GENERIC_TOKENS: resolve qualquer campo do lead/vendedor (ver src/lib/leadTokens.ts)
+        if (process.env.CAMPAIGN_GENERIC_TOKENS === 'true') {
+          const tokenCtx = { leadName: lead.name, phoneNumber: lead.phoneNumber, publicUrl: lead.publicUrl, website: lead.website, niche: lead.niche, sellerName };
+          const resolved = [rawVar1, rawVar2, rawVar3].map(t => resolveLeadTokens(String(t), tokenCtx));
+          const emptyFields = [...new Set(resolved.flatMap(r => r.empty))];
+          if (emptyFields.length > 0) {
+            // Lead sem dado exigido pela copy: não enfileira (a Meta recusaria o parâmetro vazio)
+            console.warn(`[Disparo] lead ${lead.id} sem dado para: ${emptyFields.join(', ')}. Não enfileirado.`);
+            continue;
+          }
+          leadVar1 = resolved[0].text;
+          leadVar2 = resolved[1].text;
+          leadVar3 = resolved[2].text;
+        }
 
         // Sem corte por tamanho: os limites de 100/160/120 caracteres cortavam o valor no meio
         // e o link do site do cliente chegava quebrado (a variável {{2}} costuma ser a URL).
