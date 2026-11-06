@@ -19,6 +19,8 @@ import { extensionFor, saveMediaBuffer } from '../src/lib/mediaStorage';
 import { effectiveSpeedPerSecond, dispatchRpm, planRpm, delayForIndex, maxDispatchPerSecond, FluxoRateLimitedError } from '../src/lib/dispatchRate';
 import { detectOptOut, sanitizeTemplateVariable } from '../src/lib/leadIntent';
 import { isPubliclyFetchableUrl } from '../src/lib/auditEngine';
+import { resolveLeadTokens, TOKEN_NAMES } from '../src/lib/leadTokens';
+import { validateTemplateCategory, buildMetaButtons, defaultExamples, countBodyVariables, validateTemplateVariables } from '../src/lib/templateRules';
 import {
   verifyMetaSignature, metaSendText, metaSendTemplate, metaMarkRead, metaDownloadMedia,
   encryptMetaToken, decryptMetaToken, setMetaRegistry, resolveMetaSender,
@@ -418,6 +420,99 @@ async function main() {
   ]);
 
   // ---------------------------------------------------------------------------
+  group('Tokens da copy: campos do lead e do vendedor (resolvidos antes do envio)');
+  {
+    const ctx = { leadName: 'Marcelo Silva', sellerName: 'Thomas', publicUrl: 'https://p.nyroh.com.br/x', website: 'https://antigo.com.br', phoneNumber: '+5531999990000', niche: 'Marcenaria', now: new Date(2026, 10, 6, 9, 30) };
+
+    test('tokens legados: {nome} vira primeiro nome, {empresa} vira nome do lead', () => {
+      const r = resolveLeadTokens('{nome}! Falo com o responsável pela {empresa}?', ctx);
+      assert.equal(r.text, 'Marcelo! Falo com o responsável pela Marcelo Silva?');
+    });
+    test('tokens legados: {vendedor} e {site_novo}', () => {
+      const r = resolveLeadTokens('Eu sou {vendedor}: {site_novo}', ctx);
+      assert.equal(r.text, 'Eu sou Thomas: https://p.nyroh.com.br/x');
+    });
+    test('fallbacks legados: lead sem nome vira "Cliente" e "sua empresa"', () => {
+      const r = resolveLeadTokens('Oi {nome}, sobre a {empresa}', { ...ctx, leadName: 'Cliente' });
+      assert.equal(r.text, 'Oi Cliente, sobre a sua empresa');
+    });
+    test('fallback legado: sem link de prévia usa o endereço padrão', () => {
+      const r = resolveLeadTokens('{site_novo}', { ...ctx, publicUrl: undefined });
+      assert.equal(r.text, 'https://nyroh.app/preview');
+    });
+    test('token em maiúsculas também é reconhecido', () => {
+      assert.equal(resolveLeadTokens('{NOME}', ctx).text, 'Marcelo');
+    });
+    test('campos novos: {site_antigo}, {telefone}, {nicho} e {data} vêm do lead', () => {
+      const r = resolveLeadTokens('{site_antigo} {telefone} {nicho} {data}', ctx);
+      assert.equal(r.text, 'https://antigo.com.br +5531999990000 Marcenaria 06/11/2026');
+    });
+    test('campo vazio é reportado (não some em silêncio)', () => {
+      const r = resolveLeadTokens('site: {site_antigo}', { ...ctx, website: undefined });
+      assert.deepEqual(r.empty, ['site_antigo']);
+    });
+    test('token desconhecido fica no texto e é reportado (ex.: {cidade}, que não existe no lead)', () => {
+      const r = resolveLeadTokens('Estamos em {cidade}', ctx);
+      assert.deepEqual(r.unknown, ['cidade']);
+      assert.equal(r.text, 'Estamos em {cidade}');
+    });
+    test('troca é de uma passada: valor do lead com "{vendedor}" não é expandido de novo', () => {
+      const r = resolveLeadTokens('{empresa}', { ...ctx, leadName: 'Loja {vendedor}' });
+      assert.equal(r.text, 'Loja {vendedor}');
+    });
+    test('lista de tokens conhecidos inclui os campos novos', () => {
+      for (const t of ['nome', 'empresa', 'vendedor', 'site_novo', 'site_antigo', 'telefone', 'data', 'nicho']) {
+        assert.ok((TOKEN_NAMES as readonly string[]).includes(t), `falta ${t}`);
+      }
+    });
+  }
+
+  group('Modelos: regras de criação e envio (categoria, botões, exemplos, variáveis)');
+  {
+    test('categoria fora de MARKETING/UTILITY é recusada (não vira UTILITY em silêncio)', () => {
+      assert.equal(validateTemplateCategory('MARKETING').ok, true);
+      assert.equal(validateTemplateCategory('UTILITY').ok, true);
+      assert.equal(validateTemplateCategory(undefined).ok, true);
+      const r = validateTemplateCategory('AUTHENTICATION');
+      assert.equal(r.ok, false);
+      assert.match(r.error || '', /AUTHENTICATION/);
+    });
+    test('botão de link vira URL, não resposta rápida', () => {
+      const b = buildMetaButtons([{ text: 'Acessar link', type: 'URL', url: 'https://exemplo.com.br' }]);
+      assert.deepEqual(b, [{ type: 'URL', text: 'Acessar link', url: 'https://exemplo.com.br' }]);
+    });
+    test('botão de telefone vira PHONE_NUMBER; texto simples vira resposta rápida', () => {
+      const b = buildMetaButtons([{ text: 'Ligar', type: 'PHONE_NUMBER', phone_number: '+5531999990000' }, 'Parar mensagem']);
+      assert.deepEqual(b, [
+        { type: 'PHONE_NUMBER', text: 'Ligar', phone_number: '+5531999990000' },
+        { type: 'QUICK_REPLY', text: 'Parar mensagem' }
+      ]);
+    });
+    test('botão de URL sem endereço é descartado (não manda botão inválido para a Meta)', () => {
+      assert.deepEqual(buildMetaButtons([{ text: 'Acessar', type: 'URL' }]), []);
+    });
+    test('exemplos padrão são neutros: sem nomes reais, sem código fictício, sem link de demo', () => {
+      for (const cat of ['UTILITY', 'MARKETING'] as const) {
+        const ex = defaultExamples(cat, 3).join(' | ');
+        assert.doesNotMatch(ex, /Caio|Marcelo|883921|nyroh\.com\.br\/demo/);
+      }
+      assert.equal(defaultExamples('UTILITY', 2).length, 2);
+    });
+    test('conta variáveis {{n}} distintas do corpo', () => {
+      assert.equal(countBodyVariables('Oi {{1}}, veja {{2}} e {{1}}'), 2);
+      assert.equal(countBodyVariables('sem variável'), 0);
+    });
+    test('valida variáveis antes do envio: quantidade e valor vazio', () => {
+      const body = 'Oi {{1}}, código {{2}}';
+      assert.equal(validateTemplateVariables(body, { '1': 'Ana', '2': '123' }).ok, true);
+      const faltando = validateTemplateVariables(body, { '1': 'Ana' });
+      assert.equal(faltando.ok, false);
+      assert.deepEqual(faltando.missing, ['2']);
+      const vazio = validateTemplateVariables(body, { '1': 'Ana', '2': '  ' });
+      assert.deepEqual(vazio.missing, ['2']);
+    });
+  }
+
   group('Auditoria de site: não alcança endereço interno (SSRF)');
   await sequential([
     ['site público comum é permitido', () => {

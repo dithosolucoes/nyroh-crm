@@ -172,7 +172,7 @@ export function resolveMetaAccount(accountId?: string | null): { accountId: stri
 /** Busca os números e modelos de UMA conta (BM) direto da Meta, para sincronizar. */
 export async function metaSyncAccount(account: MetaAccountRecord) {
   const [phones, templates] = await Promise.all([
-    graphRequest('GET', `/${account.wabaId}/phone_numbers?fields=id,display_phone_number,verified_name,quality_rating,status,name_status&limit=100`, undefined, account.accessToken),
+    graphRequest('GET', `/${account.wabaId}/phone_numbers?fields=id,display_phone_number,verified_name,quality_rating,status,name_status,is_on_biz_app,platform_type&limit=100`, undefined, account.accessToken),
     graphRequest('GET', `/${account.wabaId}/message_templates?fields=id,name,language,status,category,components,quality_score,rejected_reason&limit=200`, undefined, account.accessToken)
   ]);
   return { phones, templates };
@@ -205,6 +205,8 @@ export async function metaSendTemplate(opts: {
   variables?: Record<string, string>;
   headerImageUrl?: string;
   phoneNumberId?: string;
+  /** Valores dos botões de URL dinâmica (índice do botão no modelo -> sufixo do link). */
+  urlButtonValues?: Array<{ index: number; value: string }>;
 }) {
   const sender = resolveMetaSender(opts.phoneNumberId);
   if (!sender.phoneNumberId) return { success: false, status: 0, data: null, error: 'META_PHONE_NUMBER_ID não configurado.' };
@@ -219,6 +221,10 @@ export async function metaSendTemplate(opts: {
   const keys = allNumeric ? rawKeys.sort((a, b) => Number(a) - Number(b)) : rawKeys;
   if (keys.length) {
     components.push({ type: 'body', parameters: keys.map(k => ({ type: 'text', text: String(vars[k] ?? '') })) });
+  }
+  for (const b of opts.urlButtonValues || []) {
+    if (!Number.isInteger(b.index) || b.index < 0 || !String(b.value || '').trim()) continue;
+    components.push({ type: 'button', sub_type: 'url', index: String(b.index), parameters: [{ type: 'text', text: String(b.value).trim() }] });
   }
 
   return graphRequest('POST', `/${sender.phoneNumberId}/messages`, {
@@ -237,7 +243,7 @@ export async function metaSendTemplate(opts: {
 export async function metaListPhoneNumbers() {
   const { wabaId } = getMetaCredentials();
   if (!wabaId) return { success: false, status: 0, data: null, error: 'META_WABA_ID não configurado.' };
-  return graphRequest('GET', `/${wabaId}/phone_numbers?fields=id,display_phone_number,verified_name,quality_rating,status,name_status&limit=100`);
+  return graphRequest('GET', `/${wabaId}/phone_numbers?fields=id,display_phone_number,verified_name,quality_rating,status,name_status,is_on_biz_app,platform_type&limit=100`);
 }
 
 /** Lista os modelos de mensagem da conta WABA com o status de aprovação. */

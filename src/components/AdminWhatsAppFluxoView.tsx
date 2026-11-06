@@ -201,6 +201,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
   // Sandbox & Test Dispatches (Zero mock data - strictly user driven)
   const [testMode, setTestMode] = useState<'free_text' | 'template'>('template');
   const [recipientPhone, setRecipientPhone] = useState('');
+  const [testPhoneNumberId, setTestPhoneNumberId] = useState('');
   const [messageBody, setMessageBody] = useState('');
   const [selectedTemplateForTest, setSelectedTemplateForTest] = useState<string>('');
   const [param1, setParam1] = useState('');
@@ -835,7 +836,8 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
           templateName: selectedTemplateForTest,
           language: 'pt_BR',
           parameters: [param1.trim(), param2.trim()].filter(Boolean),
-          requestedInstanceId: inputInstanceId.trim() || config.instanceId || undefined
+          requestedInstanceId: inputInstanceId.trim() || config.instanceId || undefined,
+          phoneNumberId: testPhoneNumberId || undefined
         })
       });
 
@@ -1169,10 +1171,11 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
               {instances.map((inst, index) => {
                 const connected = inst.status === 'connected';
                 const coexistence = inst.coexistence === true;
+                const coexistenceUnknown = inst.coexistence === null || inst.coexistence === undefined;
                 const quality = String(inst.quality || 'UNKNOWN').toUpperCase();
                 const qualityLabel = quality === 'GREEN' ? 'Alta (Verde)' : quality === 'YELLOW' ? 'Atenção (Amarela)' : quality === 'RED' ? 'Baixa (Vermelha)' : 'Desconhecida';
                 const qualityColor = quality === 'GREEN' ? 'text-emerald-700' : quality === 'YELLOW' ? 'text-amber-700' : quality === 'RED' ? 'text-red-700' : 'text-neutral-500';
-                const statusLabel: Record<string, string> = { connected: 'Conectada', pending: 'Aguardando conexão', disconnected: 'Desconectada', suspended: 'Suspensa' };
+                const statusLabel: Record<string, string> = { connected: 'Conectada', pending: 'Aguardando conexão', disconnected: 'Desconectada', suspended: 'Suspensa', flagged: 'Sinalizada pela Meta', restricted: 'Restrita pela Meta', migrated: 'Migrada', unknown: 'Status não informado' };
                 return (
                   <div
                     key={inst.id || index}
@@ -1202,8 +1205,8 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
                       </div>
                       <div>
                         <span className="text-neutral-500 block text-[10px]">Coexistência:</span>
-                        <span className={`font-bold ${coexistence ? 'text-emerald-700' : 'text-red-700'}`}>
-                          {coexistence ? 'Ativa (celular + CRM)' : 'DESLIGADA (somente API)'}
+                        <span className={`font-bold ${coexistenceUnknown ? 'text-neutral-600' : coexistence ? 'text-emerald-700' : 'text-red-700'}`}>
+                          {coexistenceUnknown ? 'Não verificado (a Meta não informou)' : coexistence ? 'Ativa (celular + CRM)' : 'DESLIGADA (somente API)'}
                         </span>
                       </div>
                       <div>
@@ -3083,6 +3086,19 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
               ) : (
                 <form onSubmit={handleSendTestTemplate} className="space-y-3">
                   <div>
+                    <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                      Número de envio:
+                    </label>
+                    <select
+                      value={testPhoneNumberId}
+                      onChange={(e) => setTestPhoneNumberId(e.target.value)}
+                      className="w-full text-xs px-3 py-2 mb-2 border border-neutral-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                    >
+                      <option value="">Padrão do ambiente</option>
+                      {instances.map((inst: any) => (
+                        <option key={inst.id} value={inst.id}>{inst.name} ({inst.phone})</option>
+                      ))}
+                    </select>
                     <label className="block text-xs font-semibold text-neutral-700 mb-1">
                       Número do Destinatário:
                     </label>
