@@ -17,7 +17,7 @@ import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regrasDeC
 import { hashPassword, verifyPassword, generateSessionToken, DEFAULT_USERS, StoredUser, isUserAdmin } from './src/lib/serverAuth.js';
 import { performWebsiteAudit } from './src/lib/auditEngine.js';
 import { executeFluxoRequest, downloadFluxoMediaBinary, prepareOutboundMedia, fluxoInstancePath, hasFfmpeg } from './src/lib/fluxoClient.js';
-import { setMetaRegistry, listMetaRegistry, encryptMetaToken, decryptMetaToken, metaDownloadMedia, metaSyncAccount, metaValidateToken, resolveMetaAccount, receivingPhoneNumberId, parseCoexistenceEchoes, type MetaAccountRecord, type MetaNumberRecord } from './src/lib/metaClient.js';
+import { setMetaRegistry, listMetaRegistry, encryptMetaToken, decryptMetaToken, metaDownloadMedia, metaSyncAccount, metaValidateToken, resolveMetaAccount, receivingPhoneNumberId, parseCoexistenceEchoes, getEmbeddedSignupConfig, metaExchangeSignupCode, metaSubscribeWaba, type MetaAccountRecord, type MetaNumberRecord } from './src/lib/metaClient.js';
 import type { FluxoApiResult } from './src/lib/fluxoClient.js';
 import { verifyFluxoWebhook } from './src/lib/webhookAuth.js';
 import { detectOptOut, sanitizeTemplateVariable, resolveManualInterest, SEM_INTERESSE_TAG } from './src/lib/leadIntent.js';
@@ -4107,6 +4107,55 @@ app.post('/api/admin/meta/accounts/:id/sync', async (req: any, res) => {
     return res.status(r.success ? 200 : 502).json(r);
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err?.message || 'Falha na sincronização.' });
+  }
+});
+
+// Embedded Signup: configuração pública (App ID / Config ID) para o botão "Conectar número pela Meta"
+app.get('/api/admin/meta/embedded-signup/config', (_req: any, res) => {
+  const cfg = getEmbeddedSignupConfig();
+  return res.json({ success: true, appId: cfg.appId, configId: cfg.configId, ready: cfg.ready });
+});
+
+// Embedded Signup: recebe o código do login + WABA/número escolhidos e conecta a conta sem colar token
+app.post('/api/admin/meta/embedded-signup/complete', async (req: any, res) => {
+  const code = String(req.body?.code || '').trim();
+  const wabaId = String(req.body?.wabaId || '').trim();
+  const phoneNumberId = String(req.body?.phoneNumberId || '').trim();
+  if (!code || !wabaId) {
+    return res.status(400).json({ success: false, error: 'Faltam dados do login da Meta (código ou conta). Tente conectar de novo.' });
+  }
+  if (!pgPool || !usePostgres) return res.status(503).json({ success: false, error: 'Banco indisponível.' });
+  try {
+    const exchanged = await metaExchangeSignupCode(code);
+    if (!exchanged.success || !exchanged.token) {
+      return res.status(400).json({ success: false, error: `A Meta recusou o login: ${exchanged.error}` });
+    }
+    const token = exchanged.token;
+    const enc = encryptMetaToken(token);
+    const existing = await pgPool.query('SELECT id FROM meta_accounts WHERE waba_id = $1 LIMIT 1', [wabaId]);
+    let accountId: string;
+    if (existing.rows.length > 0) {
+      accountId = String(existing.rows[0].id);
+      await pgPool.query('UPDATE meta_accounts SET access_token_enc = $1 WHERE id = $2', [enc, accountId]);
+    } else {
+      accountId = `bm_${crypto.randomBytes(6).toString('hex')}`;
+      await pgPool.query(
+        'INSERT INTO meta_accounts (id, name, waba_id, business_id, access_token_enc) VALUES ($1, $2, $3, $4, $5)',
+        [accountId, `WABA ${wabaId}`, wabaId, null, enc]
+      );
+    }
+    const sub = await metaSubscribeWaba(wabaId, token);
+    const sync = await syncMetaAccountIntoDb(accountId);
+    const phoneOk = !phoneNumberId || (sync.success && (await pgPool.query('SELECT 1 FROM meta_numbers WHERE phone_number_id = $1', [phoneNumberId])).rows.length > 0);
+    return res.json({
+      success: sync.success && phoneOk,
+      accountId,
+      numbers: sync.numbers,
+      warning: sub.success ? null : `Conectou, mas a Meta não confirmou a assinatura dos webhooks: ${sub.error}`,
+      error: !sync.success ? sync.error : (!phoneOk ? 'Conectou a conta, mas o número escolhido não apareceu na listagem da Meta.' : null)
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err?.message || 'Falha ao concluir a conexão.' });
   }
 });
 

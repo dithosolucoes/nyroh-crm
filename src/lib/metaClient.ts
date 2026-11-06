@@ -183,6 +183,34 @@ export async function metaSyncAccount(account: MetaAccountRecord) {
   return { phones, templates };
 }
 
+/** Config pública do Embedded Signup (App ID e Config ID) para o botão de conectar no painel. */
+export function getEmbeddedSignupConfig() {
+  const appId = (process.env.META_APP_ID || '').trim();
+  const configId = (process.env.META_CONFIG_ID || '').trim();
+  return { appId, configId, ready: Boolean(appId && configId && (process.env.META_APP_SECRET || '').trim()) };
+}
+
+/** Troca o código do login (Embedded Signup) por um token de acesso. */
+export async function metaExchangeSignupCode(code: string): Promise<{ success: boolean; token?: string; error?: string }> {
+  const { appId } = getEmbeddedSignupConfig();
+  const appSecret = (process.env.META_APP_SECRET || '').trim();
+  if (!appId || !appSecret) return { success: false, error: 'META_APP_ID ou META_APP_SECRET não configurado.' };
+  try {
+    const qs = new URLSearchParams({ client_id: appId, client_secret: appSecret, code });
+    const res = await fetch(`${GRAPH_BASE}/oauth/access_token?${qs.toString()}`);
+    const data: any = await res.json().catch(() => ({}));
+    if (!res.ok || !data.access_token) return { success: false, error: data?.error?.message || `HTTP ${res.status}` };
+    return { success: true, token: data.access_token };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Falha de rede ao trocar o código.' };
+  }
+}
+
+/** Assina o app nos webhooks da WABA recém-conectada (sem isso a Meta não envia mensagens ao CRM). */
+export async function metaSubscribeWaba(wabaId: string, accessToken: string) {
+  return graphRequest('POST', `/${wabaId}/subscribed_apps`, undefined, accessToken);
+}
+
 /** Valida um token antes de cadastrar: a Meta responde com o nome da conta. */
 export async function metaValidateToken(accessToken: string) {
   return graphRequest('GET', '/me?fields=id,name', undefined, accessToken);
