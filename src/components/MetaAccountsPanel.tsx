@@ -75,6 +75,99 @@ export default function MetaAccountsPanel({ onShowToast, onAccountsChanged, numb
     }
   };
 
+  // ---- Conectar número pela Meta (Embedded Signup) ----
+  const signupRef = React.useRef<{ code?: string; wabaId?: string; phoneNumberId?: string }>({});
+
+  const finishSignup = async () => {
+    const s = signupRef.current;
+    if (!s.code || !s.wabaId) return;
+    const payload = { code: s.code, wabaId: s.wabaId, phoneNumberId: s.phoneNumberId || '' };
+    signupRef.current = {};
+    setBusy('signup');
+    try {
+      const res = await fetch('/api/admin/meta/embedded-signup/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        onShowToast(data.error || 'Não foi possível concluir a conexão com a Meta.');
+        return;
+      }
+      onShowToast(data.warning ? data.warning : `Número conectado: ${data.numbers} número(s) na conta.`);
+      await load();
+      onAccountsChanged?.();
+      if (data.accountId) onSelect(data.accountId);
+    } catch (err: any) {
+      onShowToast(err?.message || 'Falha de conexão ao concluir.');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const loadFacebookSdk = (appId: string) => new Promise<void>((resolve, reject) => {
+    const w = window as any;
+    if (w.FB) { w.FB.init({ appId, cookie: true, xfbml: false, version: 'v21.0' }); return resolve(); }
+    w.fbAsyncInit = () => { w.FB.init({ appId, cookie: true, xfbml: false, version: 'v21.0' }); resolve(); };
+    const script = document.createElement('script');
+    script.src = 'https://connect.facebook.net/pt_BR/sdk.js';
+    script.async = true;
+    script.onerror = () => reject(new Error('Não consegui carregar o login da Meta. Verifique a conexão.'));
+    document.body.appendChild(script);
+  });
+
+  // Recebe a conta e o número escolhidos dentro do fluxo da Meta
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      if (!String(event.origin || '').endsWith('facebook.com')) return;
+      let data: any = event.data;
+      if (typeof data === 'string') { try { data = JSON.parse(data); } catch { return; } }
+      if (data?.type !== 'WA_EMBEDDED_SIGNUP' || !data?.data) return;
+      const info = data.data;
+      if (info.waba_id) signupRef.current.wabaId = String(info.waba_id);
+      if (info.phone_number_id) signupRef.current.phoneNumberId = String(info.phone_number_id);
+      finishSignup();
+    };
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const connectWithMeta = async () => {
+    setError(null);
+    setBusy('signup');
+    try {
+      const cfgRes = await fetch('/api/admin/meta/embedded-signup/config');
+      const cfg = await cfgRes.json();
+      if (!cfg.ready) {
+        onShowToast('Falta configurar o login da Meta no servidor (META_APP_ID, META_CONFIG_ID e META_APP_SECRET).');
+        return;
+      }
+      await loadFacebookSdk(cfg.appId);
+      const w = window as any;
+      w.FB.login((resp: any) => {
+        const code = resp?.authResponse?.code;
+        if (!code) {
+          setBusy(null);
+          onShowToast('Login cancelado ou não concluído.');
+          return;
+        }
+        signupRef.current.code = code;
+        setBusy(null);
+        finishSignup();
+      }, {
+        config_id: cfg.configId,
+        response_type: 'code',
+        override_default_response_type: true,
+        extras: { setup: {}, featureType: 'whatsapp_business_app_onboarding', sessionInfoVersion: '3' }
+      });
+    } catch (err: any) {
+      setBusy(null);
+      onShowToast(err?.message || 'Não foi possível abrir o login da Meta.');
+    }
+  };
+
   const syncAccount = async (id: string) => {
     setBusy(id);
     try {
@@ -119,6 +212,9 @@ export default function MetaAccountsPanel({ onShowToast, onAccountsChanged, numb
           <div className="flex items-center gap-2">
             <button onClick={load} disabled={loading} className="text-xs px-2.5 py-1.5 rounded-lg border border-neutral-700 text-neutral-200 flex items-center gap-1.5" aria-label="Atualizar lista">
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            </button>
+            <button onClick={connectWithMeta} disabled={busy === 'signup'} className="text-xs px-3 py-1.5 rounded-lg bg-emerald-500 text-neutral-950 font-semibold flex items-center gap-1.5 disabled:opacity-60">
+              {busy === 'signup' ? 'Conectando...' : 'Conectar número pela Meta'}
             </button>
             <button onClick={() => { setError(null); setOpen(true); }} className="text-xs px-3 py-1.5 rounded-lg bg-white text-neutral-900 font-semibold flex items-center gap-1.5">
               <Plus className="w-3.5 h-3.5" /> Cadastrar BM
