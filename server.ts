@@ -17,7 +17,7 @@ import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regrasDeC
 import { hashPassword, verifyPassword, generateSessionToken, DEFAULT_USERS, StoredUser, isUserAdmin } from './src/lib/serverAuth.js';
 import { performWebsiteAudit } from './src/lib/auditEngine.js';
 import { executeFluxoRequest, downloadFluxoMediaBinary, prepareOutboundMedia, fluxoInstancePath, hasFfmpeg } from './src/lib/fluxoClient.js';
-import { setMetaRegistry, listMetaRegistry, encryptMetaToken, decryptMetaToken, metaDownloadMedia, metaSyncAccount, metaValidateToken, type MetaAccountRecord, type MetaNumberRecord } from './src/lib/metaClient.js';
+import { setMetaRegistry, listMetaRegistry, encryptMetaToken, decryptMetaToken, metaDownloadMedia, metaSyncAccount, metaValidateToken, resolveMetaAccount, receivingPhoneNumberId, type MetaAccountRecord, type MetaNumberRecord } from './src/lib/metaClient.js';
 import type { FluxoApiResult } from './src/lib/fluxoClient.js';
 import { verifyFluxoWebhook } from './src/lib/webhookAuth.js';
 import { detectOptOut, sanitizeTemplateVariable, resolveManualInterest, SEM_INTERESSE_TAG } from './src/lib/leadIntent.js';
@@ -871,6 +871,12 @@ async function initDatabase(retries = 5, delayMs = 3000) {
             business_id VARCHAR(64),
             access_token_enc TEXT NOT NULL,
             created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+          );
+
+          CREATE TABLE IF NOT EXISTS lead_meta_routes (
+            lead_id VARCHAR(255) PRIMARY KEY,
+            phone_number_id VARCHAR(64) NOT NULL,
             updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
           );
 
@@ -2924,21 +2930,33 @@ function normalizeMetaGraphTemplate(t: any) {
 app.get('/api/admin/fluxo/templates', async (req: any, res) => {
   // Provedor Meta: lê os modelos da conta WABA direto da Meta, com o status de aprovação
   if (getMetaProvider() === 'meta') {
-    const r = await metaListTemplates();
-    if (!r.success) return res.json({ success: false, templates: [], error: { message: r.error } });
-    const templates = (r.data?.data || []).map((t: any) => ({
-      id: t.id || t.name,
-      name: t.name,
-      category: t.category,
-      language: t.language,
-      status: t.status,
-      components: t.components || [],
-      usageCount: 0,
-      qualityScore: t.quality_score?.score || 'UNKNOWN',
-      rejectedReason: t.rejected_reason || null,
-      submittedToMeta: true
-    }));
-    return res.json({ success: true, templates });
+    // Modelos de TODAS as BMs (ambiente + cadastradas), cada um marcado com a origem
+    const accountIds = ['env', ...listMetaRegistry().accounts.map(a => a.id)];
+    const templates: any[] = [];
+    const errors: any[] = [];
+    for (const accountId of accountIds) {
+      const acc = resolveMetaAccount(accountId);
+      const r = await metaListTemplates(accountId);
+      if (!r.success) { errors.push({ accountId, accountName: acc?.name, message: r.error }); continue; }
+      for (const t of r.data?.data || []) {
+        templates.push({
+          id: `${accountId}:${t.id || t.name}`,
+          name: t.name,
+          category: t.category,
+          language: t.language,
+          status: t.status,
+          components: t.components || [],
+          usageCount: 0,
+          qualityScore: t.quality_score?.score || 'UNKNOWN',
+          rejectedReason: t.rejected_reason || null,
+          submittedToMeta: true,
+          accountId,
+          accountName: acc?.name || accountId
+        });
+      }
+    }
+    if (templates.length === 0 && errors.length > 0) return res.json({ success: false, templates: [], error: { message: errors[0].message }, errors });
+    return res.json({ success: true, templates, errors });
   }
   const apiKey = (memoryFluxoConfig.apiKey || process.env.FLUXO_KEY || '').trim();
   const apiSecret = (memoryFluxoConfig.apiSecret || process.env.FLUXO_SECRET || '').trim();
@@ -3189,7 +3207,7 @@ app.post('/api/admin/fluxo/templates/sync-meta', async (req: any, res) => {
 
 // Create & Submit Template to Meta (or save as Draft)
 app.post('/api/admin/fluxo/templates', async (req: any, res) => {
-  const { name, category, language, components, isDraft, status: initialStatus, examples, bodyText: explicitBodyText, footerText: explicitFooterText, buttons: explicitButtons } = req.body;
+  const { name, category, language, components, isDraft, status: initialStatus, examples, bodyText: explicitBodyText, footerText: explicitFooterText, buttons: explicitButtons, accountId } = req.body;
 
   if (!name) {
     return res.status(400).json({ error: 'Nome do template é obrigatório.' });
@@ -3305,7 +3323,7 @@ app.post('/api/admin/fluxo/templates', async (req: any, res) => {
         language: targetLanguage,
         category: targetCategory as 'MARKETING' | 'UTILITY',
         components: metaComponents
-      }));
+      }, String(accountId || 'env')));
     } else {
     const targetPath = instanceId ? `/v1/instances/${instanceId}/templates` : '/v1/templates';
     remoteResult = await executeFluxoRequest({
@@ -3448,9 +3466,10 @@ app.patch('/api/admin/fluxo/templates/:name/status', async (req: any, res) => {
 app.delete('/api/admin/fluxo/templates/:name', async (req: any, res) => {
   const { name } = req.params;
 
-  // Na Meta: apaga o modelo na conta WABA (se falhar, mantém o registro local para não perder a referência)
+  // Na Meta: apaga o modelo na conta WABA escolhida (se falhar, mantém o registro local para não perder a referência)
   if (getMetaProvider() === 'meta') {
-    const del = await metaDeleteTemplate(String(name));
+    const accountId = String(req.query?.accountId || req.body?.accountId || 'env');
+    const del = await metaDeleteTemplate(String(name), accountId);
     if (!del.success) {
       return res.status(502).json({ success: false, error: { code: 'meta_error', message: del.error } });
     }
@@ -3775,7 +3794,7 @@ app.post('/api/campaign/test-dispatch', async (req: any, res) => {
         // Modo de envio direto de texto puro
         const targetPath = fluxoInstancePath('/messages', instanceId);
         const fRes = getMetaProvider() === 'meta'
-          ? metaToFluxoResult(await metaSendText(formattedE164, renderedFullText))
+          ? metaToFluxoResult(await metaSendText(formattedE164, renderedFullText, String(req.body?.phoneNumberId || '').trim() || undefined))
           : await executeFluxoRequest({
           method: 'POST',
           path: targetPath,
@@ -3937,6 +3956,26 @@ app.get('/api/campaign/test-dispatch/status/:messageId', async (req: any, res) =
 // ============================================================================
 // MULTI-BM / MULTI-NÚMERO: contas (BM/WABA) cadastradas no CRM
 // ============================================================================
+// Número (phone_number_id) que recebeu a conversa: responder e marcar leitura saem por ele (multi-número)
+const memoryLeadMetaRoute = new Map<string, string>();
+async function setLeadMetaRoute(leadId: string, phoneNumberId: string) {
+  memoryLeadMetaRoute.set(leadId, phoneNumberId);
+  if (!usePostgres || !pgPool) return;
+  await pgPool.query(
+    `INSERT INTO lead_meta_routes (lead_id, phone_number_id, updated_at) VALUES ($1, $2, CURRENT_TIMESTAMP)
+     ON CONFLICT (lead_id) DO UPDATE SET phone_number_id = EXCLUDED.phone_number_id, updated_at = CURRENT_TIMESTAMP`,
+    [leadId, phoneNumberId]
+  ).catch((e: any) => console.warn('[Meta] falha ao gravar rota da conversa:', e?.message));
+}
+async function getLeadMetaRoute(leadId: string): Promise<string | undefined> {
+  if (memoryLeadMetaRoute.has(leadId)) return memoryLeadMetaRoute.get(leadId);
+  if (!usePostgres || !pgPool) return undefined;
+  const r = await pgPool.query('SELECT phone_number_id FROM lead_meta_routes WHERE lead_id = $1', [leadId]).catch(() => null);
+  const pid = r?.rows?.[0]?.phone_number_id as string | undefined;
+  if (pid) memoryLeadMetaRoute.set(leadId, pid);
+  return pid;
+}
+
 async function loadMetaRegistryFromDb() {
   if (!usePostgres || !pgPool) return;
   const accRes = await pgPool.query('SELECT id, name, waba_id, business_id, access_token_enc FROM meta_accounts ORDER BY created_at ASC');
@@ -5349,6 +5388,10 @@ async function processWebhookEventAsync(event: any) {
                     mediaUrl,
                     mediaName
                   });
+
+                  if (receivingPhoneId && processed?.targetId) {
+                    await setLeadMetaRoute(String(processed.targetId), receivingPhoneId).catch(() => {});
+                  }
 
                   summary = `Mensagem de ${m.from} (${processed?.targetName || 'Lead'}): "${textBody.substring(0, 35)}"`;
                 }
@@ -11928,7 +11971,7 @@ app.post('/api/leads/:leadId/messages', requireDatabaseReady, async (req: any, r
 
     // ---- 5) ENVIA e AGUARDA a resposta da FluxoAPI ----
     const fRes = getMetaProvider() === 'meta'
-      ? await sendBodyViaMeta(bodyPayload, String(req.body?.phoneNumberId || '').trim() || undefined)
+      ? await sendBodyViaMeta(bodyPayload, String(req.body?.phoneNumberId || '').trim() || (await getLeadMetaRoute(String(leadId))) || undefined)
       : await executeFluxoRequest({
           method: 'POST',
           path: targetPath,
@@ -12099,7 +12142,7 @@ app.post('/api/leads/:leadId/read', async (req: any, res) => {
 
   lastReadMarkAt.set(leadId, now);
   const fRes = getMetaProvider() === 'meta'
-    ? metaToFluxoResult(await metaMarkRead(wamid))
+    ? metaToFluxoResult(await metaMarkRead(wamid, await getLeadMetaRoute(String(leadId))))
     : await executeFluxoRequest({
         method: 'POST',
         path: `/v1/messages/${encodeURIComponent(wamid)}/read`,

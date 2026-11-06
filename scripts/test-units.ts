@@ -21,7 +21,8 @@ import { detectOptOut, sanitizeTemplateVariable } from '../src/lib/leadIntent';
 import { isPubliclyFetchableUrl } from '../src/lib/auditEngine';
 import {
   verifyMetaSignature, metaSendText, metaSendTemplate, metaMarkRead, metaDownloadMedia,
-  encryptMetaToken, decryptMetaToken, setMetaRegistry, resolveMetaSender
+  encryptMetaToken, decryptMetaToken, setMetaRegistry, resolveMetaSender,
+  metaCreateTemplate, metaDeleteTemplate, metaListTemplates, receivingPhoneNumberId
 } from '../src/lib/metaClient';
 
 let passed = 0;
@@ -595,6 +596,63 @@ async function main() {
       assert.equal(fetchCalls[1].init.headers.Authorization, 'Bearer TOKEN_ENV');
       assert.equal(step, 2);
       resetFetch();
+    }],
+    ['modelo: criar na BM escolhida usa a WABA e o token DESSA BM', async () => {
+      withMetaEnv();
+      setMetaRegistry([{ id: 'bm_2', name: 'Outra BM', wabaId: 'WABA_2', accessToken: 'TOKEN_BM2' }], []);
+      mockFetch(() => ({ body: { success: true } }));
+      await metaCreateTemplate({ name: 'x', language: 'pt_BR', category: 'UTILITY', components: [] }, 'bm_2');
+      assert.ok(fetchCalls[0].url.endsWith('/WABA_2/message_templates'));
+      assert.equal(fetchCalls[0].init.headers.Authorization, 'Bearer TOKEN_BM2');
+      resetFetch();
+      setMetaRegistry([], []);
+    }],
+    ['modelo: apagar e listar usam a BM escolhida (e o ambiente por padrão)', async () => {
+      withMetaEnv();
+      setMetaRegistry([{ id: 'bm_2', name: 'Outra BM', wabaId: 'WABA_2', accessToken: 'TOKEN_BM2' }], []);
+      mockFetch(() => ({ body: { data: [] } }));
+      await metaDeleteTemplate('x', 'bm_2');
+      await metaListTemplates();
+      assert.ok(fetchCalls[0].url.includes('/WABA_2/message_templates?name=x'));
+      assert.equal(fetchCalls[0].init.method, 'DELETE');
+      assert.ok(fetchCalls[1].url.includes('/WABA_ENV/message_templates'));
+      assert.equal(fetchCalls[1].init.headers.Authorization, 'Bearer TOKEN_ENV');
+      resetFetch();
+      setMetaRegistry([], []);
+    }],
+    ['webhook: evento real da Meta -> número que recebeu -> leitura e resposta saem pelo token DA BM', async () => {
+      withMetaEnv();
+      setMetaRegistry(
+        [{ id: 'bm_2', name: 'Outra BM', wabaId: 'WABA_2', accessToken: 'TOKEN_BM2' }],
+        [{ phoneNumberId: '222', accountId: 'bm_2', displayPhoneNumber: '+55 31 0000-0000' }]
+      );
+      const event = {
+        object: 'whatsapp_business_account',
+        entry: [{ id: 'WABA_2', changes: [{ field: 'messages', value: {
+          messaging_product: 'whatsapp',
+          metadata: { display_phone_number: '553100000000', phone_number_id: '222' },
+          contacts: [{ profile: { name: 'Cliente' }, wa_id: '5531999999999' }],
+          messages: [{ from: '5531999999999', id: 'wamid.ABC', timestamp: '1700000000', type: 'text', text: { body: 'oi' } }]
+        } }] }]
+      };
+      const pid = receivingPhoneNumberId(event);
+      assert.equal(pid, '222');
+      mockFetch(() => ({ body: { messages: [{ id: 'wamid.OUT' }], success: true } }));
+      await metaMarkRead('wamid.ABC', pid);
+      await metaSendText('5531999999999', 'resposta', pid);
+      assert.ok(fetchCalls[0].url.endsWith('/222/messages'));
+      assert.equal(JSON.parse(fetchCalls[0].init.body).status, 'read');
+      assert.equal(fetchCalls[0].init.headers.Authorization, 'Bearer TOKEN_BM2');
+      assert.ok(fetchCalls[1].url.endsWith('/222/messages'));
+      assert.equal(fetchCalls[1].init.headers.Authorization, 'Bearer TOKEN_BM2');
+      resetFetch();
+      setMetaRegistry([], []);
+    }],
+    ['webhook sem metadata: sem número, cai no padrão do ambiente', () => {
+      withMetaEnv();
+      setMetaRegistry([], []);
+      assert.equal(receivingPhoneNumberId({ entry: [{ changes: [{ value: {} }] }] }), undefined);
+      assert.equal(resolveMetaSender(undefined).accountId, 'env');
     }],
     ['erro da Meta vira falha com a mensagem dela (não derruba)', async () => {
       withMetaEnv();

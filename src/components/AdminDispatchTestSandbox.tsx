@@ -175,6 +175,15 @@ export const AdminDispatchTestSandbox: React.FC<AdminDispatchTestSandboxProps> =
 
   // Dados do Lead / Contato de Teste
   const [testLeadName, setTestLeadName] = useState<string>('Gabriel (Nyroh)');
+  // Número de envio (multi-número). Vazio = número padrão do ambiente.
+  const [sendingNumbers, setSendingNumbers] = useState<Array<{ id: string; name: string; phone: string; accountId?: string }>>([]);
+  const [selectedPhoneNumberId, setSelectedPhoneNumberId] = useState<string>('');
+  useEffect(() => {
+    fetch('/api/admin/fluxo/instances')
+      .then(r => r.json())
+      .then(d => { if (d?.success && Array.isArray(d.instances)) setSendingNumbers(d.instances); })
+      .catch(() => { /* seletor é opcional */ });
+  }, []);
   const [testPhone, setTestPhone] = useState<string>('');
   const [testPublicUrl, setTestPublicUrl] = useState<string>('https://nyroh.app/p/gabriel-teste');
   const [testWebsite, setTestWebsite] = useState<string>('');
@@ -445,6 +454,7 @@ export const AdminDispatchTestSandbox: React.FC<AdminDispatchTestSandboxProps> =
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           phoneNumber: cleanDigits,
+          phoneNumberId: selectedPhoneNumberId || undefined,
           leadName: cleanLeadName,
           salespersonId: activeSeller.id,
           salespersonName: activeSeller.name,
@@ -492,6 +502,7 @@ export const AdminDispatchTestSandbox: React.FC<AdminDispatchTestSandboxProps> =
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           phoneNumber: cleanDigits,
+          phoneNumberId: selectedPhoneNumberId || undefined,
           leadName: cleanLeadName,
           salespersonId: activeSeller.id,
           salespersonName: activeSeller.name,
@@ -863,6 +874,23 @@ export const AdminDispatchTestSandbox: React.FC<AdminDispatchTestSandboxProps> =
                   placeholder="Ex: Gabriel (Nyroh)"
                   className="w-full px-3 py-2 bg-neutral-50 border border-neutral-300 rounded-xl text-xs text-neutral-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
+              </div>
+
+              {/* Número de envio */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-neutral-800">
+                  Número de envio:
+                </label>
+                <select
+                  value={selectedPhoneNumberId}
+                  onChange={e => setSelectedPhoneNumberId(e.target.value)}
+                  className="w-full px-3 py-2 bg-neutral-50 border border-neutral-300 rounded-xl text-xs text-neutral-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="">Padrão do ambiente</option>
+                  {sendingNumbers.map(n => (
+                    <option key={n.id} value={n.id}>{n.name} ({n.phone})</option>
+                  ))}
+                </select>
               </div>
 
               {/* Closer Responsável */}
