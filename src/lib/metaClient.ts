@@ -312,3 +312,23 @@ export function receivingPhoneNumberId(event: any): string | undefined {
   }
   return undefined;
 }
+
+/**
+ * Coexistência: converte o campo smb_message_echoes do webhook em mensagens "enviadas pelo celular".
+ * Mídia vira um rótulo de texto (o arquivo em si não vem nesse evento).
+ */
+export function parseCoexistenceEchoes(value: any): Array<{ phone: string; text: string; messageId?: string; eventTimestamp?: string }> {
+  const echoes: any[] = Array.isArray(value?.message_echoes) ? value.message_echoes : [];
+  const LABEL: Record<string, string> = { image: 'Imagem', video: 'Vídeo', audio: 'Áudio', document: 'Documento' };
+  return echoes.map(echo => {
+    const type = String(echo?.type || 'text');
+    const text = echo?.text?.body
+      || (type !== 'text' ? `[${LABEL[type] || 'Mídia'} enviada pelo celular]` : '');
+    return {
+      phone: String(echo?.to || echo?.recipient_id || '').replace(/\D/g, ''),
+      text,
+      messageId: echo?.id,
+      eventTimestamp: echo?.timestamp ? new Date(Number(echo.timestamp) * 1000).toISOString() : undefined
+    };
+  });
+}
