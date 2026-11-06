@@ -40,7 +40,12 @@ async function graphRequest(method: 'GET' | 'POST' | 'DELETE', path: string, bod
     });
     const data: any = await res.json().catch(() => ({}));
     if (!res.ok) {
-      const msg = data?.error?.message || `HTTP ${res.status}`;
+      const metaErr = data?.error || {};
+      const base = metaErr.message || `HTTP ${res.status}`;
+      // Mensagem completa da Meta (motivo real da recusa), sem tokens.
+      const detail = metaErr.error_user_msg || metaErr.error_user_title;
+      const msg = detail && detail !== base ? `${base}: ${detail}` : base;
+      console.error('[Meta Graph Error]', method, path, JSON.stringify(data));
       return { success: false, status: res.status, data, error: msg };
     }
     return { success: true, status: res.status, data };
