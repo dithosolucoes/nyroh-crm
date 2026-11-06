@@ -80,7 +80,7 @@ export default function MetaAccountsPanel({ onShowToast, onAccountsChanged, numb
 
   const finishSignup = async () => {
     const s = signupRef.current;
-    if (!s.code || !s.wabaId) return;
+    if (!s.code) return;
     const payload = { code: s.code, wabaId: s.wabaId, phoneNumberId: s.phoneNumberId || '' };
     signupRef.current = {};
     setBusy('signup');

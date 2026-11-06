@@ -17,7 +17,7 @@ import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regrasDeC
 import { hashPassword, verifyPassword, generateSessionToken, DEFAULT_USERS, StoredUser, isUserAdmin } from './src/lib/serverAuth.js';
 import { performWebsiteAudit } from './src/lib/auditEngine.js';
 import { executeFluxoRequest, downloadFluxoMediaBinary, prepareOutboundMedia, fluxoInstancePath, hasFfmpeg } from './src/lib/fluxoClient.js';
-import { setMetaRegistry, listMetaRegistry, encryptMetaToken, decryptMetaToken, metaDownloadMedia, metaSyncAccount, metaValidateToken, resolveMetaAccount, receivingPhoneNumberId, parseCoexistenceEchoes, getEmbeddedSignupConfig, metaExchangeSignupCode, metaSubscribeWaba, type MetaAccountRecord, type MetaNumberRecord } from './src/lib/metaClient.js';
+import { setMetaRegistry, listMetaRegistry, encryptMetaToken, decryptMetaToken, metaDownloadMedia, metaSyncAccount, metaValidateToken, resolveMetaAccount, receivingPhoneNumberId, parseCoexistenceEchoes, getEmbeddedSignupConfig, metaExchangeSignupCode, metaSubscribeWaba, metaDiscoverWabaIds, type MetaAccountRecord, type MetaNumberRecord } from './src/lib/metaClient.js';
 import type { FluxoApiResult } from './src/lib/fluxoClient.js';
 import { verifyFluxoWebhook } from './src/lib/webhookAuth.js';
 import { detectOptOut, sanitizeTemplateVariable, resolveManualInterest, SEM_INTERESSE_TAG } from './src/lib/leadIntent.js';
@@ -4119,10 +4119,10 @@ app.get('/api/admin/meta/embedded-signup/config', (_req: any, res) => {
 // Embedded Signup: recebe o código do login + WABA/número escolhidos e conecta a conta sem colar token
 app.post('/api/admin/meta/embedded-signup/complete', async (req: any, res) => {
   const code = String(req.body?.code || '').trim();
-  const wabaId = String(req.body?.wabaId || '').trim();
+  let wabaId = String(req.body?.wabaId || '').trim();
   const phoneNumberId = String(req.body?.phoneNumberId || '').trim();
-  if (!code || !wabaId) {
-    return res.status(400).json({ success: false, error: 'Faltam dados do login da Meta (código ou conta). Tente conectar de novo.' });
+  if (!code) {
+    return res.status(400).json({ success: false, error: 'A Meta não devolveu o código do login. Tente conectar de novo.' });
   }
   if (!pgPool || !usePostgres) return res.status(503).json({ success: false, error: 'Banco indisponível.' });
   try {
@@ -4131,6 +4131,13 @@ app.post('/api/admin/meta/embedded-signup/complete', async (req: any, res) => {
       return res.status(400).json({ success: false, error: `A Meta recusou o login: ${exchanged.error}` });
     }
     const token = exchanged.token;
+    if (!wabaId) {
+      const found = await metaDiscoverWabaIds(token);
+      if (found.length === 0) {
+        return res.status(400).json({ success: false, error: 'O login funcionou, mas nenhuma conta do WhatsApp Business foi encontrada para este usuário. Confira se o usuário tem acesso à conta Nyroh - Comercial.' });
+      }
+      wabaId = found[0];
+    }
     const enc = encryptMetaToken(token);
     const existing = await pgPool.query('SELECT id FROM meta_accounts WHERE waba_id = $1 LIMIT 1', [wabaId]);
     let accountId: string;
