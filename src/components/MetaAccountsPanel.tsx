@@ -92,34 +92,34 @@ export default function MetaAccountsPanel({ onShowToast, onAccountsChanged }: Pr
     }
   };
 
-  const inputCls = 'w-full px-3 py-2 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm';
+  const inputCls = 'w-full px-3 py-2 rounded-lg border border-neutral-700 bg-neutral-950 text-neutral-100 placeholder:text-neutral-500 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500';
 
   return (
-    <section className="bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 p-5 space-y-4">
+    <section className="bg-neutral-900 rounded-2xl border border-neutral-800 p-5 space-y-4 text-neutral-100">
       <div className="flex items-center justify-between gap-3">
-        <h3 className="text-base font-bold flex items-center gap-2">
+        <h3 className="text-base font-bold text-white flex items-center gap-2">
           <Building2 className="w-5 h-5 text-emerald-500" /> Contas da Meta (BMs)
         </h3>
-        <button onClick={load} disabled={loading} className="text-xs px-3 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 flex items-center gap-1.5">
+        <button onClick={load} disabled={loading} className="text-xs px-3 py-1.5 rounded-lg border border-neutral-700 text-neutral-200 flex items-center gap-1.5">
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} /> Atualizar lista
         </button>
       </div>
 
       {accounts.length === 0 ? (
-        <p className="text-sm text-neutral-500">Nenhuma conta cadastrada aqui ainda. Os números do ambiente (META_*) continuam funcionando.</p>
+        <p className="text-sm text-neutral-400">Nenhuma conta cadastrada aqui ainda. Os números do ambiente (META_*) continuam funcionando.</p>
       ) : (
-        <ul className="divide-y divide-neutral-200 dark:divide-neutral-800">
+        <ul className="divide-y divide-neutral-800">
           {accounts.map(a => (
             <li key={a.id} className="py-3 flex flex-wrap items-center justify-between gap-3">
               <div>
-                <div className="font-semibold text-sm">{a.name}</div>
-                <div className="text-xs text-neutral-500 font-mono">WABA {a.wabaId} • {a.numbers} número(s)</div>
+                <div className="font-semibold text-sm text-white">{a.name}</div>
+                <div className="text-xs text-neutral-400 font-mono">WABA {a.wabaId} • {a.numbers} número(s)</div>
               </div>
               <div className="flex items-center gap-2">
                 <button onClick={() => syncAccount(a.id)} disabled={busy === a.id} className="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-semibold disabled:opacity-50">
                   Sincronizar com a Meta
                 </button>
-                <button onClick={() => removeAccount(a.id, a.name)} disabled={busy === a.id} className="text-xs px-2 py-1.5 rounded-lg border border-red-300 text-red-600 disabled:opacity-50">
+                <button onClick={() => removeAccount(a.id, a.name)} disabled={busy === a.id} className="text-xs px-2 py-1.5 rounded-lg border border-red-700 text-red-400 disabled:opacity-50">
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -128,14 +128,14 @@ export default function MetaAccountsPanel({ onShowToast, onAccountsChanged }: Pr
         </ul>
       )}
 
-      <form onSubmit={addAccount} className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-neutral-200 dark:border-neutral-800">
+      <form onSubmit={addAccount} className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-neutral-800">
         <input className={inputCls} placeholder="Nome da BM (ex.: Nyroh - Comercial)" value={name} onChange={e => setName(e.target.value)} required />
         <input className={inputCls} placeholder="ID da conta do WhatsApp (WABA)" value={wabaId} onChange={e => setWabaId(e.target.value)} required />
         <input className={inputCls} placeholder="ID do Business Manager (opcional)" value={businessId} onChange={e => setBusinessId(e.target.value)} />
         <input className={inputCls} type="password" placeholder="Token de acesso da BM" value={token} onChange={e => setToken(e.target.value)} required autoComplete="off" />
-        {error && <p className="md:col-span-2 text-sm text-red-600">{error}</p>}
+        {error && <p className="md:col-span-2 text-sm text-red-400">{error}</p>}
         <div className="md:col-span-2">
-          <button type="submit" disabled={busy === 'add'} className="text-sm px-4 py-2 rounded-lg bg-neutral-900 dark:bg-white dark:text-neutral-900 text-white font-semibold flex items-center gap-2 disabled:opacity-50">
+          <button type="submit" disabled={busy === 'add'} className="text-sm px-4 py-2 rounded-lg bg-white text-neutral-900 font-semibold flex items-center gap-2 disabled:opacity-50">
             <Plus className="w-4 h-4" /> {busy === 'add' ? 'Validando na Meta...' : 'Cadastrar BM'}
           </button>
         </div>
