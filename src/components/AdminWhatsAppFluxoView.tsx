@@ -130,6 +130,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
   // Instances list
   // Instâncias REAIS vindas da FluxoAPI (nunca um valor fixo): vazio até a API responder
   const [instances, setInstances] = useState<any[]>([]);
+  const [selectedBmId, setSelectedBmId] = useState<string | null>(null);
   const [instancesError, setInstancesError] = useState<{ message?: string; action?: string; code?: string } | null>(null);
   const [loadingInstances, setLoadingInstances] = useState(false);
   const [newInstanceName, setNewInstanceName] = useState('');
@@ -1121,8 +1122,13 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
           <MetaAccountsPanel
             onShowToast={onShowToast}
             onAccountsChanged={() => { fetchInstances(); fetchTemplates(); fetchBmAccounts(); }}
+            numbers={instances}
+            selectedId={selectedBmId}
+            onSelect={setSelectedBmId}
+            onOpenModels={(id) => { setTemplateAccountFilter(id); setActiveSubTab('templates'); }}
           />
-          {/* Card de Instâncias Conectadas */}
+          {/* Card de Instâncias Conectadas (visão geral; some quando uma BM está selecionada) */}
+          {!selectedBmId && (
           <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-2xs space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-neutral-100 pb-3">
               <div>
@@ -1249,6 +1255,8 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
               </div>
             </div>
           </div>
+
+          )}
 
           {/* Avançado: recolhido por padrão (configuração inicial e standby da FluxoAPI) */}
           <details className="group rounded-2xl border border-neutral-200 bg-white shadow-2xs">
