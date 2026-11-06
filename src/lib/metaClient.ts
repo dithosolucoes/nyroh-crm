@@ -29,8 +29,8 @@ export function verifyMetaSignature(rawBody: string, signatureHeader: string | u
   return { isValid: true };
 }
 
-async function graphRequest(method: 'GET' | 'POST', path: string, body?: unknown): Promise<{ success: boolean; status: number; data: any; error?: string }> {
-  const { accessToken } = getMetaCredentials();
+async function graphRequest(method: 'GET' | 'POST' | 'DELETE', path: string, body?: unknown, tokenOverride?: string): Promise<{ success: boolean; status: number; data: any; error?: string }> {
+  const accessToken = tokenOverride || getMetaCredentials().accessToken;
   if (!accessToken) return { success: false, status: 0, data: null, error: 'META_ACCESS_TOKEN não configurado.' };
   try {
     const res = await fetch(`${GRAPH_BASE}${path}`, {
@@ -54,15 +54,133 @@ function toMetaPhone(phone: string): string {
   return String(phone || '').replace(/\D/g, '');
 }
 
-export async function metaSendText(to: string, body: string) {
-  const { phoneNumberId } = getMetaCredentials();
-  if (!phoneNumberId) return { success: false, status: 0, data: null, error: 'META_PHONE_NUMBER_ID não configurado.' };
-  return graphRequest('POST', `/${phoneNumberId}/messages`, {
+
+// ============================================================================
+// MULTI-BM / MULTI-NÚMERO
+// ============================================================================
+// Contas (BM/WABA) cadastradas no CRM ficam no banco com o token CRIPTOGRAFADO (AES-256-GCM).
+// O servidor carrega esse registro em memória; cada número aponta para a conta dona, e assim
+// envio, leitura e download de mídia usam o token certo para o número certo.
+// Sem registro, tudo cai no conjunto META_* do ambiente (conta "env"), como antes.
+
+export interface MetaAccountRecord {
+  id: string;
+  name: string;
+  wabaId: string;
+  businessId?: string | null;
+  accessToken: string; // já em claro só na memória; no banco fica criptografado
+}
+
+export interface MetaNumberRecord {
+  phoneNumberId: string;
+  accountId: string;
+  displayPhoneNumber: string;
+  verifiedName?: string | null;
+  qualityRating?: string | null;
+  status?: string | null;
+}
+
+const metaAccountsById = new Map<string, MetaAccountRecord>();
+const metaNumberRoute = new Map<string, MetaNumberRecord>();
+
+export function setMetaRegistry(accounts: MetaAccountRecord[], numbers: MetaNumberRecord[]) {
+  metaAccountsById.clear();
+  metaNumberRoute.clear();
+  for (const a of accounts) metaAccountsById.set(a.id, a);
+  for (const n of numbers) metaNumberRoute.set(n.phoneNumberId, n);
+}
+
+export function listMetaRegistry() {
+  return {
+    accounts: Array.from(metaAccountsById.values()).map(a => ({ id: a.id, name: a.name, wabaId: a.wabaId, businessId: a.businessId || null })),
+    numbers: Array.from(metaNumberRoute.values())
+  };
+}
+
+/** Token + número usados para um phone_number_id: o registro cadastrado, ou o do ambiente. */
+export function resolveMetaSender(phoneNumberId?: string | null): { accessToken: string; phoneNumberId: string; wabaId: string; accountId: string } {
+  const env = getMetaCredentials();
+  const pid = String(phoneNumberId || '').trim();
+  if (pid) {
+    const route = metaNumberRoute.get(pid);
+    if (route) {
+      const acc = metaAccountsById.get(route.accountId);
+      if (acc) return { accessToken: acc.accessToken, phoneNumberId: pid, wabaId: acc.wabaId, accountId: acc.id };
+    }
+  }
+  // Sem número escolhido nem número no ambiente: usa o primeiro número cadastrado no CRM
+  if (!pid && !env.phoneNumberId) {
+    const first = Array.from(metaNumberRoute.values())[0];
+    if (first) {
+      const acc = metaAccountsById.get(first.accountId);
+      if (acc) return { accessToken: acc.accessToken, phoneNumberId: first.phoneNumberId, wabaId: acc.wabaId, accountId: acc.id };
+    }
+  }
+  return { accessToken: env.accessToken, phoneNumberId: pid || env.phoneNumberId, wabaId: env.wabaId, accountId: 'env' };
+}
+
+/** Criptografia do token no banco. Chave: META_TOKEN_ENCRYPTION_KEY (qualquer texto longo, guardado no Railway). */
+function encryptionKey(): Buffer {
+  const raw = (process.env.META_TOKEN_ENCRYPTION_KEY || '').trim();
+  if (!raw) throw new Error('META_TOKEN_ENCRYPTION_KEY não configurada: não dá para guardar token de outra BM.');
+  return crypto.createHash('sha256').update(raw).digest();
+}
+
+export function encryptMetaToken(plain: string): string {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', encryptionKey(), iv);
+  const enc = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return ['v1', iv.toString('base64'), tag.toString('base64'), enc.toString('base64')].join(':');
+}
+
+export function decryptMetaToken(payload: string): string {
+  const [v, ivB64, tagB64, dataB64] = String(payload).split(':');
+  if (v !== 'v1' || !ivB64 || !tagB64 || !dataB64) throw new Error('Token criptografado em formato desconhecido.');
+  const decipher = crypto.createDecipheriv('aes-256-gcm', encryptionKey(), Buffer.from(ivB64, 'base64'));
+  decipher.setAuthTag(Buffer.from(tagB64, 'base64'));
+  return Buffer.concat([decipher.update(Buffer.from(dataB64, 'base64')), decipher.final()]).toString('utf8');
+}
+
+/** Baixa uma mídia recebida: pega a URL temporária na Graph API e baixa com o token da conta dona do número. */
+export async function metaDownloadMedia(mediaId: string, phoneNumberId?: string | null): Promise<{ success: boolean; buffer?: Buffer; contentType?: string; error?: string; status?: number }> {
+  const sender = resolveMetaSender(phoneNumberId);
+  if (!sender.accessToken) return { success: false, error: 'Token da Meta não configurado.', status: 0 };
+  const meta = await graphRequest('GET', `/${encodeURIComponent(mediaId)}`, undefined, sender.accessToken);
+  if (!meta.success || !meta.data?.url) return { success: false, error: meta.error || 'Meta não devolveu a URL da mídia.', status: meta.status };
+  try {
+    const res = await fetch(meta.data.url, { headers: { Authorization: `Bearer ${sender.accessToken}` } });
+    if (!res.ok) return { success: false, error: `Download da mídia falhou (HTTP ${res.status}).`, status: res.status };
+    const buffer = Buffer.from(await res.arrayBuffer());
+    return { success: true, buffer, contentType: meta.data.mime_type || res.headers.get('content-type') || undefined };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Falha de rede no download da mídia.', status: 0 };
+  }
+}
+
+/** Busca os números e modelos de UMA conta (BM) direto da Meta, para sincronizar. */
+export async function metaSyncAccount(account: MetaAccountRecord) {
+  const [phones, templates] = await Promise.all([
+    graphRequest('GET', `/${account.wabaId}/phone_numbers?fields=id,display_phone_number,verified_name,quality_rating,status,name_status&limit=100`, undefined, account.accessToken),
+    graphRequest('GET', `/${account.wabaId}/message_templates?fields=id,name,language,status,category,components,quality_score,rejected_reason&limit=200`, undefined, account.accessToken)
+  ]);
+  return { phones, templates };
+}
+
+/** Valida um token antes de cadastrar: a Meta responde com o nome da conta. */
+export async function metaValidateToken(accessToken: string) {
+  return graphRequest('GET', '/me?fields=id,name', undefined, accessToken);
+}
+
+export async function metaSendText(to: string, body: string, phoneNumberId?: string) {
+  const sender = resolveMetaSender(phoneNumberId);
+  if (!sender.phoneNumberId) return { success: false, status: 0, data: null, error: 'META_PHONE_NUMBER_ID não configurado.' };
+  return graphRequest('POST', `/${sender.phoneNumberId}/messages`, {
     messaging_product: 'whatsapp',
     to: toMetaPhone(to),
     type: 'text',
     text: { body }
-  });
+  }, sender.accessToken);
 }
 
 /**
@@ -75,21 +193,24 @@ export async function metaSendTemplate(opts: {
   language?: string;
   variables?: Record<string, string>;
   headerImageUrl?: string;
+  phoneNumberId?: string;
 }) {
-  const { phoneNumberId } = getMetaCredentials();
-  if (!phoneNumberId) return { success: false, status: 0, data: null, error: 'META_PHONE_NUMBER_ID não configurado.' };
+  const sender = resolveMetaSender(opts.phoneNumberId);
+  if (!sender.phoneNumberId) return { success: false, status: 0, data: null, error: 'META_PHONE_NUMBER_ID não configurado.' };
 
   const components: any[] = [];
   if (opts.headerImageUrl) {
     components.push({ type: 'header', parameters: [{ type: 'image', image: { link: opts.headerImageUrl } }] });
   }
   const vars = opts.variables || {};
-  const keys = Object.keys(vars).sort((a, b) => Number(a) - Number(b));
+  const rawKeys = Object.keys(vars);
+  const allNumeric = rawKeys.length > 0 && rawKeys.every(k => /^\d+$/.test(k));
+  const keys = allNumeric ? rawKeys.sort((a, b) => Number(a) - Number(b)) : rawKeys;
   if (keys.length) {
     components.push({ type: 'body', parameters: keys.map(k => ({ type: 'text', text: String(vars[k] ?? '') })) });
   }
 
-  return graphRequest('POST', `/${phoneNumberId}/messages`, {
+  return graphRequest('POST', `/${sender.phoneNumberId}/messages`, {
     messaging_product: 'whatsapp',
     to: toMetaPhone(opts.to),
     type: 'template',
@@ -98,7 +219,7 @@ export async function metaSendTemplate(opts: {
       language: { code: opts.language || 'pt_BR' },
       ...(components.length ? { components } : {})
     }
-  });
+  }, sender.accessToken);
 }
 
 /** Lista os números da conta WABA (para o CRM mostrar o que já está na Meta). */
@@ -112,5 +233,57 @@ export async function metaListPhoneNumbers() {
 export async function metaListTemplates() {
   const { wabaId } = getMetaCredentials();
   if (!wabaId) return { success: false, status: 0, data: null, error: 'META_WABA_ID não configurado.' };
-  return graphRequest('GET', `/${wabaId}/message_templates?fields=name,language,status,category,components&limit=200`);
+  return graphRequest('GET', `/${wabaId}/message_templates?fields=id,name,language,status,category,components,quality_score,rejected_reason&limit=200`);
+}
+
+/** Envia mídia por link HTTPS (imagem, vídeo, áudio ou documento). */
+export async function metaSendMedia(opts: {
+  to: string;
+  kind: 'image' | 'video' | 'audio' | 'document';
+  link: string;
+  caption?: string;
+  filename?: string;
+  phoneNumberId?: string;
+}) {
+  const sender = resolveMetaSender(opts.phoneNumberId);
+  if (!sender.phoneNumberId) return { success: false, status: 0, data: null, error: 'META_PHONE_NUMBER_ID não configurado.' };
+  const media: Record<string, string> = { link: opts.link };
+  if (opts.caption && opts.kind !== 'audio') media.caption = opts.caption;
+  if (opts.filename && opts.kind === 'document') media.filename = opts.filename;
+  return graphRequest('POST', `/${sender.phoneNumberId}/messages`, {
+    messaging_product: 'whatsapp',
+    to: toMetaPhone(opts.to),
+    type: opts.kind,
+    [opts.kind]: media
+  }, sender.accessToken);
+}
+
+/** Marca uma mensagem recebida como lida (aparece o "visto azul" para o cliente). */
+export async function metaMarkRead(messageId: string, phoneNumberId?: string) {
+  const sender = resolveMetaSender(phoneNumberId);
+  if (!sender.phoneNumberId) return { success: false, status: 0, data: null, error: 'META_PHONE_NUMBER_ID não configurado.' };
+  return graphRequest('POST', `/${sender.phoneNumberId}/messages`, {
+    messaging_product: 'whatsapp',
+    status: 'read',
+    message_id: messageId
+  }, sender.accessToken);
+}
+
+/** Cria um modelo na conta WABA. O status inicial é PENDING até a Meta revisar. */
+export async function metaCreateTemplate(payload: {
+  name: string;
+  language: string;
+  category: 'MARKETING' | 'UTILITY' | 'AUTHENTICATION';
+  components: any[];
+}) {
+  const { wabaId } = getMetaCredentials();
+  if (!wabaId) return { success: false, status: 0, data: null, error: 'META_WABA_ID não configurado.' };
+  return graphRequest('POST', `/${wabaId}/message_templates`, payload);
+}
+
+/** Apaga um modelo pelo nome (apaga todas as versões de idioma com esse nome). */
+export async function metaDeleteTemplate(name: string) {
+  const { wabaId } = getMetaCredentials();
+  if (!wabaId) return { success: false, status: 0, data: null, error: 'META_WABA_ID não configurado.' };
+  return graphRequest('DELETE', `/${wabaId}/message_templates?name=${encodeURIComponent(name)}`);
 }

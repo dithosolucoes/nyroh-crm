@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { isUiFlagOn } from '../lib/uiFlags';
 const SHOW_LAB = isUiFlagOn(import.meta.env.VITE_MOSTRAR_LAB);
 import { useRuntimeConfig, formatInstancePhone } from '../lib/useRuntimeConfig';
+import { onRealtime } from '../lib/realtime';
+import MetaAccountsPanel from './MetaAccountsPanel';
 import {
   MessageSquare,
   CheckCircle2,
@@ -365,6 +367,16 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
     fetchInstances();
     fetchTemplates();
     fetchWebhookEvents();
+  }, []);
+
+  // Status de aprovação chega pelo webhook da Meta (APPROVED / REJECTED): atualiza a lista sem recarregar a página
+  useEffect(() => {
+    const off = onRealtime('TEMPLATE_STATUS_UPDATE', (p: any) => {
+      fetchTemplates();
+      if (p?.templateName) onShowToast(`Modelo "${p.templateName}" agora está ${String(p.status || '').toLowerCase()}.`);
+    });
+    return off;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Save config handler
@@ -1013,6 +1025,10 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
 
   return (
     <div className="space-y-6 animate-in fade-in duration-200">
+      <MetaAccountsPanel
+        onShowToast={onShowToast}
+        onAccountsChanged={() => { fetchInstances(); fetchTemplates(); }}
+      />
       {/* Top Banner Oficial */}
       <div className="bg-gradient-to-r from-emerald-900 via-emerald-850 to-neutral-900 rounded-2xl p-6 text-white border border-emerald-800 shadow-md">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
