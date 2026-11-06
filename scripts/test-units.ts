@@ -14,6 +14,7 @@ import { buildTemplatePayload, sanitizeTemplateValue, type CatalogTemplate } fro
 import { isWindowOpen, windowExpiryFromInbound, latestExpiry, WINDOW_MS } from '../src/lib/windowUtil';
 import { arePhonesEquivalent, phoneDigitVariants, normalizeE164Phone, formatAndValidateE164Phone } from '../src/lib/phone';
 import { verifyFluxoWebhook } from '../src/lib/webhookAuth';
+import { missingFluxoVars, summarizeFluxoInstance } from '../src/lib/fluxoInstanceStatus';
 import { buildFluxoAuthHeaders, fluxoInstancePath, prepareOutboundMedia } from '../src/lib/fluxoClient';
 import { extensionFor, saveMediaBuffer } from '../src/lib/mediaStorage';
 import { effectiveSpeedPerSecond, dispatchRpm, planRpm, delayForIndex, maxDispatchPerSecond, FluxoRateLimitedError } from '../src/lib/dispatchRate';
@@ -423,6 +424,30 @@ async function main() {
   group('Tokens da copy: campos do lead e do vendedor (resolvidos antes do envio)');
   {
     const ctx = { leadName: 'Marcelo Silva', sellerName: 'Thomas', publicUrl: 'https://p.nyroh.com.br/x', website: 'https://antigo.com.br', phoneNumber: '+5531999990000', niche: 'Marcenaria', now: new Date(2026, 10, 6, 9, 30) };
+
+    test('status FluxoAPI: lista variáveis faltando na ordem certa', () => {
+      assert.deepEqual(missingFluxoVars({ key: true, secret: true, instanceId: true, webhookSecret: true }), []);
+      assert.deepEqual(
+        missingFluxoVars({ key: false, secret: true, instanceId: false, webhookSecret: true }),
+        ['FLUXO_KEY', 'FLUXO_INSTANCE_ID']
+      );
+    });
+
+    test('status FluxoAPI: instância No ar é reconhecida pelo id', () => {
+      const list = [{ id: 'inst_outra', status: 'connected' }, { id: 'inst_1', status: 'CONNECTED', name: 'NYROH', phone: '5531' }];
+      const r = summarizeFluxoInstance(list, 'inst_1');
+      assert.equal(r.found, true);
+      assert.equal(r.status, 'no_ar');
+      assert.equal(r.name, 'NYROH');
+    });
+
+    test('status FluxoAPI: instância ausente ou sem id não passa como conectada', () => {
+      assert.equal(summarizeFluxoInstance([{ id: 'inst_x' }], 'inst_1').found, false);
+      assert.equal(summarizeFluxoInstance([], '').status, 'sem_id');
+      const off = summarizeFluxoInstance([{ id: 'inst_1', status: 'disconnected' }], 'inst_1');
+      assert.equal(off.found, true);
+      assert.notEqual(off.status, 'no_ar');
+    });
 
     test('tokens legados: {nome} vira primeiro nome, {empresa} vira nome do lead', () => {
       const r = resolveLeadTokens('{nome}! Falo com o responsável pela {empresa}?', ctx);
