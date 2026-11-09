@@ -25,7 +25,8 @@ export const ZipUploadModal: React.FC<ZipUploadModalProps> = ({
   onNavigateToDisparos
 }) => {
   const [destination, setDestination] = useState<'campaign' | 'direct'>('campaign');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const selectedFile = selectedFiles[0] || null;
   const [campaignName, setCampaignName] = useState<string>('');
   const [isUploading, setIsUploading] = useState(false);
   const [progressMessage, setProgressMessage] = useState<string>('');
@@ -77,16 +78,15 @@ export const ZipUploadModal: React.FC<ZipUploadModalProps> = ({
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      const lower = file.name.toLowerCase();
-      if (lower.endsWith('.zip') || lower.endsWith('.json')) {
-        setSelectedFile(file);
-        setImportResult(null);
-      } else {
-        onShowToast('Por favor, selecione um arquivo no formato .ZIP ou .JSON');
-      }
+    const files = Array.from(e.target.files || []);
+    const valid = files.filter(f => /\.(zip|json)$/i.test(f.name));
+    if (valid.length > 0) {
+      setSelectedFiles(valid);
+      setImportResult(null);
+    } else if (files.length > 0) {
+      onShowToast('Por favor, selecione um arquivo no formato .ZIP ou .JSON');
     }
+    e.target.value = '';
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -95,19 +95,18 @@ export const ZipUploadModal: React.FC<ZipUploadModalProps> = ({
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const file = e.dataTransfer.files[0];
-      const lower = file.name.toLowerCase();
-      if (lower.endsWith('.zip') || lower.endsWith('.json')) {
-        setSelectedFile(file);
-        setImportResult(null);
-      } else {
-        onShowToast('Selecione um arquivo .ZIP ou .JSON válido.');
-      }
+    const files = Array.from(e.dataTransfer.files || []);
+    const valid = files.filter(f => /\.(zip|json)$/i.test(f.name));
+    if (valid.length > 0) {
+      setSelectedFiles(valid);
+      setImportResult(null);
+    } else if (files.length > 0) {
+      onShowToast('Selecione um arquivo .ZIP ou .JSON válido.');
     }
   };
 
-  const handleUploadZip = async () => {
+  const uploadOne = async (fileToUpload: File) => {
+    const selectedFile = fileToUpload;
     if (!selectedFile) return;
 
     if (destination === 'campaign') {
@@ -460,6 +459,13 @@ export const ZipUploadModal: React.FC<ZipUploadModalProps> = ({
       setProgressMessage('');
     }
   };
+  const handleUploadZip = async () => {
+    // Sobe todos os arquivos escolhidos, um por vez
+    const list = [...selectedFiles];
+    for (const f of list) await uploadOne(f);
+    setSelectedFiles([]);
+  };
+
 
   return (
     <div className="flex-1 flex flex-col h-full min-h-0 bg-[#f8f9fa] overflow-y-auto">
@@ -544,6 +550,7 @@ export const ZipUploadModal: React.FC<ZipUploadModalProps> = ({
               ref={fileInputRef}
               type="file"
               accept=".zip"
+              multiple
               onChange={handleFileChange}
               className="hidden"
             />
