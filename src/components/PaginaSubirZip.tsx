@@ -204,37 +204,46 @@ export const TabelaHistoricoZips: React.FC<TabelaProps> = ({ historico, carregan
       </div>
     ) : (
       <div className="overflow-x-auto">
-        <table className="w-full text-xs">
+        <table className="w-full text-xs table-fixed">
+          <colgroup>
+            <col className="w-[118px]" />
+            <col />
+            <col className="w-[78px]" />
+            <col className="w-[120px]" />
+            <col className="w-[112px]" />
+            <col className="w-[150px]" />
+          </colgroup>
           <thead className="bg-neutral-50 text-neutral-500">
             <tr className="text-left">
-              <th className="px-4 py-2 font-semibold">Data</th>
-              <th className="px-4 py-2 font-semibold">Nome do ZIP</th>
-              <th className="px-4 py-2 font-semibold">Safra</th>
-              <th className="px-4 py-2 font-semibold text-right">Leads no ZIP</th>
-              <th className="px-4 py-2 font-semibold text-right">Gravados</th>
-              <th className="px-4 py-2 font-semibold text-right">Já disparados</th>
-              <th className="px-4 py-2 font-semibold text-right">Repetidos</th>
-              <th className="px-4 py-2 font-semibold text-right">Celulares</th>
-              <th className="px-4 py-2 font-semibold text-right">Fixos</th>
-              <th className="px-4 py-2 font-semibold text-right">Tamanho</th>
-              <th className="px-4 py-2"></th>
+              <th className="px-3 py-2 font-semibold">Data</th>
+              <th className="px-3 py-2 font-semibold">Arquivo e safra</th>
+              <th className="px-3 py-2 font-semibold text-right">No ZIP</th>
+              <th className="px-3 py-2 font-semibold text-right">Gravados</th>
+              <th className="px-3 py-2 font-semibold text-right">Celulares e fixos</th>
+              <th className="px-3 py-2 font-semibold text-right">Ações</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100">
             {historico.map((h) => (
-              <tr key={h.id} className="hover:bg-neutral-50">
-                <td className="px-4 py-2.5 whitespace-nowrap text-neutral-700">{dataHora(h.createdAt)}</td>
-                <td className="px-4 py-2.5 font-semibold text-neutral-900 max-w-[260px] truncate" title={h.fileName}>{h.fileName}</td>
-                <td className="px-4 py-2.5 text-neutral-600 max-w-[200px] truncate" title={h.batchName || ''}>{h.batchName || '—'}</td>
-                <td className="px-4 py-2.5 text-right font-mono font-bold text-neutral-900">{numero(h.leadsInZip)}</td>
-                <td className="px-4 py-2.5 text-right font-mono text-emerald-700">{numero(h.leadsSaved)}</td>
-                <td className="px-4 py-2.5 text-right font-mono text-neutral-600">{numero(h.skippedContacted)}</td>
-                <td className="px-4 py-2.5 text-right font-mono text-neutral-600">{numero(h.skippedRepeated)}</td>
-                <td className="px-4 py-2.5 text-right font-mono text-neutral-700">{numero(h.validMobiles)}</td>
-                <td className="px-4 py-2.5 text-right font-mono text-neutral-700">{numero(h.landlines)}</td>
-                <td className="px-4 py-2.5 text-right text-neutral-500">{tamanho(h.fileSizeBytes)}</td>
-                <td className="px-4 py-2.5 text-right">
-                  <div className="flex items-center justify-end gap-3">
+              <tr key={h.id} className="hover:bg-neutral-50 align-top">
+                <td className="px-3 py-2.5 whitespace-nowrap text-neutral-700">{dataHora(h.createdAt)}</td>
+                <td className="px-3 py-2.5 min-w-0">
+                  <div className="font-semibold text-neutral-900 truncate" title={h.fileName}>{h.fileName}</div>
+                  <div className="text-[11px] text-neutral-500 truncate" title={h.batchName || ''}>
+                    {h.batchName || '—'} · {tamanho(h.fileSizeBytes)}
+                  </div>
+                </td>
+                <td className="px-3 py-2.5 text-right font-mono font-bold text-neutral-900">{numero(h.leadsInZip)}</td>
+                <td className="px-3 py-2.5 text-right">
+                  <div className="font-mono font-bold text-emerald-700">{numero(h.leadsSaved)}</div>
+                  <div className="text-[10px] text-neutral-500">{numero(h.skippedRepeated)} repetidos · {numero(h.skippedContacted)} já disparados</div>
+                </td>
+                <td className="px-3 py-2.5 text-right">
+                  <div className="font-mono text-neutral-800">{numero(h.validMobiles)} celulares</div>
+                  <div className="text-[10px] text-neutral-500">{numero(h.landlines)} fixos</div>
+                </td>
+                <td className="px-3 py-2.5">
+                  <div className="flex flex-col items-end gap-1.5">
                     {h.batchId && onAbrirSafra && (
                       <button type="button" onClick={() => onAbrirSafra(h.batchId as string)} className="text-xs font-semibold text-blue-700 hover:underline">
                         Abrir safra
@@ -253,7 +262,7 @@ export const TabelaHistoricoZips: React.FC<TabelaProps> = ({ historico, carregan
                           window.alert('Falha de conexão ao apagar o ZIP.');
                         }
                       }}
-                      className="text-xs font-semibold text-red-700 hover:underline"
+                      className="px-2.5 py-1 rounded-md border border-red-200 text-red-700 text-xs font-semibold hover:bg-red-50"
                     >
                       Apagar
                     </button>
