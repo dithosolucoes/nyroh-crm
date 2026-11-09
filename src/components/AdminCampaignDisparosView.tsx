@@ -3329,9 +3329,12 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
                   type="file"
                   ref={stagingZipInputRef}
                   accept=".zip"
-                  onChange={e => {
-                    const file = e.target.files?.[0];
-                    if (file) handleUploadZip(file);
+                  multiple
+                  onChange={async e => {
+                    // Vários ZIPs de uma vez: sobe um por vez, na ordem escolhida
+                    const files = Array.from(e.target.files || []);
+                    e.target.value = '';
+                    for (const f of files) await handleUploadZip(f);
                   }}
                   className="hidden"
                 />
@@ -3353,9 +3356,9 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
                 onDrop={e => {
                   e.preventDefault();
                   setIsDragOverStaging(false);
-                  const file = e.dataTransfer.files[0];
-                  if (file && file.name.endsWith('.zip')) {
-                    handleUploadZip(file);
+                  const zips = Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.zip'));
+                  if (zips.length > 0) {
+                    (async () => { for (const f of zips) await handleUploadZip(f); })();
                   } else {
                     showNotification('error', 'Por favor, solte um arquivo .ZIP válido.');
                   }
