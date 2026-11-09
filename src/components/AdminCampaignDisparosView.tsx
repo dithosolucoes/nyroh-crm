@@ -303,6 +303,16 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   }, [metaTemplatesList, selectedTemplate]);
 
 
+  // Copies por índice do modelo ativo ({{n}} -> texto do montador). Sem modelo carregado, não envia (cai no padrão antigo).
+  const copiesByIndexForClient = (): Record<string, string> | undefined => {
+    const idx = templateVarIndexes(activeMetaTemplate?.bodyText || '');
+    if (idx.length === 0) return undefined;
+    const src: Record<number, string> = { 1: templateVar1, 2: templateVar2, 3: templateVar3 };
+    const out: Record<string, string> = {};
+    for (const n of idx) out[String(n)] = n <= 3 ? src[n] : '';
+    return out;
+  };
+
   // Limite oficial da Meta para o CORPO do template (texto fixo + variáveis somados): 1024 caracteres.
   // Cada variável pode ocupar o corpo inteiro; o que vale é o total renderizado.
   const META_BODY_MAX = 1024;
@@ -1184,7 +1194,8 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
           variableValues: {
             var1: templateVar1,
             var2: templateVar2,
-            var3: templateVar3
+            var3: templateVar3,
+            byIndex: copiesByIndexForClient()
           }
         })
       });
@@ -1315,7 +1326,8 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
             variableValues: {
               var1: templateVar1.slice(0, META_CHAR_LIMITS.var1),
               var2: templateVar2.slice(0, META_CHAR_LIMITS.var2),
-              var3: templateVar3.slice(0, META_CHAR_LIMITS.var3)
+              var3: templateVar3.slice(0, META_CHAR_LIMITS.var3),
+              byIndex: copiesByIndexForClient()
             }
           })
         });
@@ -1399,7 +1411,8 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
           variableValues: {
             var1: templateVar1.slice(0, META_CHAR_LIMITS.var1),
             var2: templateVar2.slice(0, META_CHAR_LIMITS.var2),
-            var3: templateVar3.slice(0, META_CHAR_LIMITS.var3)
+            var3: templateVar3.slice(0, META_CHAR_LIMITS.var3),
+            byIndex: copiesByIndexForClient()
           }
         })
       });

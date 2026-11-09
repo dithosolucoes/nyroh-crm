@@ -17,6 +17,7 @@ import { verifyFluxoWebhook } from '../src/lib/webhookAuth';
 import { missingFluxoVars, summarizeFluxoInstance } from '../src/lib/fluxoInstanceStatus';
 import { buildFluxoAudioMedia, isFluxoAudioVoiceEnabled } from '../src/lib/fluxoAudio';
 import { parseTemplateBody, templateVarIndexes, renderTemplateBody } from '../src/lib/templateSegments';
+import { buildTemplateVariables, fillLeadTokens } from '../src/lib/templateCopy';
 import { buildFluxoAuthHeaders, fluxoInstancePath, prepareOutboundMedia } from '../src/lib/fluxoClient';
 import { extensionFor, saveMediaBuffer } from '../src/lib/mediaStorage';
 import { effectiveSpeedPerSecond, dispatchRpm, planRpm, delayForIndex, maxDispatchPerSecond, FluxoRateLimitedError } from '../src/lib/dispatchRate';
@@ -426,6 +427,20 @@ async function main() {
   group('Tokens da copy: campos do lead e do vendedor (resolvidos antes do envio)');
   {
     const ctx = { leadName: 'Marcelo Silva', sellerName: 'Thomas', publicUrl: 'https://p.nyroh.com.br/x', website: 'https://antigo.com.br', phoneNumber: '+5531999990000', niche: 'Marcenaria', now: new Date(2026, 10, 6, 9, 30) };
+
+    test('copy sobre o modelo: cada índice vira uma variável do lead', () => {
+      const ctx = { firstName: 'Roberto', company: 'Padaria Estrela', seller: 'Thomas', url: 'https://x.app/p' };
+      assert.equal(fillLeadTokens('{nome}, {empresa} com {vendedor}', ctx), 'Roberto, Padaria Estrela com Thomas');
+      const r = buildTemplateVariables({ 1: 'Oi {nome}', 2: '{site_novo}' }, ctx);
+      assert.deepEqual(r.variables, { '1': 'Oi Roberto', '2': 'https://x.app/p' });
+      assert.deepEqual(r.empty, []);
+    });
+
+    test('copy sobre o modelo: índice vazio é reportado e não vai para o envio', () => {
+      const ctx = { firstName: 'Ana', company: 'X', seller: 'T', url: 'u' };
+      const r = buildTemplateVariables({ 1: 'Oi {nome}', 2: '   ' }, ctx);
+      assert.deepEqual(r.empty, [2]);
+    });
 
     test('modelo Meta: separa texto fixo de variável na ordem certa', () => {
       assert.deepEqual(parseTemplateBody('Oi {{1}}, tudo bem? {{2}}'), [
