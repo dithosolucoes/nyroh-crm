@@ -1772,6 +1772,25 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
               </summary>
               <div className="absolute right-0 mt-2 w-80 bg-white border border-neutral-200 rounded-xl shadow-xl p-2 z-30 space-y-1">
                 <button
+                  onClick={async () => {
+                    if (!window.confirm('Juntar na Fila de disparos todos os leads em espera das safras antigas? Um backup de origem fica guardado.')) return;
+                    try {
+                      const r = await fetch('/api/admin/campaign/merge-into-fila', { method: 'POST' });
+                      const d = await r.json();
+                      window.alert(d.success ? `Leads juntados na fila: ${d.moved}.` : `Não consegui juntar: ${d.error}`);
+                      setSelectedBatchId('fila-geral');
+                      fetchBatches();
+                      fetchLeads();
+                    } catch {
+                      window.alert('Falha de conexão ao juntar leads na fila.');
+                    }
+                  }}
+                  className="w-full text-left p-2.5 rounded-lg hover:bg-sky-50"
+                >
+                  <p className="text-xs font-bold text-sky-900">Juntar leads na Fila de disparos</p>
+                  <p className="text-[11px] text-neutral-500">Move para a fila todos os leads em espera das safras antigas. Não apaga nada.</p>
+                </button>
+                <button
                   onClick={handleReturnUnsent}
                   className="w-full text-left p-2.5 rounded-lg hover:bg-emerald-50"
                 >
