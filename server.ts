@@ -11557,6 +11557,47 @@ app.post('/api/campaign/batches/:batchId/sync-whatsapp-web', async (req: any, re
 
 // Delete a campaign batch and its staging leads
 // Apaga um ZIP que foi subido por engano (e a safra dele, se for só este ZIP e nenhum lead dela foi disparado).
+// Apagar TODOS os ZIPs de uma vez. Só apaga safras sem lead já disparado. Com dryRun (padrão) só conta.
+app.post('/api/campaign/uploads/apagar-todos', async (req: any, res) => {
+  if (!isUserAdmin(req.user)) return res.status(403).json({ error: 'Acesso restrito ao Administrador.' });
+  if (!usePostgres || !pgPool) return res.status(503).json({ error: 'Apagar exige o banco de dados.' });
+  const dryRun = req.body?.dryRun !== false;
+  try {
+    const r = await pgPool.query(`
+      SELECT b.id,
+             (SELECT COUNT(*)::int FROM zip_uploads u WHERE u.batch_id = b.id) AS zips,
+             (SELECT COUNT(*)::int FROM campaign_leads l WHERE l.batch_id = b.id AND l.status <> 'STAGING') AS nao_staging,
+             (SELECT COUNT(*)::int FROM campaign_leads l WHERE l.batch_id = b.id AND l.status = 'STAGING') AS staging
+        FROM campaign_batches b
+       WHERE EXISTS (SELECT 1 FROM zip_uploads u WHERE u.batch_id = b.id)`);
+    const orfaos = await pgPool.query(
+      `SELECT COUNT(*)::int AS n FROM zip_uploads WHERE batch_id IS NULL OR batch_id NOT IN (SELECT id FROM campaign_batches)`);
+    const apagaveis = r.rows.filter((x: any) => x.nao_staging === 0);
+    const bloqueadas = r.rows.filter((x: any) => x.nao_staging > 0);
+    const resumo = {
+      safras: apagaveis.length,
+      zips: apagaveis.reduce((a: number, x: any) => a + x.zips, 0) + orfaos.rows[0].n,
+      leads: apagaveis.reduce((a: number, x: any) => a + x.staging, 0),
+      bloqueadas: bloqueadas.length,
+      leadsBloqueados: bloqueadas.reduce((a: number, x: any) => a + x.nao_staging, 0)
+    };
+    if (dryRun) return res.json({ dryRun: true, ...resumo });
+
+    for (const x of apagaveis) {
+      await pgPool.query('DELETE FROM campaign_leads WHERE batch_id = $1 AND status = $2', [x.id, 'STAGING']);
+      await pgPool.query('DELETE FROM zip_uploads WHERE batch_id = $1', [x.id]);
+      await pgPool.query('DELETE FROM campaign_batches WHERE id = $1', [x.id]);
+    }
+    await pgPool.query(`DELETE FROM zip_uploads WHERE batch_id IS NULL OR batch_id NOT IN (SELECT id FROM campaign_batches)`);
+    await logAudit('ZIPS_APAGADOS_EM_LOTE', `Apagou ${resumo.zips} ZIP(s) em ${resumo.safras} safra(s); ${resumo.leads} lead(s) em espera`, req);
+    broadcastSSE('CAMPAIGN_BATCH_DELETED', { batchId: null });
+    return res.json({ dryRun: false, ...resumo });
+  } catch (err: any) {
+    console.error('Erro ao apagar ZIPs em lote:', err);
+    return res.status(500).json({ error: 'Erro ao apagar os ZIPs.' });
+  }
+});
+
 app.delete('/api/campaign/uploads/:uploadId', async (req: any, res) => {
   if (!isUserAdmin(req.user)) return res.status(403).json({ error: 'Acesso restrito ao Administrador.' });
   if (!usePostgres || !pgPool) return res.status(503).json({ error: 'Apagar ZIP exige o banco de dados.' });
@@ -11578,7 +11619,7 @@ app.delete('/api/campaign/uploads/:uploadId', async (req: any, res) => {
         'SELECT COUNT(*)::int AS n FROM zip_uploads WHERE batch_id = $1 AND id <> $2', [batchId, uploadId]);
       if (outrosZips.rows[0].n > 0) {
         return res.status(409).json({
-          error: 'Esta safra recebeu outros ZIPs, então este não pode ser apagado sozinho. Se quiser apagar tudo, use a aba Safras. Nada foi apagado.'
+          error: 'Esta safra recebeu outros ZIPs, então este não pode ser apagado sozinho. Use “Apagar safra” para apagar a safra inteira. Nada foi apagado.'
         });
       }
       await pgPool.query('DELETE FROM campaign_leads WHERE batch_id = $1 AND status = $2', [batchId, 'STAGING']);
@@ -11606,6 +11647,7 @@ app.delete('/api/campaign/batches/:batchId', async (req: any, res) => {
         });
       }
       await pgPool.query('DELETE FROM campaign_leads WHERE batch_id = $1', [batchId]);
+      await pgPool.query('DELETE FROM zip_uploads WHERE batch_id = $1', [batchId]);
       await pgPool.query('DELETE FROM campaign_batches WHERE id = $1', [batchId]);
     } else {
       memoryCampaignBatchesMap.delete(batchId);
