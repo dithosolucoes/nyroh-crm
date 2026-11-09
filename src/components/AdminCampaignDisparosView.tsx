@@ -160,6 +160,8 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   const instanceLabel = formatInstancePhone(runtime.instancePhone);
   const [activeTab, setActiveTab] = useState<SubPageTab>('kanban');
   const [batches, setBatches] = useState<CampaignBatch[]>([]);
+  // Safras marcadas para disparo (mais de uma = dispara todas marcadas com a mesma copy e quantidade)
+  const [checkedBatchIds, setCheckedBatchIds] = useState<string[]>([]);
   const [brandOptions, setBrandOptions] = useState<Array<{ id: string; name: string }>>([]);
   useEffect(() => {
     fetch('/api/brands').then(r => (r.ok ? r.json() : [])).then(d => { if (Array.isArray(d)) setBrandOptions(d); }).catch(() => {});
@@ -1277,7 +1279,70 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   };
 
   // Execute Batch Dispatch (Moves selected quantity from Staging -> Quarentena/Espera)
+  // Dispara cada safra marcada, uma após a outra, com a mesma quantidade e copy escolhidas no modal
+  const handleDispatchCheckedBatches = async () => {
+    const targets = checkedBatchIds.filter(id => batches.some(b => b.id === id));
+    if (targets.length === 0) return;
+    const effectiveClosers = dispatchSelectedClosers.length > 0
+      ? dispatchSelectedClosers
+      : [dispatchSelectedCloser || 'seller-thomas'];
+    let limitParam: number | 'ALL' = 'ALL';
+    if (dispatchQuantityOption !== 'ALL') {
+      const parsedQty = Number(customDispatchQuantity);
+      limitParam = parsedQty > 0 ? parsedQty : 100;
+    }
+    setDispatchModalStep('processing');
+    setIsDispatching(true);
+    setDispatchProgress(5);
+    let totalEnviados = 0;
+    const falhas: string[] = [];
+    for (const batchId of targets) {
+      try {
+        const res = await fetch('/api/campaign/dispatch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            batchId,
+            templateName: dispatchSelectedTemplate,
+            quarantineHours: dispatchQuarantineHours,
+            phoneNumberId: dispatchPhoneNumberId || undefined,
+            speedPerSecond: dispatchSpeed,
+            limit: limitParam === 'ALL' ? undefined : limitParam,
+            allowAll: limitParam === 'ALL',
+            salespersonId: effectiveClosers[0],
+            salespersonIds: effectiveClosers,
+            variableValues: {
+              var1: templateVar1.slice(0, META_CHAR_LIMITS.var1),
+              var2: templateVar2.slice(0, META_CHAR_LIMITS.var2),
+              var3: templateVar3.slice(0, META_CHAR_LIMITS.var3)
+            }
+          })
+        });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          totalEnviados += data.enqueuedCount || data.dispatchedCount || 0;
+        } else {
+          falhas.push(`${batches.find(b => b.id === batchId)?.name || batchId}: ${data.error || 'erro'}`);
+        }
+      } catch (err: any) {
+        falhas.push(`${batches.find(b => b.id === batchId)?.name || batchId}: ${err.message}`);
+      }
+    }
+    setDispatchProgress(100);
+    setDispatchModalStep('success');
+    setIsDispatching(false);
+    if (falhas.length === 0) {
+      showNotification('success', `Disparo enfileirado em ${targets.length} safra(s): ${totalEnviados} leads.`);
+    } else {
+      showNotification('error', `Algumas safras não dispararam: ${falhas.join(' | ')}`);
+    }
+    await fetchBatches();
+  };
+
   const handleExecuteBatchDispatch = async () => {
+    if (checkedBatchIds.length > 1) {
+      return handleDispatchCheckedBatches();
+    }
     if (!selectedBatchId) {
       showNotification('error', 'Selecione uma campanha ou safra para disparar.');
       return;
@@ -1725,6 +1790,45 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
               </select>
             </div>
           )}
+          <details className="relative">
+            <summary className="list-none cursor-pointer flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-neutral-50 border border-neutral-300 text-neutral-800 text-xs font-bold select-none">
+              <span>Safras para disparo ({checkedBatchIds.length || 0} marcada{checkedBatchIds.length === 1 ? '' : 's'})</span>
+              <span className="text-neutral-400">▾</span>
+            </summary>
+            <div className="absolute left-0 mt-2 w-80 bg-white border border-neutral-200 rounded-xl shadow-xl p-2 z-30 space-y-1">
+              <div className="flex items-center justify-between px-2 pb-1">
+                <button
+                  type="button"
+                  onClick={() => setCheckedBatchIds(batches.map(b => b.id))}
+                  className="text-[11px] font-bold text-emerald-700 hover:underline"
+                >
+                  Marcar todas
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCheckedBatchIds([])}
+                  className="text-[11px] font-bold text-neutral-500 hover:underline"
+                >
+                  Limpar
+                </button>
+              </div>
+              {batches.length === 0 && (
+                <p className="px-2 py-2 text-[11px] text-neutral-500">Nenhuma safra criada ainda.</p>
+              )}
+              {batches.map(b => (
+                <label key={b.id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-neutral-50 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={checkedBatchIds.includes(b.id)}
+                    onChange={e => setCheckedBatchIds(prev => e.target.checked ? [...prev, b.id] : prev.filter(x => x !== b.id))}
+                    className="w-4 h-4 accent-emerald-600"
+                  />
+                  <span className="text-xs text-neutral-900 flex-1 truncate">{b.name}</span>
+                  <span className="text-[11px] text-neutral-500">{b.totalLeads} leads</span>
+                </label>
+              ))}
+            </div>
+          </details>
           <div className="flex items-center gap-2 bg-neutral-100 border border-neutral-200 rounded-xl px-3 py-1.5">
             <span className="text-xs text-neutral-500 font-semibold">Campanha:</span>
             <select
