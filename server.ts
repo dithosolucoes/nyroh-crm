@@ -9453,9 +9453,6 @@ app.get('/api/campaign/import-progress/:jobId', (req, res) => {
 
 // 3. Upload ZIP dedicado para a Área de Disparo (Staging Oficial Meta)
 // Otimizado com disco temporário + lotes no Postgres + faxina automática para não estourar RAM da Railway
-const FILA_BATCH_ID = 'fila-geral';
-const FILA_BATCH_NAME = 'Fila de disparos';
-
 app.post('/api/campaign/upload-zip', diskUpload.single('zipFile') as any, async (req: any, res) => {
   const tempFilePath = req.file?.path;
   const jobId = req.body.jobId || `import_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
@@ -9558,11 +9555,39 @@ app.post('/api/campaign/upload-zip', diskUpload.single('zipFile') as any, async 
       return res.status(400).json({ error: 'Nenhum lead encontrado nos arquivos JSON do arquivo ZIP.' });
     }
 
-    // Fila única: todo ZIP sem lote escolhido entra na mesma "Fila de disparos".
-    // O disparo escolhe quantidade e copy na hora (não existe mais uma safra por ZIP).
-    if (!targetBatchId) targetBatchId = FILA_BATCH_ID;
-    {
-      const name = FILA_BATCH_NAME;
+    // Auto-criação da Safra se não foi fornecido um batchId existente
+    if (!targetBatchId) {
+      targetBatchId = `safra-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+      const name = safraName || `Safra Importada ${new Date().toLocaleDateString('pt-BR')} (${rawLeads.length} leads)`;
+
+      if (usePostgres && pgPool) {
+        await pgPool.query(
+          `INSERT INTO campaign_batches (id, name, created_at) VALUES ($1, $2, CURRENT_TIMESTAMP)`,
+          [targetBatchId, name]
+        );
+      } else {
+        memoryCampaignBatchesMap.set(targetBatchId, {
+          id: targetBatchId,
+          name,
+          totalLeads: 0,
+          validMobiles: 0,
+          landlines: 0,
+          withNyrohUrl: 0,
+          withWebsite: 0,
+          status: 'draft',
+          templateName: 'dns_escassez_np4',
+          quarantineHours: 4,
+          allowedClosers: ['seller-thomas'],
+          hotLeadsRetainedByAdmin: true,
+          dispatchedCount: 0,
+          hotCount: 0,
+          coldCount: 0,
+          optOutCount: 0,
+          createdAt: new Date().toISOString()
+        });
+      }
+    } else {
+      const name = safraName || `Safra ${targetBatchId}`;
       if (usePostgres && pgPool) {
         await pgPool.query(
           `INSERT INTO campaign_batches (id, name, created_at) VALUES ($1, $2, CURRENT_TIMESTAMP) ON CONFLICT (id) DO NOTHING`,
