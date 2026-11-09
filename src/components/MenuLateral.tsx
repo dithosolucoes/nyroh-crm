@@ -134,6 +134,7 @@ export const MenuLateral: React.FC<MenuLateralProps> = ({
         { label: 'Etiquetas de ligação', icon: <Tag className={`${iconeCls} text-neutral-500`} />, acao: onOpenTagsModal },
         { label: 'Mensagem do WhatsApp', icon: <MessageSquare className={`${iconeCls} text-neutral-500`} />, acao: onOpenWhatsAppSettings },
         { label: 'Histórico', icon: <Clock className={`${iconeCls} text-neutral-500`} />, destino: { tab: 'admin', section: 'auditoria' } },
+        { label: 'Logs do sistema', icon: <Database className={`${iconeCls} text-neutral-500`} />, destino: { tab: 'admin', section: 'logs' } },
         ...(INFRA_ON
           ? [{ label: 'Infraestrutura', icon: <Database className={`${iconeCls} text-neutral-500`} />, destino: { tab: 'admin' as const, section: 'blindagem' as const } }]
           : [])

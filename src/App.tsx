@@ -839,7 +839,8 @@ export default function App() {
                     adminSection === 'usuarios' ||
                     adminSection === 'carteiras' ||
                     adminSection === 'auditoria' ||
-                    adminSection === 'blindagem'
+                    adminSection === 'blindagem' ||
+                    adminSection === 'logs'
                       ? adminSection
                       : 'cockpit'
                   }

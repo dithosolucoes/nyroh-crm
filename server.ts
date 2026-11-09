@@ -19,6 +19,8 @@ import { performWebsiteAudit } from './src/lib/auditEngine.js';
 import { missingFluxoVars, summarizeFluxoInstance } from './src/lib/fluxoInstanceStatus.js';
 import { buildTemplateVariables } from './src/lib/templateCopy.js';
 import { buildFluxoAudioMedia, isFluxoAudioVoiceEnabled } from './src/lib/fluxoAudio.js';
+import { installLogBuffer, readLogs, logCategories } from './src/lib/logBuffer.js';
+installLogBuffer();
 import { executeFluxoRequest, downloadFluxoMediaBinary, prepareOutboundMedia, fluxoInstancePath, hasFfmpeg } from './src/lib/fluxoClient.js';
 import { setMetaRegistry, listMetaRegistry, encryptMetaToken, decryptMetaToken, metaDownloadMedia, metaSyncAccount, metaValidateToken, resolveMetaAccount, receivingPhoneNumberId, parseCoexistenceEchoes, getEmbeddedSignupConfig, metaExchangeSignupCode, metaSubscribeWaba, metaDiscoverWabaIds, type MetaAccountRecord, type MetaNumberRecord } from './src/lib/metaClient.js';
 import type { FluxoApiResult } from './src/lib/fluxoClient.js';
@@ -2338,6 +2340,21 @@ app.delete('/api/admin/users/:id', async (req: any, res) => {
 });
 
 // 7. Audit Logs
+// Painel de Logs (admin): últimos logs do servidor, com filtro. Atualiza por afterId.
+app.get('/api/admin/logs', (req: any, res) => {
+  if (!req.user || !isUserAdmin(req.user)) {
+    return res.status(403).json({ error: 'Acesso restrito ao Administrador.' });
+  }
+  const logs = readLogs({
+    level: String(req.query.level || ''),
+    category: String(req.query.category || ''),
+    q: String(req.query.q || ''),
+    afterId: Number(req.query.afterId) || 0,
+    limit: Number(req.query.limit) || 500
+  });
+  res.json({ logs, categories: logCategories() });
+});
+
 app.get('/api/admin/audit-logs', async (req: any, res) => {
   if (!req.user || !isUserAdmin(req.user)) {
     return res.status(403).json({ error: 'Acesso restrito ao Administrador.' });

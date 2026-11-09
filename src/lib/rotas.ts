@@ -18,6 +18,7 @@ export type SecaoAdmin =
   | 'configuracoes'
   | 'auditoria'
   | 'blindagem'
+  | 'logs'
   | 'whatsapp';
 
 export interface Destino {
