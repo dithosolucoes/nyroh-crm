@@ -3994,6 +3994,23 @@ app.post('/api/campaign/test-dispatch', async (req: any, res) => {
 
   await logAudit('TESTE_DISPARO_INDIVIDUAL', `Disparo de teste realizado para ${formattedE164} atribuído a ${resolvedSellerName}`, req);
 
+  // Só é sucesso se a FluxoAPI/Meta realmente aceitou o envio (antes sempre dizia sucesso)
+  const dispatchOk = dispatchResult?.success === true;
+  if (!dispatchOk) {
+    const motivo = dispatchResult?.error
+      || dispatchResult?.data?.error?.message
+      || dispatchResult?.data?.message
+      || (dispatchResult?.status ? `Erro HTTP ${dispatchResult.status} ao enviar o modelo` : 'A Fluxo/Meta não aceitou o envio');
+    console.warn('[Test Dispatch] Envio não saiu:', motivo, JSON.stringify(dispatchResult).slice(0, 800));
+    return res.json({
+      success: false,
+      error: `O teste não saiu: ${motivo}`,
+      lead: createdLead,
+      outgoingMessage,
+      dispatchResult
+    });
+  }
+
   return res.json({
     success: true,
     message: 'Disparo de teste executado com sucesso!',
