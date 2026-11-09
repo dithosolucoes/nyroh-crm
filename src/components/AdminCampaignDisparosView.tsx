@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { parseTemplateBody, templateVarIndexes, renderTemplateBody } from '../lib/templateSegments';
 import { resolveLeadTokens } from '../lib/leadTokens';
 import { useRuntimeConfig, formatInstancePhone } from '../lib/useRuntimeConfig';
 import { onRealtime } from '../lib/realtime';
@@ -2608,6 +2609,47 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
                             </div>
                           </div>
                         </div>
+
+                        {/* MODELO DA META: mostra o que é texto fixo e o que é variável, com a visualização em tempo real */}
+                        {activeMetaTemplate?.bodyText && (() => {
+                          const samples: Record<string, string> = { nome: 'Roberto', empresa: 'Padaria Estrela', vendedor: 'Thomas', site_novo: 'https://nyroh.app/preview' };
+                          const fill = (v: string) => (v || '').replace(/\{(nome|empresa|vendedor|site_novo)\}/gi, (_m, k) => samples[k.toLowerCase()] || _m);
+                          const values: Record<number, string> = { 1: fill(templateVar1), 2: fill(templateVar2), 3: fill(templateVar3) };
+                          const indexes = templateVarIndexes(activeMetaTemplate.bodyText || '');
+                          const preview = renderTemplateBody(activeMetaTemplate.bodyText || '', values);
+                          return (
+                            <div className="p-4 bg-white border border-neutral-200 rounded-xl space-y-3">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <p className="text-xs font-bold text-neutral-900">Modelo da Meta: {activeMetaTemplate.name}</p>
+                                <div className="flex items-center gap-3 text-[11px]">
+                                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-neutral-200 inline-block" /> texto fixo (não muda)</span>
+                                  <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-blue-100 border border-blue-400 inline-block" /> variável (você escreve)</span>
+                                </div>
+                              </div>
+                              <div className="text-xs leading-relaxed text-neutral-800 whitespace-pre-wrap">
+                                {parseTemplateBody(activeMetaTemplate.bodyText || '').map((seg, i) =>
+                                  seg.kind === 'text' ? (
+                                    <span key={i} className="bg-neutral-100 rounded px-0.5">{seg.text}</span>
+                                  ) : (
+                                    <span key={i} className="font-mono font-bold text-blue-700 bg-blue-50 border border-blue-300 rounded px-1">{`{{${seg.index}}}`}</span>
+                                  )
+                                )}
+                              </div>
+                              {indexes.some(n => n > 3) && (
+                                <p className="text-[11px] text-amber-700">Este modelo tem mais de 3 variáveis. O editor abaixo ainda mostra só as 3 primeiras.</p>
+                              )}
+                              <div>
+                                <p className="text-[11px] font-bold text-neutral-500 mb-1">Como o cliente vai ver (exemplo: Roberto, Padaria Estrela)</p>
+                                <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-950 whitespace-pre-wrap">
+                                  {preview.text}
+                                </div>
+                                {preview.missing.length > 0 && (
+                                  <p className="text-[11px] text-amber-700 mt-1">Falta preencher: {preview.missing.map(n => `{{${n}}}`).join(', ')}</p>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })()}
 
                         {/* Banner Informativo de Conformidade com a Meta */}
                         <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between">
