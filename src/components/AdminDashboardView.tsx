@@ -43,6 +43,7 @@ import {
   MessageSquare,
   Send
 } from 'lucide-react';
+import { AdminLogsView } from './AdminLogsView';
 import { AdminCampaignDisparosView } from './AdminCampaignDisparosView';
 import { ownerOf } from '../lib/sellerCounts';
 
@@ -55,7 +56,7 @@ interface AdminDashboardViewProps {
   onNavigateToKanban: (salespersonId?: string) => void;
   onRefreshData: () => void;
   onShowToast: (msg: string) => void;
-  activeSection?: 'cockpit' | 'usuarios' | 'carteiras' | 'auditoria' | 'blindagem' | 'whatsapp' | 'disparos';
+  activeSection?: 'cockpit' | 'usuarios' | 'carteiras' | 'auditoria' | 'blindagem' | 'logs' | 'whatsapp' | 'disparos';
   onChangeSection?: (section: string) => void;
   onSelectSalesperson?: (id: string) => void;
 }
@@ -73,7 +74,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
   onChangeSection,
   onSelectSalesperson
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'cockpit' | 'usuarios' | 'carteiras' | 'auditoria' | 'blindagem' | 'whatsapp' | 'disparos'>(
+  const [activeSubTab, setActiveSubTab] = useState<'cockpit' | 'usuarios' | 'carteiras' | 'auditoria' | 'blindagem' | 'logs' | 'whatsapp' | 'disparos'>(
     (activeSection as any) || 'cockpit'
   );
 
@@ -85,6 +86,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
         activeSection === 'carteiras' ||
         activeSection === 'auditoria' ||
         activeSection === 'blindagem' ||
+        activeSection === 'logs' ||
         activeSection === 'whatsapp' ||
         activeSection === 'disparos'
       ) {
@@ -600,6 +602,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
               : activeSubTab === 'carteiras' ? 'Equipe e carteiras'
               : activeSubTab === 'auditoria' ? 'Auditoria'
               : activeSubTab === 'blindagem' ? 'Blindagem de dados'
+              : activeSubTab === 'logs' ? 'Logs do sistema'
               : 'Painel'}
           </h1>
           <p className="text-sm text-neutral-500 mt-1">
@@ -607,6 +610,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
               : activeSubTab === 'carteiras' ? 'Vendedores, divisão de carteiras e distribuição de leads.'
               : activeSubTab === 'auditoria' ? 'Registro de ações feitas no sistema, com autor e horário.'
               : activeSubTab === 'blindagem' ? 'Regras de isolamento: cada vendedor vê só a própria carteira.'
+              : activeSubTab === 'logs' ? 'O que o servidor registrou nos últimos minutos: erros, envios e webhooks.'
               : ''}
           </p>
         </div>
@@ -1434,6 +1438,8 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
             </div>
           </div>
         )}
+
+        {activeSubTab === 'logs' && <AdminLogsView />}
 
         {/* TAB 3: CAIXA-PRETA DE AUDITORIA */}
         {activeSubTab === 'auditoria' && (
