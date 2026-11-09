@@ -483,7 +483,8 @@ async function main() {
       assert.deepEqual(buildFluxoAudioMedia('https://x/a.ogg', false), { url: 'https://x/a.ogg' });
       assert.deepEqual(buildFluxoAudioMedia('https://x/a.ogg', true), { url: 'https://x/a.ogg', voice: true });
       assert.equal(isFluxoAudioVoiceEnabled({ FLUXO_AUDIO_VOICE: 'true' } as any), true);
-      assert.equal(isFluxoAudioVoiceEnabled({} as any), false);
+      assert.equal(isFluxoAudioVoiceEnabled({} as any), true);
+      assert.equal(isFluxoAudioVoiceEnabled({ FLUXO_AUDIO_VOICE: 'false' } as any), false);
     });
 
     test('status FluxoAPI: lista variáveis faltando na ordem certa', () => {
