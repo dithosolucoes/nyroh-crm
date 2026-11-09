@@ -326,6 +326,11 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
       }
       vars[String(n)] = v;
     }
+    const totalTeste = measureBodyLength(sample);
+    if (totalTeste > META_BODY_MAX) {
+      setActionNotification({ type: 'error', message: `O texto do modelo ficou com ${totalTeste} caracteres (limite da Meta: ${META_BODY_MAX}). Encurte as variáveis antes do teste.` });
+      return;
+    }
     setTestSending(true);
     try {
       const r = await fetch('/api/campaign/test-dispatch', {
@@ -371,14 +376,12 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
     var3: META_BODY_MAX
   };
   // Tamanho do corpo já renderizado com as três variáveis
-  const renderedBodyLength = (v1: string, v2: string, v3: string) => {
-    const tpl = availableTemplates.find((t: any) => t.name === selectedTemplate) as any;
-    const base: string = tpl?.bodyText || '{{1}}{{2}}{{3}}';
-    return base
-      .replace('{{1}}', () => v1)
-      .replace('{{2}}', () => v2)
-      .replace('{{3}}', () => v3)
-      .length;
+  // Mede o corpo FINAL que a Meta recebe: variáveis preenchidas com os campos do lead + texto fixo do modelo
+  const bodyMeasureSample = { firstName: 'Roberto', company: 'Padaria Estrela', seller: 'Thomas', url: 'https://hf-retifica-de-motores-desde-1990-11940829913.nyroh.com.br' };
+  const measureBodyLength = (ctx: { firstName: string; company: string; seller: string; url: string } = bodyMeasureSample): number => {
+    const values: Record<number, string> = {};
+    for (const n of activeVarIndexes) values[n] = sanitizeTemplateVariable(fillLeadTokens(copiesByIdx[n] ?? '', ctx));
+    return renderTemplateBody(activeMetaTemplate?.bodyText || '', values).text.length;
   };
 
   // Variáveis de Conteúdo (Nível 2: O que vai DENTRO de cada {{X}} do template)
@@ -1412,7 +1415,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
     }
 
     // Validação rígida dos limites de caracteres da Meta para evitar o erro #132005 (Translated text too long)
-    const totalBody = renderedBodyLength(templateVar1, templateVar2, templateVar3);
+    const totalBody = measureBodyLength();
     if (totalBody > META_BODY_MAX) {
       showNotification('error', `O corpo do template ficou com ${totalBody} caracteres (limite da Meta: ${META_BODY_MAX}). Encurte o texto antes do disparo.`);
       return;
@@ -2674,6 +2677,9 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
                           const values: Record<number, string> = { 1: fill(templateVar1), 2: fill(templateVar2), 3: fill(templateVar3) };
                           const indexes = templateVarIndexes(activeMetaTemplate.bodyText || '');
                           const preview = renderTemplateBody(activeMetaTemplate.bodyText || '', values);
+                          const totalAgora = measureBodyLength();
+                          const pctAgora = Math.min(100, Math.round((totalAgora / META_BODY_MAX) * 100));
+                          const acimaDoLimite = totalAgora > META_BODY_MAX;
                           return (
                             <div className="p-4 bg-white border border-neutral-200 rounded-xl space-y-3">
                               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2691,6 +2697,17 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
                                     <span key={i} className="font-mono font-bold text-blue-700 bg-blue-50 border border-blue-300 rounded px-1">{`{{${seg.index}}}`}</span>
                                   )
                                 )}
+                              </div>
+                              <div className="space-y-1">
+                                <div className="flex items-center justify-between text-[11px]">
+                                  <span className="font-bold text-neutral-600">Limite total da Meta (texto final)</span>
+                                  <span className={`font-mono font-bold ${acimaDoLimite ? 'text-red-600' : totalAgora > META_BODY_MAX * 0.9 ? 'text-amber-600' : 'text-emerald-700'}`}>
+                                    {totalAgora} / {META_BODY_MAX} {acimaDoLimite ? '· passou do limite' : ''}
+                                  </span>
+                                </div>
+                                <div className="h-1.5 w-full rounded bg-neutral-200 overflow-hidden">
+                                  <div className={`h-full ${acimaDoLimite ? 'bg-red-500' : totalAgora > META_BODY_MAX * 0.9 ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${pctAgora}%` }} />
+                                </div>
                               </div>
                               <div>
                                 <p className="text-[11px] font-bold text-neutral-500 mb-1">Como o cliente vai ver (exemplo: Roberto, Padaria Estrela)</p>
