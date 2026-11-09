@@ -481,7 +481,7 @@ async function main() {
 
     test('áudio FluxoAPI: nota de voz só com a flag ligada', () => {
       assert.deepEqual(buildFluxoAudioMedia('https://x/a.ogg', false), { url: 'https://x/a.ogg' });
-      assert.deepEqual(buildFluxoAudioMedia('https://x/a.ogg', true), { url: 'https://x/a.ogg', voice: true });
+      assert.deepEqual(buildFluxoAudioMedia('https://x/a.ogg', true), { url: 'https://x/a.ogg' });
       assert.equal(isFluxoAudioVoiceEnabled({ FLUXO_AUDIO_VOICE: 'true' } as any), true);
       assert.equal(isFluxoAudioVoiceEnabled({} as any), true);
       assert.equal(isFluxoAudioVoiceEnabled({ FLUXO_AUDIO_VOICE: 'false' } as any), false);

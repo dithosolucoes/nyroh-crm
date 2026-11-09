@@ -308,7 +308,8 @@ export async function transcodeAudioToWhatsAppVoice(buf: Buffer, inputMime: stri
       await fs.promises.writeFile(inPath, buf);
       await execFileAsync('ffmpeg', ['-y', '-i', inPath, '-c:a', 'libopus', '-b:a', '32k', '-ar', '48000', '-ac', '1', outPath], { timeout: 30000 });
       const stat = await fs.promises.stat(outPath);
-      if (stat.size > 100) {
+      // Abaixo de 1 KB é arquivo vazio/quebrado (ex.: 984 bytes = 0:00 no player): não envia
+      if (stat.size >= 1024) {
         return { buffer: await fs.promises.readFile(outPath), mimeType: 'audio/ogg; codecs=opus', filename: 'voice_note.ogg', converted: true };
       }
     } catch (err: any) {
@@ -465,6 +466,9 @@ export async function prepareOutboundMedia(
     if (kind === 'audio') {
       const t = await transcodeAudioToWhatsAppVoice(buf, mimeType);
       if (t.error) return { url: '', error: t.error };
+      if (t.buffer.length < 1024) {
+        return { url: '', error: 'O áudio gravado saiu vazio ou muito curto (menos de 1 KB). Grave de novo, segurando o microfone por alguns segundos.' };
+      }
       buf = t.buffer;
       mimeType = t.mimeType;
       filename = t.filename;

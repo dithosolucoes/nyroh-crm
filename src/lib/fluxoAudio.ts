@@ -4,8 +4,9 @@
  * Por padrão o áudio sai como nota de voz (OGG/Opus, convertido pelo ffmpeg).
  * Para desligar, defina FLUXO_AUDIO_VOICE=false na Railway.
  */
-export function buildFluxoAudioMedia(url: string, voiceEnabled: boolean): { url: string; voice?: true } {
-  return voiceEnabled ? { url, voice: true } : { url };
+export function buildFluxoAudioMedia(url: string, _voiceEnabled: boolean): { url: string } {
+  // A FluxoAPI não documenta campo de nota de voz no envio: quem decide é o arquivo (.ogg com Opus).
+  return { url };
 }
 
 export function isFluxoAudioVoiceEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
