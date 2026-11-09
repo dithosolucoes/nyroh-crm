@@ -2838,6 +2838,13 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
                             </strong>
                           </span>
                         </div>
+                        <div className="text-[11px] text-neutral-500 break-all">
+                          Endereço do botão no modelo aprovado na Meta:{' '}
+                          <strong className="font-mono text-neutral-800">
+                            {(activeMetaTemplate?.buttons || []).find((b: any) => b.type === 'URL')?.url
+                              || 'não veio na resposta da Meta (o modelo pode não ter botão de link)'}
+                          </strong>
+                        </div>
                       </div>
 
                       {/* PAINEL DE AÇÕES EXCLUSIVO DO CRIADOR DE COPY */}
