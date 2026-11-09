@@ -87,9 +87,13 @@ app.use(`/uploads/${INBOX_SUBDIR}`, (_req, res) => res.status(404).end());
 app.use('/uploads', express.static(UPLOADS_DIR, {
   index: false,
   dotfiles: 'deny',
-  setHeaders: (res) => {
+  setHeaders: (res, filePath) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Cache-Control', 'public, max-age=86400');
+    // Nota de voz do WhatsApp: OGG com Opus. Sem o parâmetro codecs a Meta pode tratar como arquivo comum.
+    if (filePath.toLowerCase().endsWith('.ogg')) {
+      res.setHeader('Content-Type', 'audio/ogg; codecs=opus');
+    }
   }
 }));
 
