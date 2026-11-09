@@ -692,7 +692,9 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
         const data = await res.json();
         setBatches(data);
         if (data.length > 0 && !selectedBatchId) {
-          setSelectedBatchId(data[0].id);
+          // Prefere a Fila única (todos os leads que ainda não dispararam)
+          const fila = data.find((b: any) => b.id === 'fila-geral');
+          setSelectedBatchId(fila ? fila.id : data[0].id);
         }
       }
     } catch (err) {
