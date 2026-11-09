@@ -190,13 +190,44 @@ export const TabelaHistoricoZips: React.FC<TabelaProps> = ({ historico, carregan
         <h3 className="text-sm font-bold text-neutral-900">Histórico de ZIPs subidos</h3>
         <p className="text-[11px] text-neutral-500">Do mais recente para o mais antigo.</p>
       </div>
-      <button
-        type="button"
-        onClick={onAtualizar}
-        className="inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-600 hover:text-neutral-900"
-      >
-        <RefreshCw className={`w-3.5 h-3.5 ${carregando ? 'animate-spin' : ''}`} /> Atualizar
-      </button>
+      <div className="flex items-center gap-4">
+        <button
+          type="button"
+          disabled={historico.length === 0}
+          onClick={async () => {
+            try {
+              const pre = await fetch('/api/campaign/uploads/apagar-todos', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dryRun: true }),
+              }).then(r => r.json());
+              if (pre.error) return window.alert(pre.error);
+              if (!pre.zips) return window.alert('Não há ZIP para apagar.');
+              const aviso = pre.bloqueadas > 0
+                ? `\n\n${pre.bloqueadas} safra(s) NÃO serão apagadas: ${pre.leadsBloqueados} lead(s) delas já foram disparados.`
+                : '';
+              if (!window.confirm(`Apagar ${pre.zips} ZIP(s) de ${pre.safras} safra(s), com ${pre.leads} lead(s) ainda em espera?${aviso}\n\nNão dá para desfazer.`)) return;
+              const r = await fetch('/api/campaign/uploads/apagar-todos', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dryRun: false }),
+              });
+              const d = await r.json().catch(() => ({}));
+              if (!r.ok) window.alert(d.error || 'Não consegui apagar os ZIPs.');
+              else window.alert(`Pronto: ${d.zips} ZIP(s) apagado(s).${d.bloqueadas ? ` ${d.bloqueadas} safra(s) ficaram por terem leads já disparados.` : ''}`);
+              await onAtualizar();
+            } catch {
+              window.alert('Falha de conexão ao apagar os ZIPs.');
+            }
+          }}
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-red-700 hover:text-red-900 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          Apagar todos
+        </button>
+        <button
+          type="button"
+          onClick={onAtualizar}
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-600 hover:text-neutral-900"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${carregando ? 'animate-spin' : ''}`} /> Atualizar
+        </button>
+      </div>
     </div>
     {historico.length === 0 ? (
       <div className="px-5 py-10 text-center text-xs text-neutral-500">
@@ -224,7 +255,9 @@ export const TabelaHistoricoZips: React.FC<TabelaProps> = ({ historico, carregan
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100">
-            {historico.map((h) => (
+            {historico.map((h) => {
+              const zipsDaSafra = h.batchId ? historico.filter(x => x.batchId === h.batchId).length : 1;
+              return (
               <tr key={h.id} className="hover:bg-neutral-50 align-top">
                 <td className="px-3 py-2.5 whitespace-nowrap text-neutral-700">{dataHora(h.createdAt)}</td>
                 <td className="px-3 py-2.5 min-w-0">
@@ -249,6 +282,25 @@ export const TabelaHistoricoZips: React.FC<TabelaProps> = ({ historico, carregan
                         Abrir safra
                       </button>
                     )}
+                    {zipsDaSafra > 1 && h.batchId ? (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!window.confirm(`Apagar a safra "${h.batchName || ''}" inteira, com os ${zipsDaSafra} ZIPs dela? Só os leads ainda em espera são apagados. Não dá para desfazer.`)) return;
+                        try {
+                          const r = await fetch(`/api/campaign/batches/${h.batchId}`, { method: 'DELETE' });
+                          const d = await r.json().catch(() => ({}));
+                          if (!r.ok) window.alert(d.error || 'Não consegui apagar esta safra.');
+                          await onAtualizar();
+                        } catch {
+                          window.alert('Falha de conexão ao apagar a safra.');
+                        }
+                      }}
+                      className="px-2.5 py-1 rounded-md border border-red-200 text-red-700 text-xs font-semibold hover:bg-red-50"
+                    >
+                      Apagar safra ({zipsDaSafra})
+                    </button>
+                    ) : (
                     <button
                       type="button"
                       onClick={async () => {
@@ -266,10 +318,12 @@ export const TabelaHistoricoZips: React.FC<TabelaProps> = ({ historico, carregan
                     >
                       Apagar
                     </button>
+                    )}
                   </div>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
