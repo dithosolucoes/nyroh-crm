@@ -11532,10 +11532,55 @@ app.post('/api/campaign/batches/:batchId/sync-whatsapp-web', async (req: any, re
 });
 
 // Delete a campaign batch and its staging leads
+// Apaga um ZIP que foi subido por engano (e a safra dele, se for só este ZIP e nenhum lead dela foi disparado).
+app.delete('/api/campaign/uploads/:uploadId', async (req: any, res) => {
+  if (!isUserAdmin(req.user)) return res.status(403).json({ error: 'Acesso restrito ao Administrador.' });
+  if (!usePostgres || !pgPool) return res.status(503).json({ error: 'Apagar ZIP exige o banco de dados.' });
+  const { uploadId } = req.params;
+  try {
+    const up = await pgPool.query('SELECT id, batch_id, file_name FROM zip_uploads WHERE id = $1', [uploadId]);
+    if (up.rowCount === 0) return res.status(404).json({ error: 'ZIP não encontrado no histórico.' });
+    const { batch_id: batchId, file_name: fileName } = up.rows[0];
+
+    if (batchId) {
+      const naoStaging = await pgPool.query(
+        `SELECT COUNT(*)::int AS n FROM campaign_leads WHERE batch_id = $1 AND status <> 'STAGING'`, [batchId]);
+      if (naoStaging.rows[0].n > 0) {
+        return res.status(409).json({
+          error: `Não dá para apagar: ${naoStaging.rows[0].n} lead(s) desta safra já foram disparados ou atualizados. Nada foi apagado.`
+        });
+      }
+      const outrosZips = await pgPool.query(
+        'SELECT COUNT(*)::int AS n FROM zip_uploads WHERE batch_id = $1 AND id <> $2', [batchId, uploadId]);
+      if (outrosZips.rows[0].n > 0) {
+        return res.status(409).json({
+          error: 'Esta safra recebeu outros ZIPs, então este não pode ser apagado sozinho. Se quiser apagar tudo, use a aba Safras. Nada foi apagado.'
+        });
+      }
+      await pgPool.query('DELETE FROM campaign_leads WHERE batch_id = $1 AND status = $2', [batchId, 'STAGING']);
+      await pgPool.query('DELETE FROM campaign_batches WHERE id = $1', [batchId]);
+    }
+    await pgPool.query('DELETE FROM zip_uploads WHERE id = $1', [uploadId]);
+    await logAudit('ZIP_EXCLUIDO', `Excluiu ZIP ${fileName} (safra ${batchId || '—'})`, req);
+    broadcastSSE('CAMPAIGN_BATCH_DELETED', { batchId });
+    return res.json({ success: true, message: 'ZIP apagado.' });
+  } catch (err: any) {
+    console.error('Erro ao apagar ZIP:', err);
+    return res.status(500).json({ error: 'Erro ao apagar ZIP.' });
+  }
+});
+
 app.delete('/api/campaign/batches/:batchId', async (req: any, res) => {
   const { batchId } = req.params;
   try {
     if (usePostgres && pgPool) {
+      const naoStaging = await pgPool.query(
+        `SELECT COUNT(*)::int AS n FROM campaign_leads WHERE batch_id = $1 AND status <> 'STAGING'`, [batchId]);
+      if (naoStaging.rows[0].n > 0) {
+        return res.status(409).json({
+          error: `Não dá para apagar esta safra: ${naoStaging.rows[0].n} lead(s) já foram disparados ou atualizados. Nada foi apagado.`
+        });
+      }
       await pgPool.query('DELETE FROM campaign_leads WHERE batch_id = $1', [batchId]);
       await pgPool.query('DELETE FROM campaign_batches WHERE id = $1', [batchId]);
     } else {
