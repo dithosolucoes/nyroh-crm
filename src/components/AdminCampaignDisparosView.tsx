@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { parseTemplateBody, templateVarIndexes, renderTemplateBody } from '../lib/templateSegments';
 import { fillLeadTokens } from '../lib/templateCopy';
+import { sanitizeTemplateVariable } from '../lib/leadIntent';
 import { resolveLeadTokens } from '../lib/leadTokens';
 import { useRuntimeConfig, formatInstancePhone } from '../lib/useRuntimeConfig';
 import { onRealtime } from '../lib/realtime';
@@ -309,6 +310,48 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
     const idx = templateVarIndexes(activeMetaTemplate?.bodyText || '');
     return idx.length > 0 ? idx : [1, 2, 3];
   }, [activeMetaTemplate]);
+
+  // Teste de envio: manda o modelo escolhido, com a copy montada, para um número (com um lead de exemplo)
+  const [testPhone, setTestPhone] = useState<string>('5511988216073');
+  const [testSending, setTestSending] = useState<boolean>(false);
+  const handleSendTestToPhone = async () => {
+    const sample = { firstName: 'Thomas', company: 'Teste', seller: 'Thomas', url: 'https://hf-retifica-de-motores-desde-1990-11940829913.nyroh.com.br' };
+    const idx = activeVarIndexes;
+    const vars: Record<string, string> = {};
+    for (const n of idx) {
+      const v = sanitizeTemplateVariable(fillLeadTokens(copiesByIdx[n] ?? '', sample));
+      if (!v.trim()) {
+        setActionNotification({ type: 'error', message: `Preencha a Variável {{${n}}} antes do teste.` });
+        return;
+      }
+      vars[String(n)] = v;
+    }
+    setTestSending(true);
+    try {
+      const r = await fetch('/api/campaign/test-dispatch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phoneNumber: testPhone,
+          leadName: 'Teste Thomas',
+          metaTemplateName: selectedTemplate,
+          variables: vars,
+          publicUrl: sample.url,
+          customNotes: 'Teste de envio pelo montador'
+        })
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || d.success === false) {
+        setActionNotification({ type: 'error', message: d.error || 'O teste não saiu. Veja a mensagem de erro.' });
+      } else {
+        setActionNotification({ type: 'success', message: `Teste enviado para ${testPhone} com o modelo ${selectedTemplate}.` });
+      }
+    } catch {
+      setActionNotification({ type: 'error', message: 'Falha de conexão ao enviar o teste.' });
+    } finally {
+      setTestSending(false);
+    }
+  };
 
   // Copies por índice do modelo ativo ({{n}} -> texto do montador). Sem modelo carregado, não envia (cai no padrão antigo).
   const copiesByIndexForClient = (): Record<string, string> | undefined => {
@@ -2842,7 +2885,31 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
                       {/* CARD GUIA: ORIENTAÇÃO PARA DISPARO NO KANBAN */}
                       <div className="p-4 bg-gradient-to-r from-blue-50/80 to-indigo-50/60 border border-blue-200 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                         <div className="space-y-0.5">
-                          <div className="font-bold text-xs text-blue-950 flex items-center gap-1.5">
+                          <div className="bg-white border border-neutral-200 rounded-xl p-4 space-y-3">
+                      <div>
+                        <p className="text-xs font-bold text-neutral-900">Testar o envio deste modelo</p>
+                        <p className="text-[11px] text-neutral-500 mt-0.5">Manda o modelo <strong>{selectedTemplate}</strong> com a copy que você montou para o número abaixo. Use só o seu número.</p>
+                      </div>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <input
+                          type="text"
+                          value={testPhone}
+                          onChange={e => setTestPhone(e.target.value.replace(/\D/g, ''))}
+                          placeholder="5511988216073"
+                          className="flex-1 px-3 py-2 bg-white border border-neutral-300 rounded-lg text-xs font-mono text-neutral-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleSendTestToPhone}
+                          disabled={testSending || !testPhone}
+                          className="px-4 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-bold disabled:opacity-50"
+                        >
+                          {testSending ? 'Enviando...' : 'Enviar teste para este número'}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="font-bold text-xs text-blue-950 flex items-center gap-1.5">
                             <Send className="w-3.5 h-3.5 text-blue-600" />
                             <span>Pronto para disparar para os leads?</span>
                           </div>

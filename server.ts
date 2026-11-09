@@ -3776,11 +3776,14 @@ app.post('/api/campaign/test-dispatch', async (req: any, res) => {
   // Resolver as 3 variáveis da copy para encaixar no template oficial da Meta
   let resolvedVariables: Record<string, string> = {};
   if (variables && typeof variables === 'object') {
-    resolvedVariables = {
-      '1': String(variables['1'] || variables.var1 || '').trim(),
-      '2': String(variables['2'] || variables.var2 || '').trim(),
-      '3': String(variables['3'] || variables.var3 || '').trim()
-    };
+    // Aceita qualquer quantidade de variáveis ({{1}}, {{2}}, ...) e mantém var1..var3 como antes
+    resolvedVariables = {};
+    for (const k of Object.keys(variables)) {
+      if (/^\d+$/.test(k)) resolvedVariables[k] = String(variables[k] ?? '').trim();
+    }
+    for (const n of ['1', '2', '3']) {
+      if (!resolvedVariables[n]) resolvedVariables[n] = String(variables[`var${n}`] || '').trim();
+    }
   } else if (var1 || var2 || var3) {
     resolvedVariables = {
       '1': String(var1 || '').trim(),
