@@ -442,6 +442,27 @@ async function main() {
       assert.deepEqual(r.empty, [2]);
     });
 
+    test('modelo com 4 variáveis: todas entram na copy e no envio (não cai em 1..3)', () => {
+      const ctx = { firstName: 'Ana', company: 'Loja X', seller: 'Thomas', url: 'https://x.app/a' };
+      const body = 'Oi {{1}}, {{2}} na {{3}}. Veja {{4}}';
+      assert.deepEqual(templateVarIndexes(body), [1, 2, 3, 4]);
+      const r = buildTemplateVariables({ 1: 'Oi {nome}', 2: 'Falo da {empresa}', 3: '{vendedor}', 4: '{site_novo}' }, ctx);
+      assert.deepEqual(r.variables, { '1': 'Oi Ana', '2': 'Falo da Loja X', '3': 'Thomas', '4': 'https://x.app/a' });
+      assert.deepEqual(r.empty, []);
+    });
+
+    test('modelo com 4 variáveis: a 4ª vazia bloqueia o lead (vai para empty)', () => {
+      const ctx = { firstName: 'Ana', company: 'Loja X', seller: 'Thomas', url: 'u' };
+      const r = buildTemplateVariables({ 1: 'Oi {nome}', 2: 'a', 3: 'b', 4: '  ' }, ctx);
+      assert.deepEqual(r.empty, [4]);
+    });
+
+    test('modelo com 4 variáveis: texto final sai com os valores no lugar certo', () => {
+      const out = renderTemplateBody('Oi {{1}}, {{2}}. {{3}} {{4}}', { 1: 'Ana', 2: 'tudo bem', 3: 'Sim', 4: 'ok' });
+      assert.equal(out.text, 'Oi Ana, tudo bem. Sim ok');
+      assert.deepEqual(out.missing, []);
+    });
+
     test('modelo Meta: separa texto fixo de variável na ordem certa', () => {
       assert.deepEqual(parseTemplateBody('Oi {{1}}, tudo bem? {{2}}'), [
         { kind: 'text', text: 'Oi ' }, { kind: 'var', index: 1 }, { kind: 'text', text: ', tudo bem? ' }, { kind: 'var', index: 2 }
