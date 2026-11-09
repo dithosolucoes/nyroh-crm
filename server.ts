@@ -9456,49 +9456,6 @@ app.get('/api/campaign/import-progress/:jobId', (req, res) => {
 const FILA_BATCH_ID = 'fila-geral';
 const FILA_BATCH_NAME = 'Fila de disparos';
 
-// Junta na Fila de disparos os leads em espera que estão em safras antigas.
-// Antes de mover, grava (lead_id, lote de origem) numa tabela de backup, para reverter se precisar.
-// Idempotente: rodar de novo não duplica nada.
-app.post('/api/admin/campaign/merge-into-fila', async (req: any, res) => {
-  if (!isUserAdmin(req.user)) return res.status(403).json({ error: 'Acesso restrito ao Administrador.' });
-  try {
-    if (usePostgres && pgPool) {
-      await pgPool.query(
-        `INSERT INTO campaign_batches (id, name, created_at) VALUES ($1, $2, CURRENT_TIMESTAMP) ON CONFLICT (id) DO NOTHING`,
-        [FILA_BATCH_ID, FILA_BATCH_NAME]
-      );
-      await pgPool.query(`
-        CREATE TABLE IF NOT EXISTS campaign_leads_backup_fila (
-          lead_id TEXT PRIMARY KEY,
-          from_batch_id TEXT,
-          backed_up_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-        )`);
-      const backup = await pgPool.query(`
-        INSERT INTO campaign_leads_backup_fila (lead_id, from_batch_id)
-        SELECT id, batch_id FROM campaign_leads
-        WHERE status = 'STAGING' AND batch_id <> $1
-        ON CONFLICT (lead_id) DO NOTHING`, [FILA_BATCH_ID]);
-      const moved = await pgPool.query(`
-        UPDATE campaign_leads SET batch_id = $1
-        WHERE status = 'STAGING' AND batch_id <> $1`, [FILA_BATCH_ID]);
-      return res.json({ success: true, backedUp: backup.rowCount, moved: moved.rowCount, fila: FILA_BATCH_ID });
-    }
-    let moved = 0;
-    for (const lead of memoryCampaignLeadsMap.values()) {
-      if (lead.status === 'STAGING' && lead.batchId !== FILA_BATCH_ID) {
-        lead.batchId = FILA_BATCH_ID;
-        moved++;
-      }
-    }
-    if (!memoryCampaignBatchesMap.has(FILA_BATCH_ID)) {
-      memoryCampaignBatchesMap.set(FILA_BATCH_ID, { id: FILA_BATCH_ID, name: FILA_BATCH_NAME, totalLeads: 0, validMobiles: 0, landlines: 0, withNyrohUrl: 0, withWebsite: 0, status: 'draft', templateName: 'dns_escassez_np4', quarantineHours: 4, allowedClosers: ['seller-thomas'], hotLeadsRetainedByAdmin: true, dispatchedCount: 0, hotCount: 0, coldCount: 0, optOutCount: 0, createdAt: new Date().toISOString() } as any);
-    }
-    return res.json({ success: true, backedUp: 0, moved, fila: FILA_BATCH_ID });
-  } catch (err: any) {
-    return res.status(500).json({ success: false, error: err?.message || 'Erro ao juntar leads na fila.' });
-  }
-});
-
 app.post('/api/campaign/upload-zip', diskUpload.single('zipFile') as any, async (req: any, res) => {
   const tempFilePath = req.file?.path;
   const jobId = req.body.jobId || `import_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
