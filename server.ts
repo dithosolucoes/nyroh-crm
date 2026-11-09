@@ -115,6 +115,63 @@ app.get('/health', (req, res) => {
   res.status(200).send('OK');
 });
 
+// Link de rastreio por lead: o CRM registra o clique e redireciona para o site do cliente.
+const TRACKING_BASE_URL = (process.env.PUBLIC_APP_URL || 'https://nyroh-crm-production-fedd.up.railway.app').replace(/\/$/, '');
+async function trackedLinkFor(leadId: string, targetUrl: string): Promise<string> {
+  const destino = String(targetUrl || '').trim();
+  if (!destino || !/^https?:\/\//i.test(destino) || !usePostgres || !pgPool) return destino;
+  try {
+    const token = crypto.randomBytes(9).toString('base64url');
+    await pgPool.query('INSERT INTO link_clicks (token, lead_id, target_url) VALUES ($1, $2, $3)', [token, leadId, destino]);
+    return `${TRACKING_BASE_URL}/r/${token}`;
+  } catch (err) {
+    console.warn('[Rastreio] não consegui criar o link de rastreio; usando o link direto.', err);
+    return destino;
+  }
+}
+
+app.get('/r/:token', async (req: any, res) => {
+  const token = String(req.params.token || '').replace(/[^A-Za-z0-9_-]/g, '');
+  if (!token || !usePostgres || !pgPool) return res.status(404).send('Link não encontrado.');
+  try {
+    const r = await pgPool.query(
+      `UPDATE link_clicks
+          SET click_count = click_count + 1,
+              last_clicked_at = now(),
+              first_clicked_at = COALESCE(first_clicked_at, now())
+        WHERE token = $1
+    RETURNING target_url`,
+      [token]
+    );
+    if (r.rowCount === 0) return res.status(404).send('Link não encontrado.');
+    return res.redirect(302, r.rows[0].target_url);
+  } catch (err) {
+    console.error('Erro no link de rastreio:', err);
+    return res.status(500).send('Erro ao abrir o link.');
+  }
+});
+
+// Quem clicou (admin): leads com pelo menos um clique, do mais recente para o mais antigo.
+app.get('/api/campaign/link-clicks', async (req: any, res) => {
+  if (!isUserAdmin(req.user)) return res.status(403).json({ error: 'Acesso restrito ao Administrador.' });
+  if (!usePostgres || !pgPool) return res.json({ clicks: [] });
+  try {
+    const r = await pgPool.query(
+      `SELECT c.token, c.lead_id, c.target_url, c.click_count, c.first_clicked_at, c.last_clicked_at,
+              l.name, l.phone_number
+         FROM link_clicks c
+         LEFT JOIN campaign_leads l ON l.id = c.lead_id
+        WHERE c.click_count > 0
+        ORDER BY c.last_clicked_at DESC
+        LIMIT 200`
+    );
+    res.json({ clicks: r.rows });
+  } catch (err) {
+    console.error('Erro ao listar cliques:', err);
+    res.status(500).json({ error: 'Erro ao listar cliques.' });
+  }
+});
+
 app.get('/api/health', (req, res) => {
   // /health (acima) continua respondendo na hora para o healthcheck da Railway; aqui o estado do banco, para monitoramento
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString(), database: { connected: usePostgres, starting: isDatabaseStarting() } });
@@ -931,6 +988,17 @@ async function initDatabase(retries = 5, delayMs = 3000) {
             created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
           );
           CREATE INDEX IF NOT EXISTS idx_zip_uploads_created ON zip_uploads(created_at DESC);
+
+          CREATE TABLE IF NOT EXISTS link_clicks (
+            token VARCHAR(64) PRIMARY KEY,
+            lead_id VARCHAR(255),
+            target_url TEXT NOT NULL,
+            click_count INT DEFAULT 0,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            first_clicked_at TIMESTAMP WITH TIME ZONE,
+            last_clicked_at TIMESTAMP WITH TIME ZONE
+          );
+          CREATE INDEX IF NOT EXISTS idx_link_clicks_lead ON link_clicks(lead_id);
 
           ALTER TABLE campaign_batches ADD COLUMN IF NOT EXISTS selected_copy_id VARCHAR(255);
           ALTER TABLE campaign_batches ADD COLUMN IF NOT EXISTS copy_var1 TEXT;
@@ -10518,7 +10586,7 @@ app.post('/api/campaign/dispatch', async (req: any, res) => {
         // A Meta só exige que a variável não tenha quebra de linha nem espaços repetidos.
         // Variáveis do modelo da Meta: uma por índice escrito na copy ({{1}}, {{2}}...). Sem byIndex, usa var1..var3.
         const copiesMap: Record<number, string> = copiesByIndexFromBody(variableValues);
-        const built = buildTemplateVariables(copiesMap, { firstName, company, seller: sellerName, url: nyrohUrl });
+        const built = buildTemplateVariables(copiesMap, { firstName, company, seller: sellerName, url: await trackedLinkFor(dLead.id, nyrohUrl) });
         const sanitizedVariables: Record<string, string> = built.variables;
         if (built.empty.length > 0) {
           console.warn(`[Disparo] lead sem texto para as variáveis ${built.empty.join(', ')}. Não enfileirado.`);
@@ -10688,7 +10756,7 @@ app.post('/api/campaign/dispatch', async (req: any, res) => {
         // A Meta só exige que a variável não tenha quebra de linha nem espaços repetidos.
         // Variáveis do modelo da Meta: uma por índice escrito na copy ({{1}}, {{2}}...). Sem byIndex, usa var1..var3.
         const copiesMap: Record<number, string> = copiesByIndexFromBody(variableValues);
-        const built = buildTemplateVariables(copiesMap, { firstName, company, seller: sellerName, url: nyrohUrl });
+        const built = buildTemplateVariables(copiesMap, { firstName, company, seller: sellerName, url: await trackedLinkFor(lead.id, nyrohUrl) });
         const sanitizedVariables: Record<string, string> = built.variables;
         if (built.empty.length > 0) {
           console.warn(`[Disparo] lead sem texto para as variáveis ${built.empty.join(', ')}. Não enfileirado.`);
