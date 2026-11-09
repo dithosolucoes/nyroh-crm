@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { parseTemplateBody, templateVarIndexes, renderTemplateBody } from '../lib/templateSegments';
+import { fillLeadTokens } from '../lib/templateCopy';
 import { resolveLeadTokens } from '../lib/leadTokens';
 import { useRuntimeConfig, formatInstancePhone } from '../lib/useRuntimeConfig';
 import { onRealtime } from '../lib/realtime';
@@ -226,7 +227,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   const [montadorSubTab, setMontadorSubTab] = useState<'editor' | 'biblioteca'>('editor');
 
   // Rastreio da variável ativa para inserção com 1 clique de tags
-  const [activeVarField, setActiveVarField] = useState<'var1' | 'var2' | 'var3'>('var1');
+  const [activeVarField, setActiveVarField] = useState<number>(1);
 
   // Configuração do Botão do Template da Meta (Call to Action)
   const [buttonDestinationType, setButtonDestinationType] = useState<'site_novo' | 'site_antigo' | 'custom'>('site_novo');
@@ -303,13 +304,18 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   }, [metaTemplatesList, selectedTemplate]);
 
 
+  // Índices {{n}} do modelo ativo (uma caixa para cada). Sem corpo lido, cai em 1..3.
+  const activeVarIndexes: number[] = useMemo(() => {
+    const idx = templateVarIndexes(activeMetaTemplate?.bodyText || '');
+    return idx.length > 0 ? idx : [1, 2, 3];
+  }, [activeMetaTemplate]);
+
   // Copies por índice do modelo ativo ({{n}} -> texto do montador). Sem modelo carregado, não envia (cai no padrão antigo).
   const copiesByIndexForClient = (): Record<string, string> | undefined => {
     const idx = templateVarIndexes(activeMetaTemplate?.bodyText || '');
     if (idx.length === 0) return undefined;
-    const src: Record<number, string> = { 1: templateVar1, 2: templateVar2, 3: templateVar3 };
     const out: Record<string, string> = {};
-    for (const n of idx) out[String(n)] = n <= 3 ? src[n] : '';
+    for (const n of idx) out[String(n)] = copiesByIdx[n] ?? '';
     return out;
   };
 
@@ -333,27 +339,44 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   };
 
   // Variáveis de Conteúdo (Nível 2: O que vai DENTRO de cada {{X}} do template)
-  const [templateVar1, setTemplateVar1] = useState<string>(() => {
+  // Copy por índice do modelo: { 1: texto, 2: texto, ... } — uma caixa por {{n}} do template
+  const [copiesByIdx, setCopiesByIdx] = useState<Record<number, string>>(() => {
+    const DEFAULTS: Record<number, string> = {
+      1: '{nome}! Bom diaaa! Ótima semana 😄 Falo com o responsável pela {empresa}?',
+      2: 'Eu sou {vendedor} e queria te fazer uma pergunta: você ficaria chateado se eu tivesse criado um site para a {empresa} sem pedir? 😂',
+      3: 'Desenvolvi uma prévia exclusiva para vocês: 🔗 {site_novo}'
+    };
     try {
-      return localStorage.getItem('nyroh_campaign_var1') || '{nome}! Bom diaaa! Ótima semana 😄 Falo com o responsável pela {empresa}?';
-    } catch {
-      return '{nome}! Bom diaaa! Ótima semana 😄 Falo com o responsável pela {empresa}?';
+      const saved = localStorage.getItem('nyroh_campaign_copies');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const out: Record<number, string> = {};
+        for (const k of Object.keys(parsed)) {
+          const n = Number(k);
+          if (n > 0) out[n] = String(parsed[k] ?? '');
+        }
+        return out;
+      }
+    } catch {}
+    // Migração: copy salva no formato antigo (var1..var3)
+    const out: Record<number, string> = {};
+    for (const n of [1, 2, 3]) {
+      try {
+        out[n] = localStorage.getItem(`nyroh_campaign_var${n}`) ?? DEFAULTS[n];
+      } catch {
+        out[n] = DEFAULTS[n];
+      }
     }
+    return out;
   });
-  const [templateVar2, setTemplateVar2] = useState<string>(() => {
-    try {
-      return localStorage.getItem('nyroh_campaign_var2') || 'Eu sou {vendedor} e queria te fazer uma pergunta: você ficaria chateado se eu tivesse criado um site para a {empresa} sem pedir? 😂';
-    } catch {
-      return 'Eu sou {vendedor} e queria te fazer uma pergunta: você ficaria chateado se eu tivesse criado um site para a {empresa} sem pedir? 😂';
-    }
-  });
-  const [templateVar3, setTemplateVar3] = useState<string>(() => {
-    try {
-      return localStorage.getItem('nyroh_campaign_var3') || 'Desenvolvi uma prévia exclusiva para vocês: 🔗 {site_novo}';
-    } catch {
-      return 'Desenvolvi uma prévia exclusiva para vocês: 🔗 {site_novo}';
-    }
-  });
+  const setCopyAt = (n: number, value: string) => setCopiesByIdx(prev => ({ ...prev, [n]: value }));
+  // Apelidos antigos (usados por dispatch e biblioteca): leem/gravam a mesma copy por índice
+  const templateVar1 = copiesByIdx[1] ?? '';
+  const templateVar2 = copiesByIdx[2] ?? '';
+  const templateVar3 = copiesByIdx[3] ?? '';
+  const setTemplateVar1 = (v: string) => setCopyAt(1, v);
+  const setTemplateVar2 = (v: string) => setCopyAt(2, v);
+  const setTemplateVar3 = (v: string) => setCopyAt(3, v);
 
   // Biblioteca de Templates de Copy (O que vai DENTRO das variáveis do template da Meta)
   const [copyTemplates, setCopyTemplates] = useState<CampaignCopyTemplate[]>([]);
@@ -374,11 +397,12 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   // Sincronizar variáveis da copy no localStorage para não perder ao dar F5
   useEffect(() => {
     try {
+      localStorage.setItem('nyroh_campaign_copies', JSON.stringify(copiesByIdx));
       localStorage.setItem('nyroh_campaign_var1', templateVar1);
       localStorage.setItem('nyroh_campaign_var2', templateVar2);
       localStorage.setItem('nyroh_campaign_var3', templateVar3);
     } catch {}
-  }, [templateVar1, templateVar2, templateVar3]);
+  }, [copiesByIdx]);
 
   useEffect(() => {
     try {
@@ -594,45 +618,22 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
     }
   };
 
-  // Insert Tag Helper: Insere a tag na variável selecionada atualmente respeitando os limites da Meta
+  // Insert Tag Helper: insere a tag na caixa ativa respeitando o limite de caracteres do corpo da Meta
   const insertTagIntoActiveVar = (tag: string) => {
-    if (activeVarField === 'var1') {
-      const next = `${templateVar1} ${tag}`.trim();
-      const total = renderedBodyLength(next, templateVar2, templateVar3);
-      if (total > META_BODY_MAX) {
-        setActionNotification({
-          type: 'error',
-          message: `Não foi possível inserir ${tag}: o corpo do template chegaria a ${total} caracteres (Limite Meta: ${META_BODY_MAX}).`
-        });
-        return;
-      }
-      setTemplateVar1(next);
-    } else if (activeVarField === 'var2') {
-      const next = `${templateVar2} ${tag}`.trim();
-      const total = renderedBodyLength(templateVar1, next, templateVar3);
-      if (total > META_BODY_MAX) {
-        setActionNotification({
-          type: 'error',
-          message: `Não foi possível inserir ${tag}: o corpo do template chegaria a ${total} caracteres (Limite Meta: ${META_BODY_MAX}).`
-        });
-        return;
-      }
-      setTemplateVar2(next);
-    } else if (activeVarField === 'var3') {
-      const next = `${templateVar3} ${tag}`.trim();
-      const total = renderedBodyLength(templateVar1, templateVar2, next);
-      if (total > META_BODY_MAX) {
-        setActionNotification({
-          type: 'error',
-          message: `Não foi possível inserir ${tag}: o corpo do template chegaria a ${total} caracteres (Limite Meta: ${META_BODY_MAX}).`
-        });
-        return;
-      }
-      setTemplateVar3(next);
+    const n = activeVarField;
+    const next = `${copiesByIdx[n] ?? ''} ${tag}`.trim();
+    const total = renderTemplateBody(activeMetaTemplate?.bodyText || '{{1}}{{2}}{{3}}', { ...copiesByIdx, [n]: next }).text.length;
+    if (total > META_BODY_MAX) {
+      setActionNotification({
+        type: 'error',
+        message: `Não foi possível inserir ${tag}: o corpo do template chegaria a ${total} caracteres (Limite Meta: ${META_BODY_MAX}).`
+      });
+      return;
     }
+    setCopyAt(n, next);
     setActionNotification({
       type: 'success',
-      message: `Tag ${tag} inserida na Variável {{${activeVarField === 'var1' ? '1' : activeVarField === 'var2' ? '2' : '3'}}}`
+      message: `Tag ${tag} inserida na Variável {{${n}}}`
     });
   };
 
@@ -2526,7 +2527,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
                             </span>
                           </div>
                           <span className="text-[10px] text-neutral-500">
-                            Inserindo na: <strong className="text-blue-600 uppercase">Variável &#123;&#123;{activeVarField === 'var1' ? '1' : activeVarField === 'var2' ? '2' : '3'}&#125;&#125;</strong>
+                            Inserindo na: <strong className="text-blue-600 uppercase">Variável &#123;&#123;{activeVarField}&#125;&#125;</strong>
                           </span>
                         </div>
 
@@ -2648,9 +2649,6 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
                                   )
                                 )}
                               </div>
-                              {indexes.some(n => n > 3) && (
-                                <p className="text-[11px] text-amber-700">Este modelo tem mais de 3 variáveis. O editor abaixo ainda mostra só as 3 primeiras.</p>
-                              )}
                               <div>
                                 <p className="text-[11px] font-bold text-neutral-500 mb-1">Como o cliente vai ver (exemplo: Roberto, Padaria Estrela)</p>
                                 <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-950 whitespace-pre-wrap">
@@ -2680,173 +2678,51 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
                           </span>
                         </div>
 
-                        {/* Variável 1 */}
-                        <div
-                          onClick={() => setActiveVarField('var1')}
-                          className={`p-3 rounded-xl border transition-all ${
-                            activeVarField === 'var1'
-                              ? 'bg-white border-blue-500 shadow-2xs ring-1 ring-blue-500/20'
-                              : 'bg-white/70 border-neutral-200'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between text-xs font-bold text-neutral-700 mb-1.5">
-                            <label className="flex items-center gap-1.5">
-                              <span className={`w-4 h-4 rounded-full text-white flex items-center justify-center text-[10px] ${
-                                activeVarField === 'var1' ? 'bg-blue-600' : 'bg-neutral-400'
-                              }`}>1</span>
-                              <span>Variável &#123;&#123;1&#125;&#125; (Saudação + Nome + Pergunta do Responsável):</span>
-                            </label>
-                            <div className="flex items-center gap-2">
-                              <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border transition-colors ${
-                                templateVar1.length >= META_CHAR_LIMITS.var1
-                                  ? 'bg-rose-50 text-rose-700 border-rose-200'
-                                  : templateVar1.length >= META_CHAR_LIMITS.var1 * 0.85
-                                  ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                  : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                              }`}>
-                                {templateVar1.length} / {META_CHAR_LIMITS.var1} chars
-                              </span>
-                              <span className="text-[10px] text-neutral-400 font-semibold hidden sm:inline">
-                                Limite Máx: {META_CHAR_LIMITS.var1}
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="w-full bg-neutral-100 rounded-full h-1 mb-2 overflow-hidden">
+                        {/* Uma caixa por {{n}} do modelo escolhido */}
+                        {activeVarIndexes.map(n => {
+                          const value = copiesByIdx[n] ?? '';
+                          const isActive = activeVarField === n;
+                          const ratio = value.length / META_BODY_MAX;
+                          const badge = ratio >= 1 ? 'bg-rose-50 text-rose-700 border-rose-200' : ratio >= 0.85 ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                          const bar = ratio >= 1 ? 'bg-rose-500' : ratio >= 0.85 ? 'bg-amber-500' : 'bg-emerald-500';
+                          return (
                             <div
-                              className={`h-full transition-all duration-300 ${
-                                templateVar1.length >= META_CHAR_LIMITS.var1
-                                  ? 'bg-rose-500'
-                                  : templateVar1.length >= META_CHAR_LIMITS.var1 * 0.85
-                                  ? 'bg-amber-500'
-                                  : 'bg-emerald-500'
+                              key={n}
+                              onClick={() => setActiveVarField(n)}
+                              className={`p-3 rounded-xl border transition-all ${
+                                isActive ? 'bg-white border-blue-500 shadow-2xs ring-1 ring-blue-500/20' : 'bg-white/70 border-neutral-200'
                               }`}
-                              style={{ width: `${Math.min(100, (templateVar1.length / META_CHAR_LIMITS.var1) * 100)}%` }}
-                            />
-                          </div>
+                            >
+                              <div className="flex items-center justify-between text-xs font-bold text-neutral-700 mb-1.5">
+                                <label className="flex items-center gap-1.5">
+                                  <span className={`w-4 h-4 rounded-full text-white flex items-center justify-center text-[10px] ${
+                                    isActive ? 'bg-blue-600' : 'bg-neutral-400'
+                                  }`}>{n}</span>
+                                  <span>Variável &#123;&#123;{n}&#125;&#125;</span>
+                                </label>
+                                <div className="flex items-center gap-2">
+                                  <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border transition-colors ${badge}`}>
+                                    {value.length} / {META_BODY_MAX} chars
+                                  </span>
+                                </div>
+                              </div>
 
-                          <textarea
-                            value={templateVar1}
-                            maxLength={META_CHAR_LIMITS.var1}
-                            onFocus={() => setActiveVarField('var1')}
-                            onChange={e => setTemplateVar1(e.target.value)}
-                            rows={2}
-                            className="w-full p-2.5 bg-neutral-50 border border-neutral-300 rounded-lg text-xs text-neutral-800 focus:outline-none focus:ring-2 focus:ring-blue-500 font-sans"
-                            placeholder="Ex: {nome}! Bom diaaa! Ótima semana 😄 Falo com o responsável pela {empresa}?"
-                          />
-                        </div>
+                              <div className="w-full bg-neutral-100 rounded-full h-1 mb-2 overflow-hidden">
+                                <div className={`h-full transition-all duration-300 ${bar}`} style={{ width: `${Math.min(100, ratio * 100)}%` }} />
+                              </div>
 
-                        {/* Variável 2 */}
-                        <div
-                          onClick={() => setActiveVarField('var2')}
-                          className={`p-3 rounded-xl border transition-all ${
-                            activeVarField === 'var2'
-                              ? 'bg-white border-blue-500 shadow-2xs ring-1 ring-blue-500/20'
-                              : 'bg-white/70 border-neutral-200'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between text-xs font-bold text-neutral-700 mb-1.5">
-                            <label className="flex items-center gap-1.5">
-                              <span className={`w-4 h-4 rounded-full text-white flex items-center justify-center text-[10px] ${
-                                activeVarField === 'var2' ? 'bg-blue-600' : 'bg-neutral-400'
-                              }`}>2</span>
-                              <span>Variável &#123;&#123;2&#125;&#125; (O Gancho Comercial + Criado sem Pedir):</span>
-                            </label>
-                            <div className="flex items-center gap-2">
-                              <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border transition-colors ${
-                                templateVar2.length >= META_CHAR_LIMITS.var2
-                                  ? 'bg-rose-50 text-rose-700 border-rose-200'
-                                  : templateVar2.length >= META_CHAR_LIMITS.var2 * 0.85
-                                  ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                  : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                              }`}>
-                                {templateVar2.length} / {META_CHAR_LIMITS.var2} chars
-                              </span>
-                              <span className="text-[10px] text-neutral-400 font-semibold hidden sm:inline">
-                                Limite Máx: {META_CHAR_LIMITS.var2}
-                              </span>
+                              <textarea
+                                value={value}
+                                maxLength={META_BODY_MAX}
+                                onFocus={() => setActiveVarField(n)}
+                                onChange={e => setCopyAt(n, e.target.value)}
+                                rows={3}
+                                className="w-full p-2.5 bg-neutral-50 border border-neutral-300 rounded-lg text-xs text-neutral-800 focus:outline-none focus:ring-2 focus:ring-blue-500 font-sans"
+                                placeholder={`Texto da Variável {{${n}}}. Use {nome}, {empresa}, {vendedor} ou {site_novo} para puxar os dados do lead.`}
+                              />
                             </div>
-                          </div>
-
-                          <div className="w-full bg-neutral-100 rounded-full h-1 mb-2 overflow-hidden">
-                            <div
-                              className={`h-full transition-all duration-300 ${
-                                templateVar2.length >= META_CHAR_LIMITS.var2
-                                  ? 'bg-rose-500'
-                                  : templateVar2.length >= META_CHAR_LIMITS.var2 * 0.85
-                                  ? 'bg-amber-500'
-                                  : 'bg-emerald-500'
-                              }`}
-                              style={{ width: `${Math.min(100, (templateVar2.length / META_CHAR_LIMITS.var2) * 100)}%` }}
-                            />
-                          </div>
-
-                          <textarea
-                            value={templateVar2}
-                            maxLength={META_CHAR_LIMITS.var2}
-                            onFocus={() => setActiveVarField('var2')}
-                            onChange={e => setTemplateVar2(e.target.value)}
-                            rows={3}
-                            className="w-full p-2.5 bg-neutral-50 border border-neutral-300 rounded-lg text-xs text-neutral-800 focus:outline-none focus:ring-2 focus:ring-blue-500 font-sans"
-                            placeholder="Ex: Eu sou {vendedor} e queria te fazer uma pergunta: você ficaria chateado se eu tivesse criado um site para a {empresa} sem pedir? 😂"
-                          />
-                        </div>
-
-                        {/* Variável 3 */}
-                        <div
-                          onClick={() => setActiveVarField('var3')}
-                          className={`p-3 rounded-xl border transition-all ${
-                            activeVarField === 'var3'
-                              ? 'bg-white border-blue-500 shadow-2xs ring-1 ring-blue-500/20'
-                              : 'bg-white/70 border-neutral-200'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between text-xs font-bold text-neutral-700 mb-1.5">
-                            <label className="flex items-center gap-1.5">
-                              <span className={`w-4 h-4 rounded-full text-white flex items-center justify-center text-[10px] ${
-                                activeVarField === 'var3' ? 'bg-blue-600' : 'bg-neutral-400'
-                              }`}>3</span>
-                              <span>Variável &#123;&#123;3&#125;&#125; (Entrega do Link Nyroh + Pedido de Feedback):</span>
-                            </label>
-                            <div className="flex items-center gap-2">
-                              <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border transition-colors ${
-                                templateVar3.length >= META_CHAR_LIMITS.var3
-                                  ? 'bg-rose-50 text-rose-700 border-rose-200'
-                                  : templateVar3.length >= META_CHAR_LIMITS.var3 * 0.85
-                                  ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                  : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                              }`}>
-                                {templateVar3.length} / {META_CHAR_LIMITS.var3} chars
-                              </span>
-                              <span className="text-[10px] text-neutral-400 font-semibold hidden sm:inline">
-                                Limite Máx: {META_CHAR_LIMITS.var3}
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="w-full bg-neutral-100 rounded-full h-1 mb-2 overflow-hidden">
-                            <div
-                              className={`h-full transition-all duration-300 ${
-                                templateVar3.length >= META_CHAR_LIMITS.var3
-                                  ? 'bg-rose-500'
-                                  : templateVar3.length >= META_CHAR_LIMITS.var3 * 0.85
-                                  ? 'bg-amber-500'
-                                  : 'bg-emerald-500'
-                              }`}
-                              style={{ width: `${Math.min(100, (templateVar3.length / META_CHAR_LIMITS.var3) * 100)}%` }}
-                            />
-                          </div>
-
-                          <textarea
-                            value={templateVar3}
-                            maxLength={META_CHAR_LIMITS.var3}
-                            onFocus={() => setActiveVarField('var3')}
-                            onChange={e => setTemplateVar3(e.target.value)}
-                            rows={3}
-                            className="w-full p-2.5 bg-neutral-50 border border-neutral-300 rounded-lg text-xs text-neutral-800 focus:outline-none focus:ring-2 focus:ring-blue-500 font-sans"
-                            placeholder="Ex: Desenvolvi uma prévia exclusiva para vocês: 🔗 {site_novo}"
-                          />
-                        </div>
+                          );
+                        })}
                       </div>
 
                       {/* CONFIGURAÇÃO DO BOTÃO DO TEMPLATE (CALL TO ACTION) */}
@@ -4086,19 +3962,14 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
                           <span className="text-[9px] bg-emerald-600 text-white px-1.5 py-0.2 rounded font-mono">UTILITY</span>
                         </div>
 
-                        {/* Bloco 1 com Ei, */}
-                        <div className="text-neutral-900 font-medium">
-                          Ei, {templateVar1.slice(0, META_CHAR_LIMITS.var1).replace(/\{nome\}/gi, 'Roberto').replace(/\{empresa\}/gi, 'Padaria Estrela')}
-                        </div>
-
-                        {/* Bloco 2 */}
-                        <div className="text-neutral-800">
-                          {templateVar2.slice(0, META_CHAR_LIMITS.var2).replace(/\{vendedor\}/gi, salespeople.find(s => s.id === (dispatchSelectedClosers[0] || dispatchSelectedCloser))?.name || 'Thomas Gabriel').replace(/\{empresa\}/gi, 'Padaria Estrela')}
-                        </div>
-
-                        {/* Bloco 3 */}
-                        <div className="text-neutral-800">
-                          {templateVar3.slice(0, META_CHAR_LIMITS.var3).replace(/\{site_novo\}/gi, 'https://padariaestrela.nyroh.app')}
+                        {/* Corpo real do modelo escolhido, com as copies de cada variável (exemplo: Roberto, Padaria Estrela) */}
+                        <div className="text-neutral-900 whitespace-pre-wrap">
+                          {(() => {
+                            const sample = { firstName: 'Roberto', company: 'Padaria Estrela', seller: 'Thomas', url: 'https://padariaestrela.nyroh.app' };
+                            const values: Record<number, string> = {};
+                            for (const n of activeVarIndexes) values[n] = fillLeadTokens(copiesByIdx[n] ?? '', sample);
+                            return renderTemplateBody(activeMetaTemplate?.bodyText || '', values).text;
+                          })()}
                         </div>
 
                         {/* Chamada do Botão */}
