@@ -16,6 +16,7 @@ import { arePhonesEquivalent, phoneDigitVariants, normalizeE164Phone, formatAndV
 import { verifyFluxoWebhook } from '../src/lib/webhookAuth';
 import { missingFluxoVars, summarizeFluxoInstance } from '../src/lib/fluxoInstanceStatus';
 import { buildFluxoAudioMedia, isFluxoAudioVoiceEnabled } from '../src/lib/fluxoAudio';
+import { parseTemplateBody, templateVarIndexes, renderTemplateBody } from '../src/lib/templateSegments';
 import { buildFluxoAuthHeaders, fluxoInstancePath, prepareOutboundMedia } from '../src/lib/fluxoClient';
 import { extensionFor, saveMediaBuffer } from '../src/lib/mediaStorage';
 import { effectiveSpeedPerSecond, dispatchRpm, planRpm, delayForIndex, maxDispatchPerSecond, FluxoRateLimitedError } from '../src/lib/dispatchRate';
@@ -425,6 +426,22 @@ async function main() {
   group('Tokens da copy: campos do lead e do vendedor (resolvidos antes do envio)');
   {
     const ctx = { leadName: 'Marcelo Silva', sellerName: 'Thomas', publicUrl: 'https://p.nyroh.com.br/x', website: 'https://antigo.com.br', phoneNumber: '+5531999990000', niche: 'Marcenaria', now: new Date(2026, 10, 6, 9, 30) };
+
+    test('modelo Meta: separa texto fixo de variável na ordem certa', () => {
+      assert.deepEqual(parseTemplateBody('Oi {{1}}, tudo bem? {{2}}'), [
+        { kind: 'text', text: 'Oi ' }, { kind: 'var', index: 1 }, { kind: 'text', text: ', tudo bem? ' }, { kind: 'var', index: 2 }
+      ]);
+      assert.deepEqual(templateVarIndexes('{{2}} x {{1}} y {{2}}'), [1, 2]);
+    });
+
+    test('modelo Meta: renderiza preview e avisa variável sem valor', () => {
+      const ok = renderTemplateBody('Oi {{1}}!', { 1: 'Roberto' });
+      assert.equal(ok.text, 'Oi Roberto!');
+      assert.deepEqual(ok.missing, []);
+      const falta = renderTemplateBody('Oi {{1}} de {{2}}', { 1: 'Ana' });
+      assert.equal(falta.text, 'Oi Ana de {{2}}');
+      assert.deepEqual(falta.missing, [2]);
+    });
 
     test('áudio FluxoAPI: nota de voz só com a flag ligada', () => {
       assert.deepEqual(buildFluxoAudioMedia('https://x/a.ogg', false), { url: 'https://x/a.ogg' });
