@@ -17,6 +17,7 @@ import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regrasDeC
 import { hashPassword, verifyPassword, generateSessionToken, DEFAULT_USERS, StoredUser, isUserAdmin } from './src/lib/serverAuth.js';
 import { performWebsiteAudit } from './src/lib/auditEngine.js';
 import { missingFluxoVars, summarizeFluxoInstance } from './src/lib/fluxoInstanceStatus.js';
+import { buildTemplateVariables } from './src/lib/templateCopy.js';
 import { buildFluxoAudioMedia, isFluxoAudioVoiceEnabled } from './src/lib/fluxoAudio.js';
 import { executeFluxoRequest, downloadFluxoMediaBinary, prepareOutboundMedia, fluxoInstancePath, hasFfmpeg } from './src/lib/fluxoClient.js';
 import { setMetaRegistry, listMetaRegistry, encryptMetaToken, decryptMetaToken, metaDownloadMedia, metaSyncAccount, metaValidateToken, resolveMetaAccount, receivingPhoneNumberId, parseCoexistenceEchoes, getEmbeddedSignupConfig, metaExchangeSignupCode, metaSubscribeWaba, metaDiscoverWabaIds, type MetaAccountRecord, type MetaNumberRecord } from './src/lib/metaClient.js';
@@ -10252,6 +10253,23 @@ app.delete('/api/campaign/copies/:id', async (req: any, res) => {
 });
 
 // 5. Trigger Campaign Dispatch (Meta Template Blast - Alta Velocidade / Throughput Oficial Meta)
+// Lê as copies por índice enviadas pelo montador; sem elas, cai nas 3 variáveis antigas (var1..var3).
+function copiesByIndexFromBody(variableValues: any): Record<number, string> {
+  if (variableValues?.byIndex && typeof variableValues.byIndex === 'object' && Object.keys(variableValues.byIndex).length > 0) {
+    const out: Record<number, string> = {};
+    for (const [k, v] of Object.entries(variableValues.byIndex)) {
+      const n = Number(k);
+      if (Number.isFinite(n) && n > 0) out[n] = String(v ?? '');
+    }
+    return out;
+  }
+  return {
+    1: String(variableValues?.var1 || '{nome}! Bom diaaa! Ótima semana 😄 Falo com o responsável pela {empresa}?'),
+    2: String(variableValues?.var2 || 'Eu sou {vendedor} e queria te fazer uma pergunta: você ficaria chateado se eu tivesse criado um site para a {empresa} sem pedir? 😂'),
+    3: String(variableValues?.var3 || 'Desenvolvi uma prévia exclusiva para vocês: 🔗 {site_novo}')
+  };
+}
+
 app.post('/api/campaign/dispatch', async (req: any, res) => {
   const {
     batchId,
@@ -10498,11 +10516,14 @@ app.post('/api/campaign/dispatch', async (req: any, res) => {
         // Sem corte por tamanho: os limites de 100/160/120 caracteres cortavam o valor no meio
         // e o link do site do cliente chegava quebrado (a variável {{2}} costuma ser a URL).
         // A Meta só exige que a variável não tenha quebra de linha nem espaços repetidos.
-        const sanitizedVariables: Record<string, string> = {
-          '1': sanitizeTemplateVariable(leadVar1),
-          '2': sanitizeTemplateVariable(leadVar2),
-          '3': sanitizeTemplateVariable(leadVar3)
-        };
+        // Variáveis do modelo da Meta: uma por índice escrito na copy ({{1}}, {{2}}...). Sem byIndex, usa var1..var3.
+        const copiesMap: Record<number, string> = copiesByIndexFromBody(variableValues);
+        const built = buildTemplateVariables(copiesMap, { firstName, company, seller: sellerName, url: nyrohUrl });
+        const sanitizedVariables: Record<string, string> = built.variables;
+        if (built.empty.length > 0) {
+          console.warn(`[Disparo] lead sem texto para as variáveis ${built.empty.join(', ')}. Não enfileirado.`);
+          continue;
+        }
 
         const cleanDigits = String(dLead.phoneNumber || '').replace(/\D/g, '');
         let formattedE164 = '';
@@ -10665,11 +10686,14 @@ app.post('/api/campaign/dispatch', async (req: any, res) => {
         // Sem corte por tamanho: os limites de 100/160/120 caracteres cortavam o valor no meio
         // e o link do site do cliente chegava quebrado (a variável {{2}} costuma ser a URL).
         // A Meta só exige que a variável não tenha quebra de linha nem espaços repetidos.
-        const sanitizedVariables: Record<string, string> = {
-          '1': sanitizeTemplateVariable(leadVar1),
-          '2': sanitizeTemplateVariable(leadVar2),
-          '3': sanitizeTemplateVariable(leadVar3)
-        };
+        // Variáveis do modelo da Meta: uma por índice escrito na copy ({{1}}, {{2}}...). Sem byIndex, usa var1..var3.
+        const copiesMap: Record<number, string> = copiesByIndexFromBody(variableValues);
+        const built = buildTemplateVariables(copiesMap, { firstName, company, seller: sellerName, url: nyrohUrl });
+        const sanitizedVariables: Record<string, string> = built.variables;
+        if (built.empty.length > 0) {
+          console.warn(`[Disparo] lead sem texto para as variáveis ${built.empty.join(', ')}. Não enfileirado.`);
+          continue;
+        }
 
         const cleanDigits = String(lead.phoneNumber || '').replace(/\D/g, '');
         let formattedE164 = '';
