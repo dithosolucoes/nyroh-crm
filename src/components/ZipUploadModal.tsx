@@ -487,34 +487,35 @@ export const ZipUploadModal: React.FC<ZipUploadModalProps> = ({
           </div>
         </div>
       </div>
-      <div className="p-4 sm:p-6 max-w-5xl w-full mx-auto space-y-5">
+      <div className="p-4 sm:p-6 w-full min-w-0 grid grid-cols-1 xl:grid-cols-[minmax(360px,420px)_minmax(0,1fr)] gap-6 items-start">
+        <div className="min-w-0 space-y-5">
 
         <div className="bg-white rounded-2xl border border-neutral-200 shadow-2xs p-5">
         <div className="space-y-4">
-          {/* Destino da Importação */}
-          <div className="flex p-1 bg-neutral-100 rounded-xl border border-neutral-200">
-            <button
-              type="button"
-              onClick={() => setDestination('campaign')}
-              className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                destination === 'campaign'
-                  ? 'bg-white text-neutral-900 shadow-2xs'
-                  : 'text-neutral-600 hover:text-neutral-900'
-              }`}
-            >
-              🚀 Área de Disparos & Campanhas (Staging Oficial Meta)
-            </button>
-            <button
-              type="button"
-              onClick={() => setDestination('direct')}
-              className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                destination === 'direct'
-                  ? 'bg-white text-neutral-900 shadow-2xs'
-                  : 'text-neutral-600 hover:text-neutral-900'
-              }`}
-            >
-              👥 Distribuir para Vendedores
-            </button>
+          {/* Destino da Importação (opções lado a lado, sem sub-abas) */}
+          <div className="space-y-2">
+            <p className="text-xs font-bold text-neutral-800">Para onde vão os leads?</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-2">
+              {[
+                { id: 'campaign' as const, titulo: '🚀 Área de Disparos', desc: 'Staging oficial para campanhas pela Meta. Vendedores só veem após a quarentena.' },
+                { id: 'direct' as const, titulo: '👥 Vendedores', desc: 'Distribui os leads direto entre os vendedores.' },
+              ].map(op => (
+                <button
+                  key={op.id}
+                  type="button"
+                  onClick={() => setDestination(op.id)}
+                  aria-pressed={destination === op.id}
+                  className={`text-left p-3 rounded-xl border transition cursor-pointer ${
+                    destination === op.id
+                      ? 'border-blue-500 bg-blue-50/60 ring-1 ring-blue-500/20'
+                      : 'border-neutral-200 bg-white hover:border-neutral-300'
+                  }`}
+                >
+                  <span className="block text-xs font-bold text-neutral-900">{op.titulo}</span>
+                  <span className="block text-[11px] text-neutral-500 mt-0.5 leading-relaxed">{op.desc}</span>
+                </button>
+              ))}
+            </div>
           </div>
 
           {destination === 'campaign' && (
@@ -825,7 +826,10 @@ export const ZipUploadModal: React.FC<ZipUploadModalProps> = ({
             }}
           />
         )}
-        <HistoricoZipsAutoCarregado chave={JSON.stringify([campaignResult, importResult])} />
+        </div>
+        <div className="min-w-0 xl:sticky xl:top-6">
+          <HistoricoZipsAutoCarregado chave={JSON.stringify([campaignResult, importResult])} />
+        </div>
       </div>
 
     </div>
