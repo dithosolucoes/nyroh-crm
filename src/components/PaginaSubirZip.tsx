@@ -234,11 +234,30 @@ export const TabelaHistoricoZips: React.FC<TabelaProps> = ({ historico, carregan
                 <td className="px-4 py-2.5 text-right font-mono text-neutral-700">{numero(h.landlines)}</td>
                 <td className="px-4 py-2.5 text-right text-neutral-500">{tamanho(h.fileSizeBytes)}</td>
                 <td className="px-4 py-2.5 text-right">
-                  {h.batchId && onAbrirSafra && (
-                    <button type="button" onClick={() => onAbrirSafra(h.batchId as string)} className="text-xs font-semibold text-blue-700 hover:underline">
-                      Abrir safra
+                  <div className="flex items-center justify-end gap-3">
+                    {h.batchId && onAbrirSafra && (
+                      <button type="button" onClick={() => onAbrirSafra(h.batchId as string)} className="text-xs font-semibold text-blue-700 hover:underline">
+                        Abrir safra
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!window.confirm(`Apagar o ZIP "${h.fileName}"? Se ele for a única carga da safra e nenhum lead tiver sido disparado, a safra também é apagada. Não dá para desfazer.`)) return;
+                        try {
+                          const r = await fetch(`/api/campaign/uploads/${h.id}`, { method: 'DELETE' });
+                          const d = await r.json().catch(() => ({}));
+                          if (!r.ok) window.alert(d.error || 'Não consegui apagar este ZIP.');
+                          await onAtualizar();
+                        } catch {
+                          window.alert('Falha de conexão ao apagar o ZIP.');
+                        }
+                      }}
+                      className="text-xs font-semibold text-red-700 hover:underline"
+                    >
+                      Apagar
                     </button>
-                  )}
+                  </div>
                 </td>
               </tr>
             ))}
