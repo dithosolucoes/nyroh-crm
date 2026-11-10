@@ -1,8 +1,6 @@
 import { useState } from 'react';
-import { Plus, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
 import {
   ACOES,
-  AMOSTRA,
   EVENTOS,
   LIMITE_TEXTO,
   conversaSimulada,
@@ -16,10 +14,15 @@ import {
 } from '../lib/automacoes';
 import { TOKEN_NAMES } from '../lib/leadTokens';
 
+/**
+ * Tela de Automações de resposta (admin). Porta fiel do protótipo aprovado.
+ * Só dados de exemplo: nada é salvo no servidor e nada é enviado.
+ */
+
 type Status = 'ativa' | 'inativa' | 'rascunho';
 type Regra = { id: string; status: Status; def: Automacao };
 type Visao = 'json' | 'conversa' | 'lado' | 'editar';
-type Aba = 'regras' | 'execucoes' | 'fila' | 'revisao' | 'config';
+type Aba = 'regras' | 'exec' | 'fila' | 'revisao' | 'config';
 
 const SEED: Regra[] = [
   {
@@ -38,6 +41,7 @@ const SEED: Regra[] = [
     def: {
       nome: 'Pediu para parar',
       gatilho: { evento: 'cliente_pediu_parar' },
+      condicoes: [],
       passos: [
         { acao: 'marcar_optout' },
         { acao: 'enviar_texto', params: { texto: 'Obrigado pelo retorno, {nome}. Vou tirar seu número da lista. Bom sucesso!' } },
@@ -50,6 +54,7 @@ const SEED: Regra[] = [
     def: {
       nome: 'Ameaça: pausar e revisar',
       gatilho: { evento: 'cliente_ameacou' },
+      condicoes: [],
       passos: [
         { acao: 'pausar_lead' },
         { acao: 'revisao', params: { motivo: 'Palavra de alerta' } },
@@ -63,95 +68,128 @@ const SEED: Regra[] = [
     def: {
       nome: 'Outra resposta: mandar para revisão',
       gatilho: { evento: 'cliente_respondeu' },
+      condicoes: [],
       passos: [{ acao: 'revisao', params: { motivo: 'Resposta para classificar' } }],
     },
   },
 ];
 
-const BASE_PASSO: Partial<Record<AcaoV, Record<string, unknown>>> = {
+const BASE: Partial<Record<AcaoV, Record<string, unknown>>> = {
   enviar_texto: { texto: '' },
   esperar: { valor: 1, unidade: 'horas' },
   revisao: { motivo: '' },
   etiqueta: { op: 'adicionar', nome: '' },
   notificar: { mensagem: '' },
   definir_campo: { campo: '', valor: '' },
+  marcar_optout: {},
+  pausar_lead: {},
 };
 
-const CHIP_ABAS: Array<{ id: Aba; label: string }> = [
+const SUBTABS: Array<{ id: Aba; label: string }> = [
   { id: 'regras', label: 'Regras' },
-  { id: 'execucoes', label: 'Execuções' },
+  { id: 'exec', label: 'Execuções' },
   { id: 'fila', label: 'Fila agendada' },
   { id: 'revisao', label: 'Revisão' },
   { id: 'config', label: 'Configurações' },
 ];
 
-const EXEMPLO_EXECUCOES = [
+const EXECUCOES = [
   { lead: 'Roberto · Padaria Estrela', regra: 'Clicou em Acessar Link', resultado: 'Link enviado' },
   { lead: 'Ana · Clínica Vida', regra: 'Pediu para parar', resultado: 'Opt-out aplicado' },
   { lead: 'Carlos · Oficina Norte', regra: 'Ameaça', resultado: 'Pausado · revisão' },
 ];
+const FILA = [{ lead: 'Lúcia · Loja Sol', passo: 'Passo 2 · etiqueta', quando: 'hoje, 22:20' }];
+const REVISOES = [
+  { lead: 'Carlos · Oficina Norte', motivo: 'Ameaça', acao: 'Aguardando você' },
+  { lead: 'Paulo · Imobiliária Centro', motivo: 'Resposta para classificar', acao: 'Aguardando você' },
+];
 
-const btn = 'inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm font-semibold text-neutral-800 hover:border-neutral-300 disabled:cursor-not-allowed disabled:opacity-40';
-const btnPrimario = 'inline-flex items-center gap-1.5 rounded-lg border border-teal-700 bg-teal-700 px-3 py-2 text-sm font-semibold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-40';
-const btnSm = 'rounded-md border border-neutral-200 bg-white px-2 py-1 text-xs font-semibold text-neutral-700 hover:border-neutral-300';
-const campo = 'w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 focus:border-teal-600 focus:outline-none';
+const ACCENT = 'text-[#0F766E]';
+const BTN = 'inline-flex items-center rounded-lg border border-[#E3E1DA] bg-white px-3 py-2 text-sm font-semibold whitespace-nowrap hover:border-[#cfcdc4] disabled:cursor-not-allowed disabled:opacity-45';
+const BTN_PRIMARY = 'inline-flex items-center rounded-lg border border-[#0F766E] bg-[#0F766E] px-3 py-2 text-sm font-semibold text-white hover:bg-[#0B5C56] disabled:cursor-not-allowed disabled:opacity-45';
+const BTN_SM = 'rounded-lg border border-[#E3E1DA] bg-white px-2.5 py-1 text-xs font-semibold hover:border-[#cfcdc4]';
+const CHIP = 'rounded-full border border-[#E3E1DA] px-2.5 py-1 text-xs font-medium text-[#6B6A64]';
+const CHIP_ON = 'rounded-full border border-[#0F766E] bg-[#E7F2F0] px-2.5 py-1 text-xs font-semibold text-[#0B5C56]';
+const INP = 'w-full min-w-0 rounded-lg border border-[#E3E1DA] bg-white px-2.5 py-2 text-[13px] text-[#191917] focus-visible:outline-2 focus-visible:outline-[#0F766E]';
+const LABEL = 'mt-2 mb-1 block text-xs font-semibold text-[#6B6A64]';
 
 export default function AdminAutomacoesView() {
-  const [aba, setAba] = useState<Aba>('regras');
+  const [tab, setTab] = useState<Aba>('regras');
   const [regras, setRegras] = useState<Regra[]>(SEED);
-  const [selId, setSelId] = useState('r1');
+  const [selId, setSelId] = useState<string | null>('r1');
   const [filtro, setFiltro] = useState<'todas' | Status>('todas');
-  const [visao, setVisao] = useState<Visao>('lado');
-  const [rascunho, setRascunho] = useState<Automacao | null>(null);
-  const [jsonTxt, setJsonTxt] = useState<string | null>(null);
-  const [jsonErro, setJsonErro] = useState('');
-  const [passo, setPasso] = useState(0);
+  const [view, setView] = useState<Visao>('lado');
+  const [draft, setDraft] = useState<string | null>(null);
+  const [step, setStep] = useState(0);
 
   const sel = regras.find((r) => r.id === selId) ?? regras[0];
-  const atual: Automacao = rascunho ?? sel.def;
-  const val = validarAutomacao(atual, regras, sel.id);
-  const temErro = val.erros.length > 0 || !!jsonErro;
-  const podeSalvar = !temErro;
-  const podeAtivar = podeSalvar && val.conflitos.length === 0;
-  const alterado = rascunho !== null;
 
-  const editar = (nd: Automacao) => {
-    setRascunho(nd);
-    setJsonTxt(null);
-    setJsonErro('');
+  if (!sel) {
+    return (
+      <div className="p-6">
+        <p className="text-sm text-[#6B6A64]">Nenhuma automação. Crie uma com "Nova automação".</p>
+      </div>
+    );
+  }
+
+  const jsonAtual = draft ?? JSON.stringify(sel.def, null, 2);
+  let cur: Automacao | null = null;
+  let jsonErro = '';
+  try {
+    const p = JSON.parse(jsonAtual);
+    if (p && typeof p === 'object' && !Array.isArray(p)) cur = p as Automacao;
+    else jsonErro = 'O JSON precisa ser um objeto.';
+  } catch (e) {
+    jsonErro = `JSON incompleto: ${(e as Error).message}`;
+  }
+  // Só renderiza passos/lógica quando a estrutura básica existe; a validação mostra o resto.
+  const ok = cur && Array.isArray(cur.passos) ? cur : null;
+
+  const val = cur
+    ? validarAutomacao(cur, regras, sel.id)
+    : { erros: [jsonErro], avisos: [] as string[], conflitos: [] as string[] };
+  const temErros = val.erros.length > 0;
+  const temConflitos = val.conflitos.length > 0;
+  const tudoOk = !temErros && !temConflitos;
+  const noSave = temErros || !ok;
+  const noActivate = !tudoOk && sel.status !== 'ativa';
+
+  const commit = (nd: Automacao) => setDraft(JSON.stringify(nd, null, 2));
+  const copia = (): Automacao => JSON.parse(JSON.stringify(ok ?? sel.def));
+  const evLabel = (v?: string) => EVENTOS.find((e) => e.v === v)?.label ?? '—';
+  const fallbackTxt = (n: string) => {
+    const fb = fallbackDe(n);
+    return fb.startsWith('(vazio') ? 'bloqueia o envio' : fb;
   };
 
-  const selecionar = (id: string) => {
+  const trocarSel = (id: string) => {
     setSelId(id);
-    setRascunho(null);
-    setJsonTxt(null);
-    setJsonErro('');
-    setPasso(0);
+    setDraft(null);
+    setStep(0);
   };
 
   const salvar = () => {
-    if (!podeSalvar) return;
-    setRegras((rs) => rs.map((r) => (r.id === sel.id ? { ...r, def: atual, status: r.status === 'ativa' ? 'ativa' : 'rascunho' } : r)));
-    setRascunho(null);
-    setJsonTxt(null);
+    if (noSave || !ok) return;
+    setRegras((rs) => rs.map((r) => (r.id === sel.id ? { ...r, def: ok, status: r.status === 'ativa' ? 'ativa' : 'rascunho' } : r)));
+    setDraft(null);
   };
 
-  const ativarOuPausar = () => {
+  const ativar = () => {
     if (sel.status === 'ativa') {
       setRegras((rs) => rs.map((r) => (r.id === sel.id ? { ...r, status: 'inativa' } : r)));
       return;
     }
-    if (!podeAtivar) return;
-    setRegras((rs) => rs.map((r) => (r.id === sel.id ? { ...r, def: atual, status: 'ativa' } : r)));
-    setRascunho(null);
-    setJsonTxt(null);
+    if (noActivate || !ok) return;
+    setRegras((rs) => rs.map((r) => (r.id === sel.id ? { ...r, def: ok, status: 'ativa' } : r)));
+    setDraft(null);
   };
 
   const excluir = () => {
-    const restantes = regras.filter((r) => r.id !== sel.id);
-    setRegras(restantes);
-    setSelId(restantes[0]?.id ?? '');
-    setRascunho(null);
+    const next = regras.filter((r) => r.id !== sel.id);
+    setRegras(next);
+    setSelId(next[0]?.id ?? null);
+    setDraft(null);
+    setStep(0);
   };
 
   const novaAutomacao = () => {
@@ -159,302 +197,355 @@ export default function AdminAutomacoesView() {
     const def: Automacao = {
       nome: 'Nova automação',
       gatilho: { evento: 'cliente_clicou', filtro: { texto_igual: 'Acessar Link' } },
+      condicoes: [],
       passos: [{ acao: 'enviar_texto', params: { texto: 'Oi {nome}, aqui está o link: {site_novo}' } }],
     };
     setRegras((rs) => [...rs, { id, status: 'rascunho', def }]);
     setSelId(id);
-    setRascunho(null);
-    setAba('regras');
-    setVisao('editar');
-  };
-
-  const mudarPasso = (j: number, novo: Partial<{ acao: AcaoV; params: Record<string, unknown> }>) => {
-    const passos = [...atual.passos];
-    passos[j] = { ...passos[j], ...novo } as Automacao['passos'][number];
-    editar({ ...atual, passos });
-  };
-
-  const trocarAcao = (j: number, acao: AcaoV) => {
-    const passos = [...atual.passos];
-    passos[j] = BASE_PASSO[acao] ? { acao, params: { ...BASE_PASSO[acao] } } : { acao };
-    editar({ ...atual, passos });
-  };
-
-  const moverPasso = (j: number, para: number) => {
-    if (para < 0 || para >= atual.passos.length) return;
-    const passos = [...atual.passos];
-    [passos[j], passos[para]] = [passos[para], passos[j]];
-    editar({ ...atual, passos });
-  };
-
-  const removerPasso = (j: number) => editar({ ...atual, passos: atual.passos.filter((_, i) => i !== j) });
-
-  const inserirVariavel = (j: number, nome: string) => {
-    const texto = String(atual.passos[j]?.params?.texto ?? '');
-    mudarPasso(j, { params: { ...(atual.passos[j]?.params || {}), texto: `${texto}{${nome}}` } });
+    setDraft(null);
+    setStep(0);
+    setFiltro('todas');
+    setTab('regras');
   };
 
   const visiveis = filtro === 'todas' ? regras : regras.filter((r) => r.status === filtro);
-  const bolhas = conversaSimulada(atual);
-  const linhas = logicaEmPalavras(atual);
-  const eventoAtual = EVENTOS.find((e) => e.v === atual.gatilho?.evento);
-
-  const rotuloStatus = (s: Status) => (s === 'ativa' ? 'Ativa' : s === 'rascunho' ? 'Rascunho' : 'Inativa');
-  const corStatus = (s: Status) => (s === 'ativa' ? 'bg-teal-50 text-teal-800' : s === 'rascunho' ? 'bg-amber-50 text-amber-800' : 'bg-neutral-100 text-neutral-600');
+  const nAt = (s: Status) => regras.filter((r) => r.status === s).length;
+  const bolhas = ok ? conversaSimulada(ok) : [];
+  const total = ok ? ok.passos.length + 1 : 0;
+  const linhas = ok ? logicaEmPalavras(ok) : [];
+  const resumo = ok ? resumoDe(ok) : 'Corrija o JSON para ver o resumo.';
+  const ativarLabel = sel.status === 'ativa' ? 'Pausar' : 'Ativar';
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#f8f9fa] overflow-y-auto">
-      <div className="bg-white border-b border-neutral-200 px-4 sm:px-6 py-4 shrink-0">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-bold text-neutral-900">Automações de resposta</h2>
-            <p className="text-sm text-neutral-500">Quando o cliente age, o sistema executa os passos. Nada é enviado enquanto o motor não estiver ligado ao servidor.</p>
-          </div>
-          <button type="button" onClick={novaAutomacao} className={btnPrimario}>
-            <Plus className="h-4 w-4" /> Nova automação
-          </button>
+    <div className="min-h-full bg-[#F5F4F0] p-4 text-[14px] leading-[1.45] text-[#191917] sm:p-6">
+      <header className="mb-3.5 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="m-0 text-2xl font-bold tracking-tight">Automações</h1>
+          <p className="mt-1 text-[#6B6A64]">Cada automação é uma regra: quando o cliente faz algo, o sistema executa os passos.</p>
         </div>
-        <div className="mt-4 flex gap-1 overflow-x-auto border-b border-neutral-200">
-          {CHIP_ABAS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setAba(t.id)}
-              className={`whitespace-nowrap border-b-2 px-3 py-2 text-sm ${aba === t.id ? 'border-teal-700 font-semibold text-neutral-900' : 'border-transparent text-neutral-500 hover:text-neutral-800'}`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-      </div>
+        <button type="button" onClick={novaAutomacao} className={BTN_PRIMARY}>Nova automação</button>
+      </header>
 
-      {aba !== 'regras' && (
-        <div className="p-4 sm:p-6">
-          <div className="rounded-xl border border-neutral-200 bg-white p-4">
-            <p className="mb-3 text-xs text-neutral-500">Dados de exemplo: esta aba ainda não está ligada ao servidor.</p>
-            {aba === 'execucoes' && EXEMPLO_EXECUCOES.map((e) => (
-              <div key={e.lead} className="flex justify-between border-b border-neutral-100 py-2 text-sm last:border-0">
-                <span>{e.lead} · {e.regra}</span><b>{e.resultado}</b>
+      <nav className="mb-4 flex gap-1 overflow-x-auto border-b border-[#E3E1DA]">
+        {SUBTABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setTab(t.id)}
+            className={`-mb-px whitespace-nowrap border-b-2 px-3 py-2.5 ${tab === t.id ? 'border-[#0F766E] font-semibold text-[#191917]' : 'border-transparent font-medium text-[#6B6A64]'}`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </nav>
+
+      {tab === 'regras' && (
+        <>
+          <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+            {[
+              [String(regras.length), 'Automações'],
+              [String(nAt('ativa')), 'Ativas'],
+              [String(nAt('inativa')), 'Inativas'],
+              [String(nAt('rascunho')), 'Rascunhos'],
+            ].map(([n, l]) => (
+              <div key={l} className="rounded-[10px] border border-[#E3E1DA] bg-white px-3.5 py-3">
+                <b className="block text-xl">{n}</b>
+                <span className="text-xs text-[#6B6A64]">{l}</span>
               </div>
             ))}
-            {aba === 'fila' && <p className="text-sm text-neutral-600">Lúcia · Loja Sol · passo 2 · hoje, 22:20</p>}
-            {aba === 'revisao' && <p className="text-sm text-neutral-600">Carlos · Oficina Norte · Palavra de alerta · aguardando você</p>}
-            {aba === 'config' && (
-              <div className="space-y-2 text-sm text-neutral-700">
-                <p>Janela de texto livre: 24 horas após a última mensagem do cliente.</p>
-                <p>Espera padrão de uma resposta automática: 2 horas.</p>
-                <p>Máximo de mensagens automáticas por lead: 2 por dia, 5 por semana.</p>
-                <p>Horário comercial: 08:00 às 18:00 (Brasília).</p>
-              </div>
-            )}
           </div>
-        </div>
-      )}
 
-      {aba === 'regras' && (
-        <div className="grid flex-1 grid-cols-1 gap-4 p-4 sm:p-6 xl:grid-cols-[250px_minmax(0,1fr)_300px] xl:items-start">
-          <section className="rounded-xl border border-neutral-200 bg-white p-4">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-neutral-500">Automações ({regras.length})</p>
-            <div className="mb-3 flex flex-wrap gap-1">
-              {(['todas', 'ativa', 'inativa', 'rascunho'] as const).map((f) => (
-                <button key={f} type="button" onClick={() => setFiltro(f)} className={`rounded-full border px-2.5 py-1 text-xs ${filtro === f ? 'border-teal-700 bg-teal-50 font-semibold text-teal-900' : 'border-neutral-200 text-neutral-500'}`}>
-                  {f === 'todas' ? 'Todas' : rotuloStatus(f)}
-                </button>
-              ))}
-            </div>
-            <div className="space-y-2">
-              {visiveis.map((r) => (
-                <button key={r.id} type="button" onClick={() => selecionar(r.id)} className={`w-full rounded-lg border p-3 text-left ${r.id === sel.id ? 'border-teal-700 ring-2 ring-teal-100' : 'border-neutral-200 hover:border-neutral-300'}`}>
-                  <span className="block text-sm font-semibold text-neutral-900">{r.def.nome}</span>
-                  <span className="block text-xs text-neutral-500">
-                    Quando {(EVENTOS.find((e) => e.v === r.def.gatilho?.evento)?.label || '—').toLowerCase()} · {r.def.passos.length} passo(s)
-                  </span>
-                  <span className={`mt-2 inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${corStatus(r.status)}`}>{rotuloStatus(r.status)}</span>
-                </button>
-              ))}
-              {visiveis.length === 0 && <p className="text-sm text-neutral-500">Nenhuma automação neste filtro.</p>}
-            </div>
-          </section>
-
-          <section className="min-w-0 rounded-xl border border-neutral-200 bg-white p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h3 className="text-base font-bold text-neutral-900">{atual.nome || 'Sem nome'}</h3>
-                <p className="text-xs text-neutral-500">Situação salva: {rotuloStatus(sel.status)}{alterado ? ' · alterações não salvas' : ''}</p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={salvar} disabled={!podeSalvar} className={btn}>Salvar</button>
-                <button type="button" onClick={ativarOuPausar} disabled={sel.status !== 'ativa' && !podeAtivar} className={btnPrimario}>
-                  {sel.status === 'ativa' ? 'Pausar' : 'Ativar'}
-                </button>
-                <button type="button" onClick={excluir} className={`${btn} text-red-700`}>Excluir</button>
-              </div>
-            </div>
-
-            <div className="mt-3 rounded-lg bg-teal-50 px-3 py-2 text-sm text-teal-900">{resumo(atual)}</div>
-
-            <div className="mt-4 flex flex-wrap gap-1">
-              {([
-                ['json', 'JSON'],
-                ['conversa', 'Conversa ao vivo'],
-                ['lado', 'Lado a lado'],
-                ['editar', 'Editar'],
-              ] as Array<[Visao, string]>).map(([id, label]) => (
-                <button key={id} type="button" onClick={() => setVisao(id)} className={`rounded-full border px-3 py-1 text-xs ${visao === id ? 'border-teal-700 bg-teal-50 font-semibold text-teal-900' : 'border-neutral-200 text-neutral-500'}`}>
-                  {label}
-                </button>
-              ))}
-            </div>
-
-            <div className={`mt-4 grid gap-4 ${visao === 'lado' ? '2xl:grid-cols-2' : ''}`}>
-              {(visao === 'json' || visao === 'lado') && (
-                <div>
-                  <textarea
-                    value={jsonTxt ?? JSON.stringify(atual, null, 2)}
-                    spellCheck={false}
-                    onChange={(e) => {
-                      const txt = e.target.value;
-                      setJsonTxt(txt);
-                      try {
-                        const parsed = JSON.parse(txt) as Automacao;
-                        setRascunho(parsed);
-                        setJsonErro('');
-                      } catch (err) {
-                        setJsonErro(`JSON incompleto: ${(err as Error).message}`);
-                      }
-                    }}
-                    className="h-[480px] w-full rounded-lg border border-neutral-200 bg-[#fbfaf7] p-3 font-mono text-xs leading-relaxed text-neutral-900 focus:border-teal-600 focus:outline-none"
-                  />
-                  {jsonErro && <p className="mt-2 text-xs text-red-700">{jsonErro}</p>}
-                </div>
-              )}
-
-              {(visao === 'conversa' || visao === 'lado') && (
-                <div className="rounded-lg bg-[#efebe4] p-3">
-                  <p className="mb-2 text-xs text-neutral-600">Conversa simulada, com dados de exemplo ({AMOSTRA.nome}, {AMOSTRA.empresa}).</p>
-                  <div className="flex flex-col gap-2">
-                    {bolhas.map((b, i) => (
-                      <div key={i} className={b.quem === 'sistema' ? 'self-center rounded-full bg-white/80 px-3 py-1 text-center text-xs text-neutral-600' : b.quem === 'automacao' ? 'max-w-[82%] self-end whitespace-pre-wrap rounded-lg bg-[#dcf3ec] px-3 py-2 text-sm' : 'max-w-[82%] self-start rounded-lg bg-white px-3 py-2 text-sm'}>
-                        {b.quem === 'cliente' && <span className="block text-[11px] font-semibold text-neutral-500">Cliente</span>}
-                        {b.quem === 'automacao' && <span className="block text-[11px] font-semibold text-neutral-500">Automação</span>}
-                        {b.texto}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {visao === 'editar' && (
-                <div className="space-y-4">
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold text-neutral-500">Nome da automação</label>
-                    <input className={campo} value={atual.nome} onChange={(e) => editar({ ...atual, nome: e.target.value })} />
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold text-neutral-500">Quando isso acontecer</label>
-                    <select className={campo} value={atual.gatilho?.evento} onChange={(e) => editar({ ...atual, gatilho: { ...atual.gatilho, evento: e.target.value as EventoV } })}>
-                      {EVENTOS.map((e) => <option key={e.v} value={e.v}>{e.label}</option>)}
-                    </select>
-                    {atual.gatilho?.evento === 'cliente_clicou' && (
-                      <p className="mt-1 text-xs text-neutral-500">Texto do botão que dispara: {atual.gatilho.filtro?.texto_igual || 'Acessar Link'}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <p className="mb-2 text-sm font-semibold text-neutral-900">Passos, na ordem em que acontecem</p>
-                    <div className="space-y-3">
-                      {atual.passos.map((p, j) => (
-                        <div key={j} className={`rounded-lg border p-3 ${passo === j ? 'border-teal-600' : 'border-neutral-200'}`} onClick={() => setPasso(j)}>
-                          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                            <span className="text-sm font-semibold">Passo {j + 1}: {ACOES.find((a) => a.v === p.acao)?.label || p.acao}</span>
-                            <div className="flex gap-1">
-                              <button type="button" className={btnSm} onClick={() => moverPasso(j, j - 1)} aria-label="Subir passo"><ArrowUp className="h-3.5 w-3.5" /></button>
-                              <button type="button" className={btnSm} onClick={() => moverPasso(j, j + 1)} aria-label="Descer passo"><ArrowDown className="h-3.5 w-3.5" /></button>
-                              <button type="button" className={`${btnSm} text-red-700`} onClick={() => removerPasso(j)} aria-label="Remover passo"><Trash2 className="h-3.5 w-3.5" /></button>
-                            </div>
-                          </div>
-
-                          <label className="mb-1 block text-xs font-semibold text-neutral-500">O que acontece neste passo</label>
-                          <select className={campo} value={p.acao} onChange={(e) => trocarAcao(j, e.target.value as AcaoV)}>
-                            {ACOES.map((a) => <option key={a.v} value={a.v}>{a.label}</option>)}
-                          </select>
-
-                          {p.acao === 'enviar_texto' && (
-                            <div className="mt-3">
-                              <label className="mb-1 block text-xs font-semibold text-neutral-500">Texto da mensagem</label>
-                              <textarea className={`${campo} min-h-[70px]`} value={String(p.params?.texto ?? '')} onChange={(e) => mudarPasso(j, { params: { ...p.params, texto: e.target.value } })} />
-                              <div className="mt-2 flex flex-wrap gap-1.5">
-                                {TOKEN_NAMES.map((nome) => (
-                                  <button key={nome} type="button" onClick={() => inserirVariavel(j, nome)} className="rounded-md border border-neutral-200 bg-neutral-50 px-2 py-0.5 font-mono text-[11px] text-neutral-700 hover:border-teal-600">
-                                    {`{${nome}}`}
-                                  </button>
-                                ))}
-                              </div>
-                              <p className="mt-2 text-[11px] text-neutral-500">Se o lead não tiver o dado: {TOKEN_NAMES.map((n) => `{${n}} = ${fallbackDe(n)}`).join(' · ')}</p>
-                              <p className="mt-1 text-[11px] text-neutral-500">Como o cliente vê: {renderPrevia(String(p.params?.texto ?? ''))} ({String(renderPrevia(String(p.params?.texto ?? ''))).length}/{LIMITE_TEXTO})</p>
-                            </div>
-                          )}
-
-                          {p.acao === 'esperar' && (
-                            <div className="mt-3">
-                              <label className="mb-1 block text-xs font-semibold text-neutral-500">Esperar quanto tempo antes do próximo passo</label>
-                              <div className="flex gap-2">
-                                <input type="number" className={`${campo} w-28`} value={Number(p.params?.valor ?? 1)} onChange={(e) => mudarPasso(j, { params: { ...p.params, valor: Number(e.target.value) } })} />
-                                <select className={`${campo} w-36`} value={String(p.params?.unidade ?? 'horas')} onChange={(e) => mudarPasso(j, { params: { ...p.params, unidade: e.target.value } })}>
-                                  <option value="minutos">minutos</option>
-                                  <option value="horas">horas</option>
-                                  <option value="dias">dias</option>
-                                </select>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                    <button type="button" onClick={() => editar({ ...atual, passos: [...atual.passos, { acao: 'enviar_texto', params: { texto: '' } }] })} className="mt-3 w-full rounded-lg border border-dashed border-neutral-300 py-2 text-sm font-semibold text-teal-800 hover:bg-teal-50">
-                      + Adicionar passo
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="mt-4 space-y-2 border-t border-neutral-100 pt-4">
-              {linhas.map((l) => <p key={l} className="text-sm text-neutral-700">{l}</p>)}
-            </div>
-            {eventoAtual && <p className="mt-2 text-xs text-neutral-400">Gatilho: {eventoAtual.desc}</p>}
-          </section>
-
-          <aside className="space-y-4">
-            <section className="rounded-xl border border-neutral-200 bg-white p-4">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-neutral-500">Validação ao vivo</p>
-              {val.erros.map((e) => <p key={e} className="mb-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{e}</p>)}
-              {jsonErro && <p className="mb-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{jsonErro}</p>}
-              {val.conflitos.map((c) => <p key={c} className="mb-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">{c}</p>)}
-              {val.avisos.map((a) => <p key={a} className="mb-2 rounded-lg bg-neutral-50 px-3 py-2 text-xs text-neutral-600">{a}</p>)}
-              {!temErro && val.conflitos.length === 0 && <p className="rounded-lg bg-teal-50 px-3 py-2 text-sm text-teal-900">Sem erros. Pode salvar e ativar.</p>}
-            </section>
-            <section className="rounded-xl border border-neutral-200 bg-white p-4">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-neutral-500">Variáveis do projeto</p>
-              <div className="space-y-1">
-                {TOKEN_NAMES.map((n) => (
-                  <div key={n} className="flex justify-between gap-2 rounded-md bg-neutral-50 px-2 py-1 text-xs">
-                    <code className="font-mono">{`{${n}}`}</code>
-                    <span className="text-right text-neutral-500">{fallbackDe(n)}</span>
-                  </div>
+          <div className="grid gap-[18px] min-[860px]:grid-cols-[250px_minmax(0,1fr)] min-[1280px]:grid-cols-[250px_minmax(0,1fr)_320px] items-start">
+            <section className="rounded-[14px] border border-[#E3E1DA] bg-white p-4">
+              <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6A64]">Todas as automações</p>
+              <div className="mb-3 flex flex-wrap gap-1">
+                {(['todas', 'ativa', 'inativa', 'rascunho'] as const).map((f) => (
+                  <button key={f} type="button" onClick={() => setFiltro(f)} className={filtro === f ? CHIP_ON : CHIP}>
+                    {f === 'todas' ? 'Todas' : f === 'ativa' ? 'Ativas' : f === 'inativa' ? 'Inativas' : 'Rascunhos'}
+                  </button>
                 ))}
               </div>
+              {visiveis.map((r) => (
+                <button
+                  key={r.id}
+                  type="button"
+                  onClick={() => trocarSel(r.id)}
+                  className={`mb-2 flex w-full flex-col gap-1 rounded-[10px] border bg-white p-3 text-left hover:border-[#cfcdc4] ${r.id === sel.id ? 'border-[#0F766E] shadow-[0_0_0_3px_#E7F2F0]' : 'border-[#E3E1DA]'}`}
+                >
+                  <span className="font-semibold">{r.def.nome}</span>
+                  <span className="text-xs text-[#6B6A64]">Quando {evLabel(r.def.gatilho?.evento).toLowerCase()} · {r.def.passos?.length ?? 0} passo(s)</span>
+                  <span className={`w-fit rounded-full px-2 py-0.5 text-[11px] font-semibold ${r.status === 'ativa' ? 'bg-[#E7F2F0] text-[#0B5C56]' : r.status === 'rascunho' ? 'bg-[#FBF1E0] text-[#9A5B00]' : 'bg-[#F5F4F0] text-[#6B6A64]'}`}>
+                    {r.status === 'ativa' ? 'Ativa' : r.status === 'rascunho' ? 'Rascunho' : 'Inativa'}
+                  </span>
+                </button>
+              ))}
+              {visiveis.length === 0 && <p className="text-sm text-[#6B6A64]">Nenhuma automação neste filtro.</p>}
             </section>
-          </aside>
-        </div>
+
+            <section className="min-w-0 rounded-[14px] border border-[#E3E1DA] bg-white p-4">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2.5">
+                <div>
+                  <h2 className="m-0 text-[19px] font-bold">{ok?.nome || sel.def.nome}</h2>
+                  <div className="text-xs text-[#6B6A64]">Situação salva: {sel.status === 'ativa' ? 'ativa' : sel.status === 'rascunho' ? 'rascunho' : 'inativa'}</div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={salvar} disabled={noSave} className={BTN}>Salvar</button>
+                  <button type="button" onClick={ativar} disabled={sel.status !== 'ativa' && noActivate} className={BTN_PRIMARY}>{ativarLabel}</button>
+                  <button type="button" onClick={excluir} className={`${BTN} text-[#B42318]`}>Excluir</button>
+                </div>
+              </div>
+
+              <div className="my-2.5 mb-3 rounded-[10px] bg-[#E7F2F0] px-3 py-2.5 text-[13px] leading-normal text-[#0B5C56]">{resumo}</div>
+
+              <div className="mb-3 flex flex-wrap gap-1">
+                {([
+                  ['json', 'JSON'],
+                  ['conversa', 'Conversa ao vivo'],
+                  ['lado', 'Lado a lado'],
+                  ['editar', 'Editar'],
+                ] as Array<[Visao, string]>).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => {
+                      setView(id);
+                      if (id === 'conversa') setStep(0);
+                    }}
+                    className={view === id ? CHIP_ON : CHIP}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {view !== 'editar' && (
+                <div className={`grid gap-3.5 ${view === 'lado' ? 'xl:grid-cols-2' : ''}`}>
+                  {view !== 'conversa' && (
+                    <textarea
+                      value={jsonAtual}
+                      spellCheck={false}
+                      onChange={(e) => setDraft(e.target.value)}
+                      className="min-h-[520px] w-full rounded-[10px] border border-[#E3E1DA] bg-[#FBFAF7] p-3 font-mono text-xs leading-[1.55] focus-visible:outline-2 focus-visible:outline-[#0F766E]"
+                    />
+                  )}
+                  {view !== 'json' && (
+                    <div className="min-w-0">
+                      <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-xs text-[#6B6A64]">Etapa {Math.min(step, total)} de {total} · dados de exemplo (Roberto, Padaria Estrela)</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          <button type="button" className={BTN_SM} onClick={() => setStep(0)}>Reiniciar</button>
+                          <button type="button" className={BTN_SM} onClick={() => setStep(total)}>Mostrar tudo</button>
+                          <button type="button" className={BTN_SM + ' !border-[#0F766E] !bg-[#0F766E] !text-white'} onClick={() => setStep((s) => Math.min(s + 1, total))}>Próximo passo</button>
+                        </div>
+                      </div>
+                      <div className="flex min-h-[520px] flex-col gap-2 rounded-[14px] border border-[#E3E1DA] bg-[#EFEBE4] p-3.5">
+                        {bolhas.map((b, i) => {
+                          if (i >= step) return null;
+                          if (b.quem === 'cliente') {
+                            return (
+                              <div key={i} className="max-w-[82%] self-start whitespace-pre-wrap rounded-[10px] bg-white px-3 py-2 text-[13.5px] shadow-sm">
+                                <span className="mb-0.5 block text-[11px] font-semibold text-[#6B6A64]">Cliente</span>
+                                {b.texto}
+                              </div>
+                            );
+                          }
+                          if (b.quem === 'automacao') {
+                            return (
+                              <div key={i} className="max-w-[82%] self-end whitespace-pre-wrap rounded-[10px] bg-[#DCF3EC] px-3 py-2 text-[13.5px] shadow-sm">
+                                <span className="mb-0.5 block text-[11px] font-semibold text-[#6B6A64]">Automação</span>
+                                {b.texto}
+                              </div>
+                            );
+                          }
+                          const warn = /^(Aguarda|Opt-out|Lead pausado)/.test(b.texto);
+                          return (
+                            <div key={i} className={`max-w-full self-center rounded-full px-2.5 py-1 text-center text-xs ${warn ? 'bg-[#FBF1E0] text-[#9A5B00]' : 'bg-white/75 text-[#6B6A64]'}`}>
+                              {b.texto}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {view !== 'editar' && ok && (
+                <div className="mt-3 rounded-[14px] border border-[#E3E1DA] p-3.5">
+                  <p className="mb-2 text-[13px] font-semibold">Lógica em palavras</p>
+                  {linhas.map((l, i) => (
+                    <p key={i} className="mb-1 text-[13px] leading-normal">{l}</p>
+                  ))}
+                </div>
+              )}
+
+              {view === 'editar' && ok && (
+                <div className="rounded-[14px] border border-[#E3E1DA] p-3.5">
+                  <p className="mb-2 text-[13px] font-semibold">Editar a automação</p>
+                  <p className="mb-2.5 text-xs text-[#6B6A64]">Mude aqui e o JSON acompanha. Não precisa mexer no JSON.</p>
+
+                  <label className={LABEL}>Nome da automação</label>
+                  <input className={INP} value={ok.nome} onChange={(e) => { const nd = copia(); nd.nome = e.target.value; commit(nd); }} />
+
+                  <label className={LABEL}>Quando isso acontecer</label>
+                  <select className={INP} value={ok.gatilho?.evento ?? ''} onChange={(e) => { const nd = copia(); nd.gatilho = { ...(nd.gatilho || {}), evento: e.target.value as EventoV }; commit(nd); }}>
+                    {EVENTOS.map((e) => <option key={e.v} value={e.v}>{e.label}</option>)}
+                  </select>
+
+                  <p className="mt-3.5 mb-2 text-[13px] font-semibold">Passos, na ordem em que acontecem</p>
+                  {ok.passos.map((p, j) => {
+                    const texto = String(p.params?.texto ?? '');
+                    return (
+                      <div key={j} className="mb-2.5 rounded-[10px] border border-[#E3E1DA] bg-white p-3">
+                        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                          <b className="text-[13px]">Passo {j + 1}: {ACOES.find((a) => a.v === p.acao)?.label ?? p.acao}</b>
+                          <div className="flex flex-wrap gap-1.5">
+                            <button type="button" className={BTN_SM} disabled={j === 0} onClick={() => { const nd = copia(); [nd.passos[j - 1], nd.passos[j]] = [nd.passos[j], nd.passos[j - 1]]; commit(nd); }}>Subir</button>
+                            <button type="button" className={BTN_SM} disabled={j >= ok.passos.length - 1} onClick={() => { const nd = copia(); [nd.passos[j + 1], nd.passos[j]] = [nd.passos[j], nd.passos[j + 1]]; commit(nd); }}>Descer</button>
+                            <button type="button" className={`${BTN_SM} text-[#B42318]`} onClick={() => { const nd = copia(); nd.passos.splice(j, 1); commit(nd); }}>Remover</button>
+                          </div>
+                        </div>
+
+                        <label className={LABEL}>O que acontece neste passo</label>
+                        <select
+                          className={INP}
+                          value={p.acao}
+                          onChange={(e) => {
+                            const nd = copia();
+                            const v = e.target.value as AcaoV;
+                            nd.passos[j] = BASE[v] ? { acao: v, params: { ...BASE[v] } } : { acao: v };
+                            commit(nd);
+                          }}
+                        >
+                          {ACOES.map((a) => <option key={a.v} value={a.v}>{a.label}</option>)}
+                        </select>
+
+                        {p.acao === 'enviar_texto' && (
+                          <>
+                            <label className={LABEL}>Texto da mensagem (clique numa variável para inserir)</label>
+                            <textarea
+                              className={`${INP} min-h-[70px]`}
+                              value={texto}
+                              onChange={(e) => { const nd = copia(); nd.passos[j].params = { ...(nd.passos[j].params || {}), texto: e.target.value }; commit(nd); }}
+                            />
+                            <div className="mt-1.5 flex flex-wrap gap-1.5">
+                              {TOKEN_NAMES.map((n) => (
+                                <button
+                                  key={n}
+                                  type="button"
+                                  onClick={() => { const nd = copia(); nd.passos[j].params = { ...(nd.passos[j].params || {}), texto: texto + `{${n}}` }; commit(nd); }}
+                                  className="rounded-md border border-[#E3E1DA] bg-[#F5F4F0] px-2 py-1 font-mono text-[11.5px] hover:border-[#0F766E]"
+                                >
+                                  {`{${n}}`}
+                                </button>
+                              ))}
+                            </div>
+                            <div className="mt-1 text-[11.5px] text-[#6B6A64]">Se o lead não tiver o dado: {TOKEN_NAMES.map((n) => `{${n}} = ${fallbackTxt(n)}`).join(' · ')}</div>
+                            <div className="mt-1 text-[11.5px] text-[#6B6A64]">Como o cliente vê: {renderPrevia(texto)} ({renderPrevia(texto).length}/{LIMITE_TEXTO})</div>
+                          </>
+                        )}
+
+                        {p.acao === 'esperar' && (
+                          <>
+                            <label className={LABEL}>Esperar quanto tempo antes do próximo passo</label>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <input type="number" className={`${INP} w-[110px]`} value={Number(p.params?.valor ?? 1)} onChange={(e) => { const nd = copia(); nd.passos[j].params = { ...(nd.passos[j].params || {}), valor: Number(e.target.value) }; commit(nd); }} />
+                              <select className={`${INP} w-[110px]`} value={String(p.params?.unidade ?? 'horas')} onChange={(e) => { const nd = copia(); nd.passos[j].params = { ...(nd.passos[j].params || {}), unidade: e.target.value }; commit(nd); }}>
+                                <option value="minutos">minutos</option>
+                                <option value="horas">horas</option>
+                                <option value="dias">dias</option>
+                              </select>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => { const nd = copia(); nd.passos = [...nd.passos, { acao: 'enviar_texto', params: { texto: '' } }]; commit(nd); }}
+                    className={`w-full rounded-[10px] border border-dashed border-[#c8c6bd] py-2.5 font-semibold ${ACCENT} hover:border-solid hover:border-[#0F766E] hover:bg-[#E7F2F0]`}
+                  >
+                    + Adicionar passo
+                  </button>
+                </div>
+              )}
+            </section>
+
+            <aside className="min-[1280px]:col-span-1 min-[860px]:col-span-2 space-y-3.5">
+              <section className="rounded-[14px] border border-[#E3E1DA] bg-white p-4">
+                <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6A64]">Validação ao vivo</p>
+                {val.erros.map((e) => <div key={e} className="mb-2 rounded-[10px] bg-[#FCEBEA] px-3 py-2 text-[13px] text-[#B42318]">{e}</div>)}
+                {val.conflitos.map((c) => <div key={c} className="mb-2 rounded-[10px] bg-[#FBF1E0] px-3 py-2 text-[13px] text-[#9A5B00]">{c}</div>)}
+                {val.avisos.map((a) => <div key={a} className="mb-2 rounded-[10px] bg-[#FBF1E0] px-3 py-2 text-[13px] text-[#9A5B00]">{a}</div>)}
+                {tudoOk && <div className="rounded-[10px] bg-[#E7F2F0] px-3 py-2 text-[13px] text-[#0B5C56]">Sem erros. Pode salvar e ativar.</div>}
+              </section>
+
+              <section className="rounded-[14px] border border-[#E3E1DA] bg-white p-4">
+                <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6A64]">Catálogo</p>
+                <div className="mb-3">
+                  <h4 className="mb-1.5 text-xs font-semibold text-[#6B6A64]">Quando (gatilhos)</h4>
+                  {EVENTOS.map((e) => <Item key={e.v} nome={e.v} texto={e.desc} />)}
+                </div>
+                <div className="mb-3">
+                  <h4 className="mb-1.5 text-xs font-semibold text-[#6B6A64]">Variáveis do projeto</h4>
+                  {TOKEN_NAMES.map((n) => <Item key={n} nome={`{${n}}`} texto={fallbackTxt(n)} />)}
+                </div>
+                <div>
+                  <h4 className="mb-1.5 text-xs font-semibold text-[#6B6A64]">O que acontece (ações)</h4>
+                  {ACOES.map((a) => <Item key={a.v} nome={a.v} texto={a.params} />)}
+                </div>
+              </section>
+            </aside>
+          </div>
+        </>
+      )}
+
+      {tab === 'exec' && (
+        <section className="rounded-[14px] border border-[#E3E1DA] bg-white p-4">
+          <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6A64]">Execuções (exemplo)</p>
+          {EXECUCOES.map((e) => <Item key={e.lead} nome={`${e.lead} · ${e.regra}`} texto={e.resultado} />)}
+        </section>
+      )}
+
+      {tab === 'fila' && (
+        <section className="rounded-[14px] border border-[#E3E1DA] bg-white p-4">
+          <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6A64]">Fila agendada (exemplo)</p>
+          {FILA.map((f) => <Item key={f.lead} nome={`${f.lead} · ${f.passo}`} texto={f.quando} />)}
+        </section>
+      )}
+
+      {tab === 'revisao' && (
+        <section className="rounded-[14px] border border-[#E3E1DA] bg-white p-4">
+          <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6A64]">Revisão manual (exemplo)</p>
+          {REVISOES.map((v) => <Item key={v.lead} nome={`${v.lead} · ${v.motivo}`} texto={v.acao} />)}
+        </section>
+      )}
+
+      {tab === 'config' && (
+        <section className="rounded-[14px] border border-[#E3E1DA] bg-white p-4">
+          <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6A64]">Configurações (exemplo)</p>
+          <Item nome="Janela de texto livre" texto="24 horas após a última mensagem do cliente" />
+          <Item nome="Espera padrão de uma resposta automática" texto="2 horas" />
+          <Item nome="Máximo de mensagens automáticas por lead" texto="2 por dia · 5 por semana" />
+          <Item nome="Horário comercial" texto="08:00 às 18:00 (Brasília)" />
+        </section>
       )}
     </div>
   );
 }
 
-function resumo(def: Automacao): string {
-  if (!def?.gatilho) return 'Escolha quando a automação acontece para ver o resumo.';
-  const ev = EVENTOS.find((e) => e.v === def.gatilho.evento);
+function Item({ nome, texto }: { nome: string; texto: string }) {
+  return (
+    <div className="mb-1 flex justify-between gap-2 rounded-md bg-[#F5F4F0] px-2 py-1.5 text-xs">
+      <code className="font-mono text-[11.5px]">{nome}</code>
+      <span className="text-right text-[#6B6A64]">{texto}</span>
+    </div>
+  );
+}
+
+function resumoDe(def: Automacao): string {
+  const ev = EVENTOS.find((e) => e.v === def.gatilho?.evento)?.desc ?? 'faz algo';
   const nomes: Partial<Record<AcaoV, string>> = {
     enviar_texto: 'envio um texto',
     marcar_optout: 'marco opt-out',
@@ -467,5 +558,5 @@ function resumo(def: Automacao): string {
   const partes = (def.passos || []).map((p) =>
     p.acao === 'esperar' ? `espero ${p.params?.valor} ${p.params?.unidade}` : nomes[p.acao] || p.acao
   );
-  return `Quando o cliente ${ev?.desc || 'faz algo'}, ${partes.join(', depois ') || 'nada'}.`;
+  return `Quando o cliente ${ev}, ${partes.join(', depois ') || 'nada'}.`;
 }
