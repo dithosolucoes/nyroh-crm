@@ -8,6 +8,7 @@
 import { renderPrevia, type Automacao, type AcaoV, type EventoV } from './automacoes';
 import { contemPalavra, quandoExecutar } from './automacoesFila';
 import { randomUUID } from 'crypto';
+import type { CondicaoDefinida } from './automacoesEstado';
 
 export interface ContextoEvento {
   /** Texto exato que o cliente mandou (ex.: "Acessar Link"), quando o gatilho exige. */
@@ -29,6 +30,8 @@ export interface PlanoAutomacao {
   id: string;
   nome: string;
   passos: PassoPlanejado[];
+  /** Condições da regra. Avaliadas de novo na execução, com o estado atual do lead. */
+  condicoes: CondicaoDefinida[];
 }
 
 export interface RegistroAutomacao {
@@ -75,7 +78,7 @@ export function planejarEvento(
         horasDesdeEvento: horas,
       });
     });
-    planos.push({ id: r.id, nome: r.def.nome, passos });
+    planos.push({ id: r.id, nome: r.def.nome, passos, condicoes: r.def.condicoes || [] });
   }
   return planos;
 }
@@ -96,6 +99,8 @@ export interface ItemFila {
   /** Texto AINDA COM {variáveis}. Quem preenche é a execução, com os dados reais do lead. */
   texto: string | null;
   executarEm: Date;
+  /** Condições da regra, avaliadas na execução. Itens antigos, sem o campo, não têm condições. */
+  condicoes?: CondicaoDefinida[];
 }
 
 export interface DepsRecebimento {
@@ -128,6 +133,7 @@ export async function registrarEventoCliente(
         acao: passo.acao,
         texto: passo.texto,
         executarEm: quandoExecutar(agora, passo.horasDesdeEvento),
+        condicoes: plano.condicoes,
       });
     }
   }

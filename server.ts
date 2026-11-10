@@ -1811,8 +1811,8 @@ async function gravarFilaAutomacoes(itens: ItemFila[]) {
   if (!usePostgres || !pgPool) return;
   for (const it of itens) {
     await pgPool.query(
-      `INSERT INTO automacoes_fila (id, automacao_id, lead_id, passo_ordem, acao, texto, executar_em) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [it.id, it.automacaoId, it.leadId, it.passoOrdem, it.acao, it.texto, it.executarEm.toISOString()]
+      `INSERT INTO automacoes_fila (id, automacao_id, lead_id, passo_ordem, acao, texto, executar_em, condicoes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [it.id, it.automacaoId, it.leadId, it.passoOrdem, it.acao, it.texto, it.executarEm.toISOString(), JSON.stringify(it.condicoes ?? [])]
     );
   }
 }
