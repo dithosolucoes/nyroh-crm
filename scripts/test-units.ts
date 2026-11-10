@@ -26,6 +26,7 @@ import { isPubliclyFetchableUrl } from '../src/lib/auditEngine';
 import { validarAutomacao, logicaEmPalavras, conversaSimulada, renderPrevia, tokensDesconhecidos, type Automacao } from '../src/lib/automacoes';
 import { planejarEvento, type RegistroAutomacao } from '../src/lib/automacoesExecucao';
 import { colunaPermitida, TABELAS_BACKUP } from '../src/lib/backupRoutes';
+import { quandoExecutar, estaVencido, contemPalavra } from '../src/lib/automacoesFila';
 import { resolveLeadTokens, TOKEN_NAMES } from '../src/lib/leadTokens';
 import { validateTemplateCategory, buildMetaButtons, defaultExamples, countBodyVariables, validateTemplateVariables } from '../src/lib/templateRules';
 import {
@@ -959,6 +960,28 @@ test('colunas de senha, hash, token e chave nunca entram no backup', () => {
 test('tabelas de tokens e chaves ficam fora da exportação', () => {
   assert.equal((TABELAS_BACKUP as readonly string[]).includes('auth_sessions'), false);
   assert.equal((TABELAS_BACKUP as readonly string[]).includes('system_settings'), false);
+});
+
+group('Agenda e palavra-chave das automações');
+test('espera personalizada soma no horário certo (ex.: 1h30 = 90 minutos)', () => {
+  const agora = new Date('2026-11-10T10:00:00-03:00');
+  assert.equal(quandoExecutar(agora, 1.5).toISOString(), '2026-11-10T14:30:00.000Z');
+  assert.equal(quandoExecutar(agora, 0).getTime(), agora.getTime());
+  assert.equal(estaVencido(quandoExecutar(agora, 2), agora), false);
+  assert.equal(estaVencido(agora, agora), true);
+});
+test('palavra-chave ignora maiúscula e acento', () => {
+  assert.equal(contemPalavra('Quero PREÇO, pode mandar', 'preco'), true);
+  assert.equal(contemPalavra('não tenho interesse', 'preco'), false);
+  assert.equal(contemPalavra('qualquer coisa', '   '), false);
+});
+test('planejador usa texto_contem como filtro do gatilho', () => {
+  const regras: RegistroAutomacao[] = [
+    { id: 'k', status: 'ativa', def: { nome: 'Preço', gatilho: { evento: 'cliente_respondeu', filtro: { texto_contem: 'preço' } },
+      passos: [{ acao: 'enviar_texto', params: { texto: 'Segue o valor' } }] } },
+  ];
+  assert.equal(planejarEvento('cliente_respondeu', regras, { texto: 'Qual o PRECO?' }).length, 1);
+  assert.equal(planejarEvento('cliente_respondeu', regras, { texto: 'oi' }).length, 0);
 });
   await Promise.all(pending);
 

@@ -39,7 +39,7 @@ export interface Passo {
 
 export interface Automacao {
   nome: string;
-  gatilho: { evento: EventoV; filtro?: { texto_igual?: string } };
+  gatilho: { evento: EventoV; filtro?: { texto_igual?: string; texto_contem?: string } };
   condicoes?: Array<{ var: string; op: string; valor?: unknown }>;
   passos: Passo[];
 }
@@ -110,6 +110,10 @@ export function validarAutomacao(
   const d = def as Partial<Automacao>;
   if (!d.nome || typeof d.nome !== 'string' || !d.nome.trim()) erros.push('Dê um nome para a automação.');
   if (!d.gatilho || !eventoValido(d.gatilho.evento)) erros.push('Escolha quando a automação acontece.');
+  const filtro = d.gatilho?.filtro;
+  if (filtro && filtro.texto_contem !== undefined && !String(filtro.texto_contem).trim()) {
+    erros.push('A palavra-chave do gatilho está vazia.');
+  }
 
   const passos = Array.isArray(d.passos) ? d.passos : [];
   if (passos.length === 0) erros.push('Adicione pelo menos um passo.');
