@@ -3795,7 +3795,7 @@ app.post('/api/campaign/test-dispatch', async (req: any, res) => {
     return res.status(400).json({ error: 'Número de telefone é obrigatório.' });
   }
 
-  // Nome oficial do template aprovado na Meta (ex: 'dns_escassez_np4' ou 'notificacao_pedido_atendimento')
+  // Nome oficial do template aprovado na Meta (sempre escolhido pelo operador)
   const effectiveMetaTemplate = String(metaTemplateName || templateName || '').trim();
 
   // Limpar telefone e formatar rigorosamente em E.164 (+55...)
@@ -3866,9 +3866,7 @@ app.post('/api/campaign/test-dispatch', async (req: any, res) => {
 
   // Montar texto completo da mensagem para o histórico do chat
   const renderedFullText = messageText || (
-    effectiveMetaTemplate === 'dns_escassez_np4'
-      ? `Ei,\n\n${resolvedVariables['1']}\n\n${resolvedVariables['2']}\n\n${resolvedVariables['3']}\n\n*Clique no link abaixo para saber mais*`
-      : `Ei, ${resolvedVariables['1']}\n\n${resolvedVariables['2']}\n\n${resolvedVariables['3']}\n\nClique no botão abaixo para acessar:`
+    `Ei, ${resolvedVariables['1']}\n\n${resolvedVariables['2']}\n\n${resolvedVariables['3']}\n\nClique no botão abaixo para acessar:`
   );
 
   // 1. Inserir ou atualizar Lead no CRM (PostgreSQL ou memória)
@@ -9737,7 +9735,7 @@ app.post('/api/campaign/upload-zip', diskUpload.single('zipFile') as any, async 
           withNyrohUrl: 0,
           withWebsite: 0,
           status: 'draft',
-          templateName: 'dns_escassez_np4',
+          templateName: '',
           quarantineHours: 4,
           allowedClosers: ['seller-thomas'],
           hotLeadsRetainedByAdmin: true,
@@ -9765,7 +9763,7 @@ app.post('/api/campaign/upload-zip', diskUpload.single('zipFile') as any, async 
           withNyrohUrl: 0,
           withWebsite: 0,
           status: 'draft',
-          templateName: 'dns_escassez_np4',
+          templateName: '',
           quarantineHours: 4,
           allowedClosers: ['seller-thomas'],
           hotLeadsRetainedByAdmin: true,
@@ -13086,9 +13084,7 @@ async function main() {
       }
 
       let renderedText = jobData.messageText || (
-        templateName === 'dns_escassez_np4'
-          ? `Ei,\n\n${sanitizedVariables['1'] || ''}\n\n${sanitizedVariables['2'] || ''}\n\n${sanitizedVariables['3'] || ''}\n\n*Clique no link abaixo para saber mais*`
-          : `Ei, ${sanitizedVariables['1'] || ''}\n\n${sanitizedVariables['2'] || ''}\n\n${sanitizedVariables['3'] || ''}`
+        `Ei, ${sanitizedVariables['1'] || ''}\n\n${sanitizedVariables['2'] || ''}\n\n${sanitizedVariables['3'] || ''}`
       );
 
       // ---------------------------------------------------------------- resultado: SUCESSO / FALHA

@@ -281,13 +281,6 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
         }
       }
 
-      if (t.name === 'dns_escassez_np4' && (!btns || btns.length === 0)) {
-        btns = [
-          { type: 'QUICK_REPLY', text: 'Acessar Link' },
-          { type: 'QUICK_REPLY', text: 'Parar Mensagens' }
-        ];
-      }
-
       return {
         ...t,
         buttons: btns,

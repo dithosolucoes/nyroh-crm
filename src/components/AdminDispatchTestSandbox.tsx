@@ -114,14 +114,6 @@ export const AdminDispatchTestSandbox: React.FC<AdminDispatchTestSandboxProps> =
         }
       }
 
-      // Se for o template dns_escassez_np4 e não tiver botões preenchidos, preencher com a estrutura oficial aprovada
-      if (t.name === 'dns_escassez_np4' && (!btns || btns.length === 0)) {
-        btns = [
-          { type: 'QUICK_REPLY', text: 'Acessar Link' },
-          { type: 'QUICK_REPLY', text: 'Parar Mensagens' }
-        ];
-      }
-
       return {
         ...t,
         buttons: btns,
@@ -129,35 +121,16 @@ export const AdminDispatchTestSandbox: React.FC<AdminDispatchTestSandboxProps> =
       };
     });
 
-    // Se o dns_escassez_np4 não veio da API por algum motivo, garantir sua presença homologada
-    if (!list.some(t => t.name === 'dns_escassez_np4')) {
-      list.unshift({
-        id: '1073339218665318',
-        name: 'dns_escassez_np4',
-        category: 'UTILITY',
-        status: 'APPROVED',
-        language: 'pt_BR',
-        variableCount: 3,
-        bodyText: 'Ei,\n\n{{1}}\n\n{{2}}\n\n{{3}}\n\n*Clique no link abaixo para saber mais*',
-        footerText: '',
-        buttons: [
-          { type: 'QUICK_REPLY', text: 'Acessar Link' },
-          { type: 'QUICK_REPLY', text: 'Parar Mensagens' }
-        ]
-      });
-    }
-
     return list;
   }, [availableTemplates]);
 
   // 1. Template Oficial Homologado da Meta selecionado
-  const [selectedMetaTemplateName, setSelectedMetaTemplateName] = useState<string>('dns_escassez_np4');
+  const [selectedMetaTemplateName, setSelectedMetaTemplateName] = useState<string>('');
 
   // Recuperar o template da Meta completo ativo
   const activeMetaTemplate = useMemo(() => {
     return (
-      metaTemplatesList.find(t => t.name === selectedMetaTemplateName) ||
-      metaTemplatesList[0]
+      metaTemplatesList.find(t => t.name === selectedMetaTemplateName)
     );
   }, [metaTemplatesList, selectedMetaTemplateName]);
 
@@ -355,23 +328,16 @@ export const AdminDispatchTestSandbox: React.FC<AdminDispatchTestSandboxProps> =
 
   // Botões reais extraídos do template oficial da Meta
   const resolvedButtons: MetaTemplateButton[] = useMemo(() => {
-    if (activeMetaTemplate?.buttons && activeMetaTemplate.buttons.length > 0) {
-      return activeMetaTemplate.buttons;
+    if (activeMetaTemplate?.buttons && activeMetaTemplate?.buttons.length > 0) {
+      return activeMetaTemplate?.buttons;
     }
-    // Fallback padrão se for o dns_escassez_np4
-    return [
-      { type: 'QUICK_REPLY', text: 'Acessar Link' },
-      { type: 'QUICK_REPLY', text: 'Parar Mensagens' }
-    ];
+    return [];
   }, [activeMetaTemplate]);
 
   // Mensagem de rodapé oficial (se existir no template homologado)
   const resolvedFooterText = useMemo(() => {
     if (activeMetaTemplate?.footerText) {
-      return activeMetaTemplate.footerText;
-    }
-    if (activeMetaTemplate?.name === 'dns_escassez_np4') {
-      return '*Clique no link abaixo para saber mais*';
+      return activeMetaTemplate?.footerText;
     }
     return '';
   }, [activeMetaTemplate]);
@@ -437,6 +403,7 @@ export const AdminDispatchTestSandbox: React.FC<AdminDispatchTestSandboxProps> =
 
   // Disparo direto pelo WhatsApp Web / Celular (100% garantido e instantâneo)
   const handleDirectWhatsAppWeb = async () => {
+    if (!selectedMetaTemplateName) { alert('Escolha um modelo aprovado antes de disparar.'); return; }
     const cleanDigits = testPhone.replace(/\D/g, '');
     if (!cleanDigits || cleanDigits.length < 10) {
       showNotification('error', 'Por favor, informe seu número de WhatsApp com DDD para o envio.');
@@ -484,6 +451,7 @@ export const AdminDispatchTestSandbox: React.FC<AdminDispatchTestSandboxProps> =
 
   // Disparo do teste real oficial
   const handleTriggerTestDispatch = async () => {
+    if (!selectedMetaTemplateName) { alert('Escolha um modelo aprovado antes de disparar.'); return; }
     const cleanDigits = testPhone.replace(/\D/g, '');
     if (!cleanDigits || cleanDigits.length < 10) {
       showNotification('error', 'Por favor, informe seu número de WhatsApp com DDD para o teste (ex: 11 98821-6073).');
@@ -624,10 +592,10 @@ export const AdminDispatchTestSandbox: React.FC<AdminDispatchTestSandboxProps> =
                 </label>
                 <div className="flex items-center gap-1.5 text-[10px]">
                   <span className="text-neutral-500 font-mono">
-                    ID: {activeMetaTemplate.id || '1073339218665318'}
+                    ID: {activeMetaTemplate?.id || '1073339218665318'}
                   </span>
                   <span className="text-blue-700 font-mono font-bold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100">
-                    {activeMetaTemplate.category || 'UTILITY'}
+                    {activeMetaTemplate?.category || 'UTILITY'}
                   </span>
                 </div>
               </div>
@@ -636,6 +604,7 @@ export const AdminDispatchTestSandbox: React.FC<AdminDispatchTestSandboxProps> =
                 onChange={e => setSelectedMetaTemplateName(e.target.value)}
                 className="w-full p-2.5 rounded-xl border border-neutral-300 bg-neutral-50 text-xs font-bold text-neutral-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
               >
+                <option value="" disabled>Escolha um modelo aprovado…</option>
                 {metaTemplatesList.map(t => (
                   <option key={t.name} value={t.name}>
                     {t.name} • {t.status || 'APPROVED'} • ({t.category || 'UTILITY'}) • {t.buttons?.length || 2} botões
@@ -647,7 +616,7 @@ export const AdminDispatchTestSandbox: React.FC<AdminDispatchTestSandboxProps> =
               <div className="p-2.5 rounded-xl bg-neutral-50 border border-neutral-200 text-[11px] text-neutral-600 space-y-1">
                 <div className="flex items-center justify-between font-mono text-[10px]">
                   <span>Status na Meta: <strong className="text-emerald-700">APPROVED ✓</strong></span>
-                  <span>Idioma: <strong>{activeMetaTemplate.language || 'pt_BR'}</strong></span>
+                  <span>Idioma: <strong>{activeMetaTemplate?.language || 'pt_BR'}</strong></span>
                   <span>Variáveis no Body: <strong>3 campos (&#123;&#123;1&#125;&#125;, &#123;&#123;2&#125;&#125;, &#123;&#123;3&#125;&#125;)</strong></span>
                 </div>
                 <div className="flex items-center gap-2 pt-1 border-t border-neutral-200/60 text-[10px] text-neutral-500">
@@ -1320,7 +1289,7 @@ export const AdminDispatchTestSandbox: React.FC<AdminDispatchTestSandboxProps> =
                 </div>
                 <div className="flex items-center gap-1">
                   <span className="text-[9px] bg-emerald-900/80 text-emerald-200 px-2 py-0.5 rounded-full font-mono">
-                    {activeMetaTemplate.category || 'UTILITY'}
+                    {activeMetaTemplate?.category || 'UTILITY'}
                   </span>
                 </div>
               </div>
