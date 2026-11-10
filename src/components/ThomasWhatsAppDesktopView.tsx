@@ -1649,43 +1649,6 @@ export const ThomasWhatsAppDesktopView: React.FC<ThomasWhatsAppDesktopViewProps>
                   <span>Templates Oficiais</span>
                 </button>
 
-                {/* Simulador: só existe fora de produção (o servidor responde 404 quando desligado) */}
-                <div className={`relative group ${runtime.simulatorsEnabled ? '' : 'hidden'}`}>
-                                    {SHOW_SIMULATE && (
-<button
-                    disabled={isSimulating}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 text-xs font-bold border border-amber-300 transition-all shadow-2xs cursor-pointer"
-                    title="Simular interações do cliente"
-                  >
-                    <Flame className="w-3.5 h-3.5 text-amber-600" />
-                    <span>{isSimulating ? 'Simulando...' : '⚡ Simular Resposta'}</span>
-                  </button>
-                  )}
-
-                  <div className="absolute right-0 mt-1 w-52 bg-white border border-neutral-200 rounded-xl shadow-lg p-1.5 hidden group-hover:block z-30 animate-in fade-in">
-                    <button
-                      onClick={() => handleSimulateReply('text')}
-                      className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-800 hover:bg-neutral-100 flex items-center gap-2 cursor-pointer"
-                    >
-                      <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Resposta de Texto (Quente)</span>
-                    </button>
-                    <button
-                      onClick={() => handleSimulateReply('audio')}
-                      className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium text-neutral-800 hover:bg-neutral-100 flex items-center gap-2 cursor-pointer"
-                    >
-                      <Volume2 className="w-3.5 h-3.5 text-blue-600" />
-                      <span>Áudio de 14s do Cliente</span>
-                    </button>
-                    <button
-                      onClick={() => handleSimulateReply('optout')}
-                      className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium text-rose-700 hover:bg-rose-50 flex items-center gap-2 cursor-pointer"
-                    >
-                      <X className="w-3.5 h-3.5 text-rose-600" />
-                      <span>Simular Opt-out (Recusar)</span>
-                    </button>
-                  </div>
-                </div>
 
                 {/* Toggle Dossier Panel */}
                 <button
