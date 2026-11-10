@@ -101,9 +101,22 @@ export function pedidoDePararPelasRegras(texto: string, regras: RegistroAutomaca
   return detectOptOut(texto, palavras);
 }
 
+/** Palavras de alerta vêm só das automações ativas no JSON (gatilho "cliente_ameacou"). */
+export function pedidoDeAlertaPelasRegras(texto: string, regras: RegistroAutomacao[]): boolean {
+  const palavras: string[] = [];
+  for (const r of regras) {
+    if (r.status !== 'ativa' || r.def?.gatilho?.evento !== 'cliente_ameacou') continue;
+    const f = r.def.gatilho.filtro;
+    if (f?.texto_contem) palavras.push(f.texto_contem);
+    if (f?.texto_igual) palavras.push(f.texto_igual);
+  }
+  return detectOptOut(texto, palavras);
+}
+
 /** Evento do cliente a partir da resposta recebida. */
-export function eventoDaResposta(texto: string, optout: boolean): EventoV {
+export function eventoDaResposta(texto: string, optout: boolean, alerta = false): EventoV {
   if (optout) return 'cliente_pediu_parar';
+  if (alerta) return 'cliente_ameacou';
   if (String(texto || '').trim() === 'Acessar Link') return 'cliente_clicou';
   return 'cliente_respondeu';
 }
@@ -133,12 +146,12 @@ export interface DepsRecebimento {
  * não faz nada. Ligada, só agenda os passos na fila. Nunca envia.
  */
 export async function registrarEventoCliente(
-  contexto: { leadId: string; texto: string; optout: boolean },
+  contexto: { leadId: string; texto: string; optout: boolean; alerta?: boolean },
   agora: Date,
   deps: DepsRecebimento
 ): Promise<number> {
   if (process.env.NYROH_AUTOMACOES_EXECUCAO !== 'true') return 0;
-  const evento = eventoDaResposta(contexto.texto, contexto.optout);
+  const evento = eventoDaResposta(contexto.texto, contexto.optout, contexto.alerta === true);
   const regras = await deps.carregarRegras();
   // Identidade: guarda o modelo. As variáveis são preenchidas só na execução, com o lead real.
   const planos = planejarEvento(evento, regras, { texto: contexto.texto, optout: contexto.optout }, (t) => t);
