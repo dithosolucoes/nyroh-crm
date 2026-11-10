@@ -30,7 +30,8 @@ import { quandoExecutar, estaVencido, contemPalavra } from '../src/lib/automacoe
 import { registrarEventoCliente, eventoDaResposta, type DepsRecebimento } from '../src/lib/automacoesExecucao';
 import { processarVencidos, type DepsWorker } from '../src/lib/automacoesWorker';
 import { decidirEvento, estadoInicial, pausarLead, liberarLead } from '../src/lib/automacoesEstado';
-import { dentroDosLimites, pausaGeralAtiva, proximaVersao, registroAuditoria, LIMITES_PADRAO } from '../src/lib/automacoesLimites';
+import { dentroDosLimites, pausaGeralAtiva, proximaVersao, registroAuditoria, aplicarVersao, LIMITES_PADRAO } from '../src/lib/automacoesLimites';
+import { avaliarCondicoes } from '../src/lib/automacoesEstado';
 import { resolveLeadTokens, TOKEN_NAMES } from '../src/lib/leadTokens';
 import { validateTemplateCategory, buildMetaButtons, defaultExamples, countBodyVariables, validateTemplateVariables } from '../src/lib/templateRules';
 import {
@@ -1223,6 +1224,56 @@ test('item bloqueado pelo limite vira cancelado com motivo e entra na auditoria'
   assert.equal(marcados[0].status, 'cancelado');
   assert.match(marcados[0].resultado, /Limite/);
   assert.equal(r.auditoria[0].decisao, 'bloqueou');
+});
+
+group('Versão, condições reais e leituras (fases C, D e E)');
+test('salvar gera versão nova e guarda a anterior no histórico, sem aceitar versão do cliente', () => {
+  const agora = new Date('2026-11-10T13:00:00Z');
+  const v1 = aplicarVersao(null, { nome: 'a', versao: 99, historico: [{ x: 1 }] }, agora);
+  assert.equal(v1.versao, 1, 'primeira versão, ignora a do cliente');
+  assert.deepEqual(v1.historico, []);
+  const v2 = aplicarVersao(v1, { nome: 'a editada' }, agora);
+  assert.equal(v2.versao, 2);
+  assert.equal((v2.historico as unknown[]).length, 1);
+  assert.equal((v2.historico as Array<{ versao: number }>)[0].versao, 1);
+});
+test('histórico de versões fica limitado a 20 entradas', () => {
+  const agora = new Date('2026-11-10T13:00:00Z');
+  let d: Record<string, unknown> | null = null;
+  for (let i = 0; i < 30; i++) d = aplicarVersao(d, { nome: `v${i}` }, agora);
+  assert.equal((d as { versao: number }).versao, 30);
+  assert.equal(((d as { historico: unknown[] }).historico).length, 20);
+});
+test('condições reais: lead em opt-out não passa em lead.optout falso', () => {
+  const ctx = { optout: true, pausado: false, janela24h: true, horarioComercial: true, ultimoComando: null };
+  const r = avaliarCondicoes([{ var: 'lead.optout', op: 'falso' }], ctx);
+  assert.equal(r.ok, false);
+  assert.deepEqual(r.falhas, ['lead.optout falso']);
+});
+test('condições reais: janela de 24h e comando do lead', () => {
+  const ctx = { optout: false, pausado: false, janela24h: false, horarioComercial: true, ultimoComando: 'cliente_clicou' as const };
+  assert.equal(avaliarCondicoes([{ var: 'janela_24h', op: 'verdadeiro' }], ctx).ok, false);
+  assert.equal(avaliarCondicoes([{ var: 'ultimo_comando', op: 'igual', valor: 'cliente_clicou' }], ctx).ok, true);
+  assert.equal(avaliarCondicoes([{ var: 'ultimo_comando', op: 'igual', valor: 'sem_resposta' }], ctx).ok, false);
+});
+test('condição desconhecida é falsa, nunca dispara por engano', () => {
+  const ctx = { optout: false, pausado: false, janela24h: true, horarioComercial: true, ultimoComando: null };
+  assert.equal(avaliarCondicoes([{ var: 'inventada', op: 'verdadeiro' }], ctx).ok, false);
+  assert.equal(avaliarCondicoes(undefined, ctx).ok, true, 'sem condições, passa');
+});
+
+group('Simulação com as regras novas (G2)');
+test('a conversa simulada mostra as condições antes dos passos', () => {
+  const def: Automacao = {
+    nome: 'x',
+    gatilho: { evento: 'cliente_clicou' },
+    condicoes: [{ var: 'lead.optout', op: 'falso' }, { var: 'ultimo_comando', op: 'igual', valor: 'cliente_clicou' }],
+    passos: [{ acao: 'enviar_texto', params: { texto: 'Oi {nome}' } }],
+  };
+  const bolhas = conversaSimulada(def);
+  assert.match(bolhas[1].texto, /Só segue se: Lead está em opt-out é falso/);
+  assert.match(bolhas[2].texto, /último comando do lead é = cliente_clicou/i);
+  assert.equal(bolhas[3].texto, 'Oi Roberto');
 });
 
   await Promise.all(pending);

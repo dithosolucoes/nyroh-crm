@@ -231,6 +231,11 @@ export function conversaSimulada(def: Automacao): BolhaConversa[] {
   const out: BolhaConversa[] = [];
   const evento = def.gatilho?.evento;
   out.push({ quem: 'cliente', texto: `[${evento ? clienteDiz[evento] : 'evento'}]` });
+  // Condições aparecem antes dos passos: a conversa mostra o que precisa ser verdade para seguir.
+  for (const c of def.condicoes || []) {
+    const rot = CONDICOES.find((x) => x.v === c.var)?.label ?? c.var;
+    out.push({ quem: 'sistema', texto: `Só segue se: ${rot}${c.op === 'falso' ? ' é falso' : c.op === 'verdadeiro' ? ' é verdadeiro' : c.valor !== undefined ? ` = ${String(c.valor)}` : ''}` });
+  }
   for (const p of def.passos || []) {
     const pr = (p.params || {}) as Record<string, unknown>;
     if (p.acao === 'enviar_texto') out.push({ quem: 'automacao', texto: renderPrevia(String(pr.texto || '(texto vazio)')) });

@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 /**
  * Rotas de persistência das automações de resposta (só admin).
  *
@@ -11,7 +12,7 @@ import type { Express, Request, Response } from 'express';
 import type pg from 'pg';
 import { validarAutomacao, type Automacao } from './automacoes';
 import { processarVencidos } from './automacoesWorker';
-import { pausaGeralAtiva } from './automacoesLimites';
+import { pausaGeralAtiva, aplicarVersao, LIMITES_PADRAO } from './automacoesLimites';
 
 interface AutomacoesDeps {
   getPool: () => pg.Pool | null;
@@ -83,16 +84,82 @@ export function registerAutomacoesRoutes(app: Express, deps: AutomacoesDeps): vo
       if (status === 'ativa' && val.conflitos.length > 0) {
         return res.status(422).json({ error: 'Não dá para ativar: há conflito com outra automação.', conflitos: val.conflitos });
       }
+      // Versão e histórico vêm do servidor: a definição anterior entra no histórico.
+      const anterior = await pool.query(`SELECT definicao FROM automacoes_respostas WHERE id = $1`, [id]);
+      const anteriorDb = anterior.rows[0]?.definicao ?? null;
+      const comVersao = aplicarVersao(anteriorDb, def as unknown as Record<string, unknown>, new Date());
       await pool.query(
         `INSERT INTO automacoes_respostas (id, status, definicao, atualizado_em)
          VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
          ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status, definicao = EXCLUDED.definicao, atualizado_em = CURRENT_TIMESTAMP`,
-        [id, status, JSON.stringify(def)]
+        [id, status, JSON.stringify(comVersao)]
       );
-      res.json({ ok: true, id, status });
+      res.json({ ok: true, id, status, versao: comVersao.versao });
     } catch {
       res.status(500).json({ error: 'Erro ao salvar automação.' });
     }
+  });
+
+  // E2: execuções (decisões do motor com motivo), da auditoria.
+  app.get('/api/admin/automacoes/execucoes', async (req: Request, res: Response) => {
+    if (!soAdmin(req, res)) return;
+    const pool = pronto(res);
+    if (!pool) return;
+    try {
+      const r = await pool.query(
+        `SELECT quando, decisao, motivo, lead_id, regra_id, versao FROM automacoes_auditoria ORDER BY quando DESC LIMIT 100`
+      );
+      res.json(r.rows.map((x: any) => ({ quando: x.quando, decisao: x.decisao, motivo: x.motivo, leadId: x.lead_id, regraId: x.regra_id, versao: x.versao })));
+    } catch {
+      res.status(500).json({ error: 'Erro ao carregar execuções.' });
+    }
+  });
+
+  // E3: fila agendada (passos com espera).
+  app.get('/api/admin/automacoes/fila', async (req: Request, res: Response) => {
+    if (!soAdmin(req, res)) return;
+    const pool = pronto(res);
+    if (!pool) return;
+    try {
+      const r = await pool.query(
+        `SELECT id, automacao_id, lead_id, passo_ordem, acao, status, executar_em, resultado
+         FROM automacoes_fila ORDER BY executar_em DESC LIMIT 100`
+      );
+      res.json(r.rows.map((x: any) => ({
+        id: x.id, automacaoId: x.automacao_id, leadId: x.lead_id, passoOrdem: x.passo_ordem,
+        acao: x.acao, status: x.status, executarEm: x.executar_em, resultado: x.resultado,
+      })));
+    } catch {
+      res.status(500).json({ error: 'Erro ao carregar a fila.' });
+    }
+  });
+
+  // E4: revisão manual (leads pausados pelo motor).
+  app.get('/api/admin/automacoes/revisao', async (req: Request, res: Response) => {
+    if (!soAdmin(req, res)) return;
+    const pool = pronto(res);
+    if (!pool) return;
+    try {
+      const r = await pool.query(
+        `SELECT lead_id, ultimo_comando, ultimo_comando_em FROM leads_estado
+         WHERE status_geral = 'revisao' ORDER BY ultimo_comando_em DESC NULLS LAST LIMIT 100`
+      );
+      res.json(r.rows.map((x: any) => ({ leadId: x.lead_id, ultimoComando: x.ultimo_comando, em: x.ultimo_comando_em })));
+    } catch {
+      res.status(500).json({ error: 'Erro ao carregar a revisão.' });
+    }
+  });
+
+  // E4: configurações reais (estado de execução e pausa geral). Não depende do banco.
+  app.get('/api/admin/automacoes/configuracoes', async (req: Request, res: Response) => {
+    if (!soAdmin(req, res)) return;
+    // Lista de um item, como as outras leituras da tela.
+    res.json([{
+      persistenciaLigada: automacoesPersistenciaOn(),
+      execucaoLigada: process.env.NYROH_AUTOMACOES_EXECUCAO === 'true',
+      pausaGeral: pausaGeralAtiva(),
+      limites: LIMITES_PADRAO,
+    }]);
   });
 
   app.delete('/api/admin/automacoes/:id', async (req: Request, res: Response) => {
@@ -190,6 +257,19 @@ export function iniciarWorkerAutomacoes(pool: pg.Pool): void {
           return r.rows.map((x: any) => new Date(x.processado_em));
         },
       }, 50, { pausaGeral: pausaGeralAtiva() });
+      // D4: auditoria gravada. Se a tabela ainda não existir, só registra o aviso.
+      for (const a of resumo.auditoria) {
+        try {
+          await pool.query(
+            `INSERT INTO automacoes_auditoria (id, quando, decisao, motivo, lead_id, regra_id, versao)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [randomUUID(), a.quando, a.decisao, a.motivo, a.leadId, a.regraId, a.versao]
+          );
+        } catch (e: any) {
+          console.warn('[AUTOMACOES] auditoria não gravada:', e?.message);
+          break;
+        }
+      }
       if (resumo.processados > 0 || resumo.ignorados > 0) console.log('[AUTOMACOES] fila processada (sem envio):', resumo);
     } catch (e: any) {
       console.warn('[AUTOMACOES] falha ao processar a fila:', e?.message);
