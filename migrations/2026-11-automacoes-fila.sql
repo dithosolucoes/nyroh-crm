@@ -20,3 +20,6 @@ CREATE TABLE IF NOT EXISTS automacoes_fila (
 CREATE INDEX IF NOT EXISTS automacoes_fila_pendentes ON automacoes_fila (executar_em) WHERE status = 'pendente';
 -- 'executando' = reservado por um ciclo do processador. Um ciclo que cair no meio deixa o item aqui;
 -- a recuperação disso é tarefa da fase D (limites e auditoria), não desta.
+
+-- Condições da regra, guardadas com o passo e avaliadas na execução (blueprint, seção 5).
+ALTER TABLE automacoes_fila ADD COLUMN IF NOT EXISTS condicoes JSONB;

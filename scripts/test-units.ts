@@ -32,6 +32,7 @@ import { processarVencidos, type DepsWorker } from '../src/lib/automacoesWorker'
 import { decidirEvento, estadoInicial, pausarLead, liberarLead } from '../src/lib/automacoesEstado';
 import { dentroDosLimites, pausaGeralAtiva, proximaVersao, registroAuditoria, aplicarVersao, LIMITES_PADRAO } from '../src/lib/automacoesLimites';
 import { avaliarCondicoes } from '../src/lib/automacoesEstado';
+import { dentroDoHorarioComercial } from '../src/lib/automacoesWorker';
 import { resolveLeadTokens, TOKEN_NAMES } from '../src/lib/leadTokens';
 import { validateTemplateCategory, buildMetaButtons, defaultExamples, countBodyVariables, validateTemplateVariables } from '../src/lib/templateRules';
 import {
@@ -1274,6 +1275,40 @@ test('a conversa simulada mostra as condições antes dos passos', () => {
   assert.match(bolhas[1].texto, /Só segue se: Lead está em opt-out é falso/);
   assert.match(bolhas[2].texto, /último comando do lead é = cliente_clicou/i);
   assert.equal(bolhas[3].texto, 'Oi Roberto');
+});
+
+group('Condições avaliadas na execução (C2)');
+test('passo com condição que falha é cancelado com o motivo e vai para a auditoria', async () => {
+  const agora = new Date('2026-11-10T13:00:00Z');
+  const marcados: Array<{ status: string; resultado: string }> = [];
+  const deps: DepsWorker = {
+    buscarVencidos: async () => [{ id: 'c1', automacaoId: 'a', leadId: 'L7', passoOrdem: 1, acao: 'enviar_texto' as const, texto: 'Oi', executarEm: agora,
+      condicoes: [{ var: 'ultimo_comando', op: 'igual', valor: 'cliente_clicou' }] }],
+    reservar: async () => true,
+    contextoDoLead: async () => ({ leadName: 'Gil', ultimoComando: 'cliente_respondeu' }),
+    marcarResultado: async (_id, status, resultado) => { marcados.push({ status, resultado }); },
+  };
+  const r = await processarVencidos(agora, deps);
+  assert.equal(marcados[0].status, 'cancelado');
+  assert.match(marcados[0].resultado, /Condição não atendida/);
+  assert.equal(r.auditoria[0].decisao, 'pulou');
+});
+test('janela de 24h sem fonte de dado falha por segurança (não envia por engano)', async () => {
+  const agora = new Date('2026-11-10T13:00:00Z');
+  const marcados: Array<{ status: string }> = [];
+  const deps: DepsWorker = {
+    buscarVencidos: async () => [{ id: 'c2', automacaoId: 'a', leadId: 'L8', passoOrdem: 1, acao: 'enviar_texto' as const, texto: 'Oi', executarEm: agora,
+      condicoes: [{ var: 'janela_24h', op: 'verdadeiro' }] }],
+    reservar: async () => true,
+    contextoDoLead: async () => ({ leadName: 'Hugo' }),
+    marcarResultado: async (_id, status) => { marcados.push({ status }); },
+  };
+  await processarVencidos(agora, deps);
+  assert.equal(marcados[0].status, 'cancelado');
+});
+test('horário comercial usa Brasília: 10h BRT dentro, 19h BRT fora', () => {
+  assert.equal(dentroDoHorarioComercial(new Date('2026-11-10T13:00:00Z')), true);
+  assert.equal(dentroDoHorarioComercial(new Date('2026-11-10T22:00:00Z')), false);
 });
 
   await Promise.all(pending);

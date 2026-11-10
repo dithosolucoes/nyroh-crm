@@ -13,10 +13,23 @@
 import { resolveLeadTokens, type LeadTokenContext } from './leadTokens';
 import type { ItemFila } from './automacoesExecucao';
 import { dentroDosLimites, registroAuditoria, type LimitesLead, type RegistroAuditoria } from './automacoesLimites';
+import { avaliarCondicoes, type EventoLead } from './automacoesEstado';
 
 export interface ContextoLeadWorker extends LeadTokenContext {
   /** Lead que pediu para não receber mensagens. Lido de novo antes de cada passo. */
   optout?: boolean;
+  /** Lead pausado ou em revisão pelo motor. */
+  pausado?: boolean;
+  /** Último comando do cliente, para a condição ultimo_comando. */
+  ultimoComando?: EventoLead | null;
+  /** Dentro da janela de 24h. Sem a fonte desse dado, fica indefinido (condição falha, por segurança). */
+  janela24h?: boolean;
+}
+
+/** Horário comercial em Brasília: 08:00 às 18:00. Faixa provisória, decisão na fase F. */
+export function dentroDoHorarioComercial(agora: Date): boolean {
+  const hora = Number(new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', hour12: false, timeZone: 'America/Sao_Paulo' }).format(agora));
+  return hora >= 8 && hora < 18;
 }
 
 export interface DepsWorker {
@@ -68,6 +81,25 @@ export async function processarVencidos(
       continue;
     }
     resumo.processados++;
+
+    // Condições da regra: lidas agora, com o estado atual do lead. Falhou = cancela com o motivo.
+    if (it.condicoes && it.condicoes.length > 0) {
+      const ctxCond = await deps.contextoDoLead(it.leadId);
+      const av = avaliarCondicoes(it.condicoes, {
+        optout: Boolean(ctxCond?.optout),
+        pausado: Boolean(ctxCond?.pausado),
+        janela24h: Boolean(ctxCond?.janela24h),
+        horarioComercial: dentroDoHorarioComercial(agora),
+        ultimoComando: ctxCond?.ultimoComando ?? null,
+      });
+      if (!av.ok) {
+        resumo.cancelados++;
+        const motivo = `Condição não atendida: ${av.falhas.join(', ')}`;
+        resumo.auditoria.push(registroAuditoria('pulou', motivo, agora, { leadId: it.leadId, regraId: it.automacaoId }));
+        await deps.marcarResultado(it.id, 'cancelado', motivo, null);
+        continue;
+      }
+    }
 
     if (it.acao === 'esperar') {
       await deps.marcarResultado(it.id, 'executado', 'Espera concluída', null);

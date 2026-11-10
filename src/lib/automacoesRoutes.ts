@@ -200,7 +200,7 @@ export function iniciarWorkerAutomacoes(pool: pg.Pool): void {
       const resumo = await processarVencidos(new Date(), {
         buscarVencidos: async (agora, limite) => {
           const r = await pool.query(
-            `SELECT id, automacao_id, lead_id, passo_ordem, acao, texto, executar_em
+            `SELECT id, automacao_id, lead_id, passo_ordem, acao, texto, executar_em, condicoes
              FROM automacoes_fila WHERE status = 'pendente' AND executar_em <= $1
              ORDER BY executar_em LIMIT $2`,
             [agora.toISOString(), limite]
@@ -213,6 +213,7 @@ export function iniciarWorkerAutomacoes(pool: pg.Pool): void {
             acao: x.acao,
             texto: x.texto,
             executarEm: new Date(x.executar_em),
+            condicoes: Array.isArray(x.condicoes) ? x.condicoes : [],
           }));
         },
         reservar: async (id) => {
@@ -224,7 +225,10 @@ export function iniciarWorkerAutomacoes(pool: pg.Pool): void {
         },
         contextoDoLead: async (leadId) => {
           const r = await pool.query(
-            `SELECT name, phone_number, public_url, website, niche, salesperson_name, status FROM leads WHERE id = $1`,
+            `SELECT l.name, l.phone_number, l.public_url, l.website, l.niche, l.salesperson_name, l.status,
+                    e.status_geral, e.ultimo_comando
+             FROM leads l LEFT JOIN leads_estado e ON e.lead_id = l.id
+             WHERE l.id = $1`,
             [leadId]
           );
           const x = r.rows[0];
@@ -237,7 +241,9 @@ export function iniciarWorkerAutomacoes(pool: pg.Pool): void {
             niche: x.niche,
             sellerName: x.salesperson_name,
             // Opt-out hoje é marcado com status DESCARTADO (ver detecção de opt-out no recebimento).
-            optout: x.status === 'DESCARTADO',
+            optout: x.status === 'DESCARTADO' || x.status_geral === 'optout',
+            pausado: x.status_geral === 'pausado' || x.status_geral === 'revisao',
+            ultimoComando: x.ultimo_comando ?? null,
           };
         },
         marcarResultado: async (id, status, resultado, textoFinal) => {
