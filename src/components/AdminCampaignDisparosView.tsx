@@ -198,7 +198,6 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   const planoDisparo: Record<string, number> = distribuicaoManual ?? distribuirQuantidade(desejadoDisparo, linhasDisparo);
   const totalPlanoDisparo = linhasDisparo.reduce((s, l) => s + (planoDisparo[l.id] ?? 0), 0);
   useEffect(() => { setDistribuicaoManual(null); }, [desejadoDisparo, checkedBatchIds.join(',')]);
-  const [dispatchSelectedTemplate, setDispatchSelectedTemplate] = useState<string>('dns_escassez_np4');
   const [dispatchSelectedCloser, setDispatchSelectedCloser] = useState<string>('seller-thomas');
   const [dispatchSelectedClosers, setDispatchSelectedClosers] = useState<string[]>([]);
   const [dispatchModalStep, setDispatchModalStep] = useState<'config' | 'processing' | 'success'>('config');
@@ -259,7 +258,10 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   const [quarantineCustomHours, setQuarantineCustomHours] = useState<number>(4);
 
   // Montador State - Templates & 2 Níveis de Variáveis
-  const [selectedTemplate, setSelectedTemplate] = useState<string>('dns_escassez_np4');
+  const [selectedTemplate, setSelectedTemplate] = useState<string>('');
+  // Seletor ÚNICO: o modelo escolhido no montador é o que a prévia mostra e o que o disparo envia
+  const dispatchSelectedTemplate = selectedTemplate;
+  const setDispatchSelectedTemplate = setSelectedTemplate;
   const [availableTemplates, setAvailableTemplates] = useState<any[]>([]);
   const [loadingTemplates, setLoadingTemplates] = useState<boolean>(false);
   const [simulatorLeadIndex, setSimulatorLeadIndex] = useState<number>(0);
@@ -293,31 +295,13 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
       };
     });
 
-    if (!list.some(t => t.name === 'dns_escassez_np4')) {
-      list.unshift({
-        id: '1073339218665318',
-        name: 'dns_escassez_np4',
-        category: 'UTILITY',
-        status: 'APPROVED',
-        language: 'pt_BR',
-        variableCount: 3,
-        bodyText: 'Ei,\n\n{{1}}\n\n{{2}}\n\n{{3}}\n\n*Clique no link abaixo para saber mais*',
-        footerText: '',
-        buttons: [
-          { type: 'QUICK_REPLY', text: 'Acessar Link' },
-          { type: 'QUICK_REPLY', text: 'Parar Mensagens' }
-        ]
-      });
-    }
-
     return list;
   }, [availableTemplates]);
 
   // Recuperar o template da Meta ativo
   const activeMetaTemplate: MetaTemplateFull = useMemo(() => {
     return (
-      metaTemplatesList.find(t => t.name === selectedTemplate) ||
-      metaTemplatesList[0]
+      metaTemplatesList.find(t => t.name === selectedTemplate)
     );
   }, [metaTemplatesList, selectedTemplate]);
 
@@ -486,11 +470,6 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
           const approved = data.templates.filter((t: any) => t.status === 'APPROVED' || t.status === 'active');
           const list = approved.length > 0 ? approved : data.templates;
           setAvailableTemplates(list);
-          if (list.length > 0 && !selectedTemplate) {
-            // Priorizar dns_escassez_np4 se existir na lista
-            const preferred = list.find((t: any) => t.name === 'dns_escassez_np4');
-            setSelectedTemplate(preferred ? preferred.name : list[0].name);
-          }
         }
       }
     } catch (err) {
@@ -1358,6 +1337,10 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   // Execute Batch Dispatch (Moves selected quantity from Staging -> Quarentena/Espera)
   // Dispara cada safra marcada, uma após a outra, com a mesma quantidade e copy escolhidas no modal
   const handleDispatchCheckedBatches = async () => {
+    if (!dispatchSelectedTemplate) {
+      showNotification('error', 'Escolha um modelo aprovado antes de disparar.');
+      return;
+    }
     const targets = checkedBatchIds.filter(id => batches.some(b => b.id === id));
     if (targets.length === 0) return;
     const effectiveClosers = dispatchSelectedClosers.length > 0
@@ -1429,6 +1412,10 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   };
 
   const handleExecuteBatchDispatch = async () => {
+    if (!dispatchSelectedTemplate) {
+      showNotification('error', 'Escolha um modelo aprovado antes de disparar.');
+      return;
+    }
     if (stagingSelectedLeadIds.length === 0 && checkedBatchIds.length > 0) {
       return handleDispatchCheckedBatches();
     }
@@ -2574,6 +2561,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
                           onChange={e => setSelectedTemplate(e.target.value)}
                           className="w-full px-3 py-2.5 bg-white border border-neutral-300 rounded-xl text-xs font-bold text-neutral-900 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-2xs"
                         >
+                          <option value="" disabled>Escolha um modelo aprovado…</option>
                           {availableTemplates.length > 0 ? (
                             availableTemplates.map(tpl => (
                               <option key={tpl.name || tpl.id} value={tpl.name}>
@@ -2581,8 +2569,8 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
                               </option>
                             ))
                           ) : (
-                            <option value="notificacao_pedido_atendimento">
-                              notificacao_pedido_atendimento (UTILITY) — APROVADO META
+                            <option value="" disabled>
+                              Nenhum modelo aprovado encontrado na conta
                             </option>
                           )}
                         </select>
@@ -4085,6 +4073,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
                         onChange={e => setDispatchSelectedTemplate(e.target.value)}
                         className="w-full p-3 bg-neutral-50 border border-neutral-300 rounded-xl text-xs font-bold text-neutral-900 focus:outline-emerald-500 cursor-pointer"
                       >
+                        <option value="" disabled>Escolha um modelo aprovado…</option>
                         {availableTemplates.length > 0 ? (
                           availableTemplates.map((t: any) => (
                             <option key={t.name} value={t.name}>
@@ -4093,11 +4082,8 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
                           ))
                         ) : (
                           <>
-                            <option value="dns_escassez_np4">
-                              dns_escassez_np4 — Template Oficial Meta com Botão CTA (Recomendado)
-                            </option>
-                            <option value="notificacao_pedido_atendimento">
-                              notificacao_pedido_atendimento — Template Padrão Notificação
+                            <option value="" disabled>
+                              Nenhum modelo aprovado encontrado na conta
                             </option>
                           </>
                         )}

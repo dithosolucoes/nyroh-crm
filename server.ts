@@ -3796,7 +3796,7 @@ app.post('/api/campaign/test-dispatch', async (req: any, res) => {
   }
 
   // Nome oficial do template aprovado na Meta (ex: 'dns_escassez_np4' ou 'notificacao_pedido_atendimento')
-  const effectiveMetaTemplate = String(metaTemplateName || templateName || 'dns_escassez_np4').trim();
+  const effectiveMetaTemplate = String(metaTemplateName || templateName || '').trim();
 
   // Limpar telefone e formatar rigorosamente em E.164 (+55...)
   let cleanDigits = String(phoneNumber).replace(/\D/g, '');
@@ -10441,7 +10441,7 @@ function copiesByIndexFromBody(variableValues: any): Record<number, string> {
 app.post('/api/campaign/dispatch', async (req: any, res) => {
   const {
     batchId,
-    templateName = 'dns_escassez_np4',
+    templateName,
     quarantineHours = 4,
     variableValues,
     customBodyText,
@@ -10456,6 +10456,9 @@ app.post('/api/campaign/dispatch', async (req: any, res) => {
 
   if (!batchId) {
     return res.status(400).json({ error: 'ID da safra é obrigatório para disparo.' });
+  }
+  if (!String(templateName || '').trim()) {
+    return res.status(400).json({ error: 'Escolha um modelo aprovado antes de disparar.' });
   }
 
   // Número escolhido na tela (instância da FluxoAPI). Vazio = padrão (marca da safra ou número geral).
@@ -10712,7 +10715,7 @@ app.post('/api/campaign/dispatch', async (req: any, res) => {
           leadId: dLead.id,
           phone: formattedE164 || dLead.phoneNumber || '',
           leadName: dLead.name,
-          templateName: templateName || 'dns_escassez_np4',
+          templateName: String(templateName).trim(),
           templateLanguage: 'pt_BR',
           variables: sanitizedVariables,
           salespersonId: sellerId,
@@ -10883,7 +10886,7 @@ app.post('/api/campaign/dispatch', async (req: any, res) => {
           leadId: lead.id,
           phone: formattedE164 || lead.phoneNumber || '',
           leadName: lead.name,
-          templateName: templateName || 'dns_escassez_np4',
+          templateName: String(templateName).trim(),
           templateLanguage: 'pt_BR',
           variables: sanitizedVariables,
           salespersonId: sellerId,
@@ -11039,10 +11042,21 @@ app.post('/api/campaign/batches/:batchId/resume', (req, res) => {
 });
 
 // Cancelar execução do lote
-app.post('/api/campaign/batches/:batchId/cancel', (req, res) => {
-  const ok = cancelBatchProgress(req.params.batchId);
-  broadcastSocketEvent('campaign_batch_cancelled', { batchId: req.params.batchId });
-  res.json({ success: ok, batchId: req.params.batchId });
+app.post('/api/campaign/batches/:batchId/cancel', async (req: any, res) => {
+  const { batchId } = req.params;
+  const ok = cancelBatchProgress(batchId);
+  broadcastSocketEvent('campaign_batch_cancelled', { batchId });
+  if (!usePostgres || !pgPool) {
+    return res.json({ success: ok, batchId, returned: 0, message: 'Cancelado na fila. Sem Postgres: nada foi revertido no banco.' });
+  }
+  try {
+    // Cancelar agora também devolve para Novos Leads os que a Meta não aceitou (muda no banco, não só na memória)
+    const r = await devolverNaoEnviadosDoLote(batchId);
+    return res.json({ success: ok, batchId, returned: r.returned, removedFromQueue: r.removedFromQueue, skippedInvalid: r.skippedInvalid, message: `Disparo cancelado. ${r.message}` });
+  } catch (err: any) {
+    console.error('[Cancelar] Erro ao devolver leads:', err);
+    return res.status(500).json({ success: ok, batchId, error: `Cancelado na fila, mas erro ao devolver leads: ${err.message}` });
+  }
 });
 
 // 6. Interactive Simulator Action (Simulate Lead Hot Response, Opt-out, or Quarantine Expiration)
@@ -11350,68 +11364,74 @@ app.post('/api/campaign/batches/:batchId/quarantine-config', async (req: any, re
   }
 });
 
-// Devolve para Novos Leads só quem NÃO foi aceito pela Meta (sem ID de mensagem), tirando da fila as mensagens pendentes
+// Devolve para Novos Leads só quem NÃO foi aceito pela Meta (sem ID de mensagem), tirando da fila as mensagens pendentes.
+// Usada pelo botão "Devolver" e pelo "Cancelar", para o cancelamento também mexer no banco.
+async function devolverNaoEnviadosDoLote(batchId: string) {
+  if (!pgPool) throw new Error('Recurso disponível apenas com banco Postgres.');
+
+  // 1) Tira da fila as mensagens desse lote que ainda não saíram (evita envio duplicado depois)
+  const removedFromQueue = await removeBatchWaitingJobs(batchId);
+
+  // 2) Candidatos: em quarentena sem ID de envio da Meta
+  const candidates = await pgPool.query(
+    `SELECT id, phone_number AS "phoneNumber" FROM campaign_leads
+      WHERE batch_id = $1 AND status = 'QUARENTENA' AND whatsapp_message_id IS NULL`,
+    [batchId]
+  );
+  const ids: string[] = candidates.rows
+    .filter((r: any) => formatAndValidateE164Phone(String(r.phoneNumber || '')).isValid)
+    .map((r: any) => r.id);
+  const skippedInvalid = (candidates.rowCount || 0) - ids.length;
+
+  let returned = 0;
+  if (ids.length > 0) {
+    const upd = await pgPool.query(
+      `UPDATE campaign_leads
+          SET status = 'STAGING', sent_at = NULL, quarantine_expires_at = NULL
+        WHERE batch_id = $1 AND id = ANY($2::text[])
+          AND status = 'QUARENTENA' AND whatsapp_message_id IS NULL`,
+      [batchId, ids]
+    );
+    returned = upd.rowCount || 0;
+  }
+
+  // 2b) Os que o corte antigo descartou por engano (marcados só porque estavam na fila, sem envio real)
+  const cutBack = await pgPool.query(
+    `UPDATE campaign_leads
+        SET status = 'STAGING', response_preview = NULL
+      WHERE batch_id = $1 AND status = 'DESCARTADO'
+        AND response_preview = 'Já contatado antes (corte automático)'
+        AND whatsapp_message_id IS NULL`,
+    [batchId]
+  );
+  returned += cutBack.rowCount || 0;
+
+  // 3) Recalcula o contador do lote a partir do banco
+  await pgPool.query(
+    `UPDATE campaign_batches
+        SET dispatched_count = (SELECT COUNT(*) FROM campaign_leads
+                                 WHERE batch_id = $1 AND status IN ('QUARENTENA', 'INTERESSADO'))
+      WHERE id = $1`,
+    [batchId]
+  );
+
+  broadcastSocketEvent('LEAD_UPDATED', { batchId, count: returned });
+  return {
+    returned,
+    removedFromQueue,
+    skippedInvalid,
+    message: `${returned} lead(s) voltaram para Novos Leads. ${removedFromQueue} mensagem(ns) removida(s) da fila. ${skippedInvalid} número(s) inválido(s) ficaram de fora.`
+  };
+}
+
 app.post('/api/campaign/batches/:batchId/return-unsent', async (req: any, res) => {
   const { batchId } = req.params;
   try {
     if (!usePostgres || !pgPool) {
       return res.status(400).json({ success: false, error: 'Recurso disponível apenas com banco Postgres.' });
     }
-
-    // 1) Tira da fila as mensagens desse lote que ainda não saíram (evita envio duplicado depois)
-    const removedFromQueue = await removeBatchWaitingJobs(batchId);
-
-    // 2) Candidatos: em quarentena sem ID de envio da Meta
-    const candidates = await pgPool.query(
-      `SELECT id, phone_number AS "phoneNumber" FROM campaign_leads
-        WHERE batch_id = $1 AND status = 'QUARENTENA' AND whatsapp_message_id IS NULL`,
-      [batchId]
-    );
-    const ids: string[] = candidates.rows
-      .filter((r: any) => formatAndValidateE164Phone(String(r.phoneNumber || '')).isValid)
-      .map((r: any) => r.id);
-    const skippedInvalid = (candidates.rowCount || 0) - ids.length;
-
-    let returned = 0;
-    if (ids.length > 0) {
-      const upd = await pgPool.query(
-        `UPDATE campaign_leads
-            SET status = 'STAGING', sent_at = NULL, quarantine_expires_at = NULL
-          WHERE batch_id = $1 AND id = ANY($2::text[])
-            AND status = 'QUARENTENA' AND whatsapp_message_id IS NULL`,
-        [batchId, ids]
-      );
-      returned = upd.rowCount || 0;
-    }
-
-    // 2b) Os que o corte antigo descartou por engano (marcados só porque estavam na fila, sem envio real)
-    const cutBack = await pgPool.query(
-      `UPDATE campaign_leads
-          SET status = 'STAGING', response_preview = NULL
-        WHERE batch_id = $1 AND status = 'DESCARTADO'
-          AND response_preview = 'Já contatado antes (corte automático)'
-          AND whatsapp_message_id IS NULL`,
-      [batchId]
-    );
-    returned += cutBack.rowCount || 0;
-
-    // 3) Recalcula o contador do lote a partir do banco
-    await pgPool.query(
-      `UPDATE campaign_batches
-          SET dispatched_count = (SELECT COUNT(*) FROM campaign_leads
-                                   WHERE batch_id = $1 AND status IN ('QUARENTENA', 'INTERESSADO'))
-        WHERE id = $1`,
-      [batchId]
-    );
-
-    broadcastSocketEvent('LEAD_UPDATED', { batchId, count: returned });
-    return res.json({
-      success: true,
-      returned,
-      removedFromQueue,
-      skippedInvalid,
-      message: `${returned} lead(s) voltaram para Novos Leads. ${removedFromQueue} mensagem(ns) removida(s) da fila. ${skippedInvalid} número(s) inválido(s) ficaram de fora.`
-    });
+    const r = await devolverNaoEnviadosDoLote(batchId);
+    return res.json({ success: true, returned: r.returned, removedFromQueue: r.removedFromQueue, skippedInvalid: r.skippedInvalid, message: r.message });
   } catch (err: any) {
     console.error('[Retorno] Erro:', err);
     return res.status(500).json({ success: false, error: `Erro ao devolver leads: ${err.message}` });
@@ -13051,7 +13071,7 @@ async function main() {
       const cleanDigits = String(jobData.phone || '').replace(/\D/g, '');
       const phoneCheck = formatAndValidateE164Phone(String(jobData.phone || ''));
       const formattedE164 = phoneCheck.isValid ? phoneCheck.e164 : '';
-      const templateName = jobData.templateName || 'dns_escassez_np4';
+      const templateName = String(jobData.templateName || '').trim();
       const language = jobData.templateLanguage || 'pt_BR';
 
       // Id local ÚNICO por disparo (job): retry do BullMQ reaproveita o mesmo id e a mesma idempotency_key
