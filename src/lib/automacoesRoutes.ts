@@ -22,6 +22,32 @@ import type { RegistroAutomacao } from './automacoesExecucao';
  * Pausa geral: vale o que está no banco (tabela automacoes_config, quando existir).
  * Sem a tabela ou sem a linha, vale a variável de ambiente, como antes.
  */
+/** Fase H: transporte real do envio ainda NÃO conectado. Enquanto for false, nada sai, mesmo ligado. */
+export const ENVIO_REAL_CONECTADO = false;
+
+/** Fase H: configuração de envio guardada em automacoes_config. Sem tabela, vale o padrão (desligado). */
+export async function lerEnvioConfig(pool: pg.Pool | null): Promise<ConfigEnvio> {
+  if (!pool || !(await tabelaExiste(pool as any, 'automacoes_config').catch(() => false))) return { ...ENVIO_PADRAO, automacoesLiberadas: [] };
+  const r = await pool.query(`SELECT valor FROM automacoes_config WHERE chave = 'envio_real'`);
+  if (!r.rows[0]) return { ...ENVIO_PADRAO, automacoesLiberadas: [] };
+  try {
+    return normalizarEnvio(JSON.parse(String(r.rows[0].valor)));
+  } catch {
+    return { ...ENVIO_PADRAO, automacoesLiberadas: [] };
+  }
+}
+
+/** Fase H: envios reais já feitos hoje (dia de São Paulo). Base do limite por dia. */
+export async function contarEnviosReaisHoje(pool: pg.Pool, agora: Date): Promise<number> {
+  const r = await pool.query(
+    `SELECT COUNT(*)::int AS n FROM automacoes_fila
+     WHERE status = 'executado' AND resultado LIKE 'Enviado%'
+       AND processado_em >= date_trunc('day', $1::timestamptz AT TIME ZONE 'America/Sao_Paulo') AT TIME ZONE 'America/Sao_Paulo'`,
+    [agora.toISOString()]
+  );
+  return Number(r.rows[0]?.n) || 0;
+}
+
 export async function lerPausaGeral(pool: pg.Pool | null): Promise<boolean> {
   if (pool && (await tabelaExiste(pool as any, 'automacoes_config').catch(() => false))) {
     const r = await pool.query(`SELECT valor FROM automacoes_config WHERE chave = 'pausa_geral'`);
@@ -61,6 +87,7 @@ export async function dispararAgendas(pool: pg.Pool, agora: Date, deps: { carreg
   return disparos;
 }
 import { pausaGeralAtiva, aplicarVersao } from './automacoesLimites';
+import { ENVIO_PADRAO, LIMITE_ENVIO_DIA_MAX, normalizarEnvio, somenteDigitos, type ConfigEnvio } from './automacoesEnvio';
 
 interface AutomacoesDeps {
   getPool: () => pg.Pool | null;
@@ -229,6 +256,45 @@ export function registerAutomacoesRoutes(app: Express, deps: AutomacoesDeps): vo
     res.json({ pausaGeral });
   });
 
+  // Fase H: controle do envio real, decidido na tela. Padrão: desligado.
+  app.get('/api/admin/automacoes/envio', async (req: Request, res: Response) => {
+    if (!soAdmin(req, res)) return;
+    const cfg = await lerEnvioConfig(deps.getPool()).catch(() => ({ ...ENVIO_PADRAO, automacoesLiberadas: [] }));
+    res.json({ ...cfg, persistenciaLigada: automacoesPersistenciaOn(), envioRealConectado: ENVIO_REAL_CONECTADO });
+  });
+
+  app.put('/api/admin/automacoes/envio', async (req: Request, res: Response) => {
+    if (!soAdmin(req, res)) return;
+    const pool = pronto(res);
+    if (!pool) return;
+    const b = (req.body || {}) as Record<string, unknown>;
+    if (typeof b.ligado !== 'boolean') return res.status(400).json({ error: 'Informe ligado como verdadeiro ou falso.' });
+    const numero = somenteDigitos(b.numeroTeste);
+    if (numero && (numero.length < 10 || numero.length > 15)) {
+      return res.status(400).json({ error: 'Número de teste: informe com DDI e DDD, entre 10 e 15 dígitos.' });
+    }
+    const limite = Number(b.limitePorDia);
+    if (!Number.isInteger(limite) || limite < 0 || limite > LIMITE_ENVIO_DIA_MAX) {
+      return res.status(400).json({ error: `Limite por dia: número inteiro entre 0 e ${LIMITE_ENVIO_DIA_MAX}.` });
+    }
+    if (!Array.isArray(b.automacoesLiberadas) || b.automacoesLiberadas.some((i) => typeof i !== 'string' || !ID_VALIDO.test(i))) {
+      return res.status(400).json({ error: 'Automações liberadas: lista de identificadores válidos.' });
+    }
+    if (b.ligado === true && !numero) {
+      return res.status(400).json({ error: 'Para ligar o envio, informe o número de teste.' });
+    }
+    if (!(await tabelaExiste(pool as any, 'automacoes_config'))) {
+      return res.status(409).json({ error: 'Configuração ainda sem tabela (migração pendente). Nada foi alterado.' });
+    }
+    const cfg = normalizarEnvio({ ligado: b.ligado, numeroTeste: numero, limitePorDia: limite, automacoesLiberadas: b.automacoesLiberadas });
+    await pool.query(
+      `INSERT INTO automacoes_config (chave, valor, atualizado_em) VALUES ('envio_real', $1, CURRENT_TIMESTAMP)
+       ON CONFLICT (chave) DO UPDATE SET valor = EXCLUDED.valor, atualizado_em = CURRENT_TIMESTAMP`,
+      [JSON.stringify(cfg)]
+    );
+    res.json({ ...cfg, persistenciaLigada: true, envioRealConectado: ENVIO_REAL_CONECTADO });
+  });
+
   app.delete('/api/admin/automacoes/:id', async (req: Request, res: Response) => {
     if (!soAdmin(req, res)) return;
     const pool = pronto(res);
@@ -360,6 +426,8 @@ export function iniciarWorkerAutomacoes(pool: pg.Pool, eventos: { carregarRegras
             [id, status, resultado, textoFinal]
           );
         },
+        lerEnvio: () => lerEnvioConfig(pool),
+        contarEnviosReaisHoje: (agora) => contarEnviosReaisHoje(pool, agora),
         enviosRecentes: async (leadId, agora) => {
           // Envios automáticos (simulados hoje) nos últimos 7 dias, para os limites por lead.
           const r = await pool.query(

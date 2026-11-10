@@ -31,6 +31,7 @@ import { criarExecutorAcoes, camposDoLead } from '../src/lib/automacoesExecutore
 import { dispararAgendas, lerPausaGeral } from '../src/lib/automacoesRoutes';
 import { registrarEventoGeral } from '../src/lib/automacoesExecucao';
 import { colunaPermitida, TABELAS_BACKUP } from '../src/lib/backupRoutes';
+import { normalizarEnvio, decidirEnvio, ENVIO_PADRAO, type ConfigEnvio } from '../src/lib/automacoesEnvio';
 import { quandoExecutar, estaVencido, contemPalavra } from '../src/lib/automacoesFila';
 import { registrarEventoCliente, eventoDaResposta, type DepsRecebimento } from '../src/lib/automacoesExecucao';
 import { processarVencidos, type DepsWorker } from '../src/lib/automacoesWorker';
@@ -1764,6 +1765,113 @@ test('arquivos de migração só criam ou acrescentam (sem DROP, TRUNCATE ou DEL
     assert.doesNotMatch(sql, /\b(DROP|TRUNCATE|DELETE\s+FROM)\b/i, arq);
     assert.match(sql, /IF NOT EXISTS/i, `${arq} é idempotente`);
   }
+});
+
+group('Fase H: envio real decidido na tela (padrão desligado, só número de teste)');
+const envioLigado: ConfigEnvio = { ligado: true, numeroTeste: '5531999990000', limitePorDia: 5, automacoesLiberadas: ['a'] };
+test('dado inválido salvo vira o padrão: desligado, sem número, sem liberadas', () => {
+  assert.deepEqual(normalizarEnvio('lixo'), { ...ENVIO_PADRAO, automacoesLiberadas: [] });
+  assert.equal(normalizarEnvio({ ligado: 'sim' }).ligado, false, 'ligado precisa ser booleano true');
+});
+test('normaliza número (só dígitos), limite (inteiro 0..1000) e lista (sem repetidos)', () => {
+  const c = normalizarEnvio({ ligado: true, numeroTeste: '+55 (31) 99999-0000', limitePorDia: 5, automacoesLiberadas: ['a', 'a', 'b'] });
+  assert.equal(c.numeroTeste, '5531999990000');
+  assert.deepEqual(c.automacoesLiberadas, ['a', 'b']);
+  assert.equal(normalizarEnvio({ numeroTeste: '123' }).numeroTeste, null, 'número curto não vale');
+  assert.equal(normalizarEnvio({ limitePorDia: 5000 }).limitePorDia, 0, 'limite acima do teto vira 0');
+  assert.equal(normalizarEnvio({ limitePorDia: 2.5 }).limitePorDia, 0, 'limite fracionado vira 0');
+});
+test('decisão: desligado, sem número, destino errado, não liberada, limite zero e limite atingido bloqueiam', () => {
+  const ok = { automacaoId: 'a', telefone: '5531999990000', enviadosHoje: 0 };
+  assert.equal(decidirEnvio(ENVIO_PADRAO, ok).ok, false);
+  assert.equal(decidirEnvio({ ...envioLigado, numeroTeste: null }, ok).ok, false);
+  assert.equal(decidirEnvio(envioLigado, { ...ok, telefone: '5511988887777' }).ok, false, 'lead real não recebe');
+  assert.equal(decidirEnvio(envioLigado, { ...ok, automacaoId: 'outra' }).ok, false, 'automação não liberada');
+  assert.equal(decidirEnvio({ ...envioLigado, limitePorDia: 0 }, ok).ok, false);
+  assert.equal(decidirEnvio(envioLigado, { ...ok, enviadosHoje: 5 }).ok, false, 'limite do dia atingido');
+});
+test('decisão: só libera com tudo certo (ligado, número de teste, liberada, dentro do limite)', () => {
+  const d = decidirEnvio(envioLigado, { automacaoId: 'a', telefone: '+55 31 99999-0000', enviadosHoje: 4 });
+  assert.equal(d.ok, true);
+});
+test('worker com envio desligado continua simulado, sem chamar transporte', async () => {
+  let chamou = 0;
+  const marcados: Array<{ status: string; resultado: string }> = [];
+  const deps: DepsWorker = {
+    reservar: async () => true,
+    buscarVencidos: async () => [{ id: 'f1', automacaoId: 'a', leadId: 'L', passoOrdem: 1, acao: 'enviar_texto' as const, texto: 'Oi {nome}', executarEm: new Date() }],
+    contextoDoLead: async () => ({ leadName: 'Ana', phoneNumber: '5531999990000', ultimaMensagemDoCliente: new Date('2026-11-10T12:00:00Z') }),
+    marcarResultado: async (_id, status, resultado) => { marcados.push({ status, resultado }); },
+    lerEnvio: async () => ENVIO_PADRAO,
+    enviarTextoReal: async () => { chamou++; return { ok: true, resultado: 'Enviado' }; },
+  };
+  await processarVencidos(new Date('2026-11-10T13:00:00Z'), deps);
+  assert.equal(chamou, 0);
+  assert.equal(marcados[0].status, 'executado');
+  assert.match(marcados[0].resultado, /nada foi enviado/);
+});
+test('worker ligado sem transporte conectado: cancela com motivo, nada sai', async () => {
+  const marcados: Array<{ status: string; resultado: string }> = [];
+  const deps: DepsWorker = {
+    reservar: async () => true,
+    buscarVencidos: async () => [{ id: 'f2', automacaoId: 'a', leadId: 'L', passoOrdem: 1, acao: 'enviar_texto' as const, texto: 'Oi', executarEm: new Date() }],
+    contextoDoLead: async () => ({ leadName: 'Ana', phoneNumber: '5531999990000', ultimaMensagemDoCliente: new Date('2026-11-10T12:00:00Z') }),
+    marcarResultado: async (_id, status, resultado) => { marcados.push({ status, resultado }); },
+    lerEnvio: async () => envioLigado,
+    contarEnviosReaisHoje: async () => 0,
+  };
+  await processarVencidos(new Date('2026-11-10T13:00:00Z'), deps);
+  assert.equal(marcados[0].status, 'cancelado');
+  assert.match(marcados[0].resultado, /ainda não conectado/);
+});
+test('worker ligado: destino que não é o número de teste nunca chama o transporte', async () => {
+  let chamou = 0;
+  const marcados: Array<{ status: string; resultado: string }> = [];
+  const deps: DepsWorker = {
+    reservar: async () => true,
+    buscarVencidos: async () => [{ id: 'f3', automacaoId: 'a', leadId: 'L', passoOrdem: 1, acao: 'enviar_texto' as const, texto: 'Oi', executarEm: new Date() }],
+    contextoDoLead: async () => ({ leadName: 'Lead real', phoneNumber: '5511988887777', ultimaMensagemDoCliente: new Date('2026-11-10T12:00:00Z') }),
+    marcarResultado: async (_id, status, resultado) => { marcados.push({ status, resultado }); },
+    lerEnvio: async () => envioLigado,
+    contarEnviosReaisHoje: async () => 0,
+    enviarTextoReal: async () => { chamou++; return { ok: true, resultado: 'Enviado' }; },
+  };
+  await processarVencidos(new Date('2026-11-10T13:00:00Z'), deps);
+  assert.equal(chamou, 0, 'nunca fala com lead real nesta fase');
+  assert.equal(marcados[0].status, 'cancelado');
+  assert.match(marcados[0].resultado, /número de teste/);
+});
+test('worker ligado com número de teste e transporte: envia uma vez e marca como executado', async () => {
+  let chamou = 0;
+  const marcados: Array<{ status: string; resultado: string }> = [];
+  const deps: DepsWorker = {
+    reservar: async () => true,
+    buscarVencidos: async () => [{ id: 'f4', automacaoId: 'a', leadId: 'L', passoOrdem: 1, acao: 'enviar_texto' as const, texto: 'Oi {nome}', executarEm: new Date() }],
+    contextoDoLead: async () => ({ leadName: 'Teste', phoneNumber: '5531999990000', ultimaMensagemDoCliente: new Date('2026-11-10T12:00:00Z') }),
+    marcarResultado: async (_id, status, resultado) => { marcados.push({ status, resultado }); },
+    lerEnvio: async () => envioLigado,
+    contarEnviosReaisHoje: async () => 0,
+    enviarTextoReal: async () => { chamou++; return { ok: true, resultado: 'Enviado' }; },
+  };
+  await processarVencidos(new Date('2026-11-10T13:00:00Z'), deps);
+  assert.equal(chamou, 1);
+  assert.equal(marcados[0].status, 'executado');
+  assert.equal(marcados[0].resultado, 'Enviado');
+});
+test('se ler a configuração falhar, vale o padrão (desligado): nada sai', async () => {
+  let chamou = 0;
+  const marcados: Array<{ status: string; resultado: string }> = [];
+  const deps: DepsWorker = {
+    reservar: async () => true,
+    buscarVencidos: async () => [{ id: 'f5', automacaoId: 'a', leadId: 'L', passoOrdem: 1, acao: 'enviar_texto' as const, texto: 'Oi', executarEm: new Date() }],
+    contextoDoLead: async () => ({ leadName: 'Teste', phoneNumber: '5531999990000', ultimaMensagemDoCliente: new Date('2026-11-10T12:00:00Z') }),
+    marcarResultado: async (_id, status, resultado) => { marcados.push({ status, resultado }); },
+    lerEnvio: async () => { throw new Error('banco fora'); },
+    enviarTextoReal: async () => { chamou++; return { ok: true, resultado: 'Enviado' }; },
+  };
+  await processarVencidos(new Date('2026-11-10T13:00:00Z'), deps);
+  assert.equal(chamou, 0);
+  assert.match(marcados[0].resultado, /nada foi enviado/);
 });
 
   await Promise.all(pending);
