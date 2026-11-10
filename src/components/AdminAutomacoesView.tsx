@@ -96,7 +96,7 @@ const SUBTABS: Array<{ id: Aba; label: string }> = [
 interface ExecucaoLinha { quando: string; decisao: string; motivo: string; leadId: string | null; regraId: string | null }
 interface FilaLinha { leadId: string; acao: string; executarEm: string; status: string }
 interface RevisaoLinha { leadId: string; ultimoComando: string | null; em: string | null }
-interface ConfigReal { persistenciaLigada: boolean; execucaoLigada: boolean; pausaGeral: boolean; limites: { porDia: number; porSemana: number } }
+interface ConfigReal { persistenciaLigada: boolean; execucaoLigada: boolean; pausaGeral: boolean; limites: null }
 
 // Exemplos mostrados só quando a persistência está desligada (o servidor responde 503).
 const EXECUCOES_EXEMPLO: ExecucaoLinha[] = [
@@ -610,7 +610,7 @@ export default function AdminAutomacoesView() {
           <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6A64]">Configurações{cfg ? '' : ' (exemplo)'}</p>
           <Item nome="Pausa geral" texto={cfg ? (cfg.pausaGeral ? 'LIGADA: a fila está parada' : 'desligada') : 'desligada'} />
           <Item nome="Execução da fila" texto={cfg ? (cfg.execucaoLigada ? 'ligada' : 'desligada, nada roda') : 'desligada, nada roda'} />
-          <Item nome="Máximo de mensagens automáticas por lead" texto={cfg ? `${cfg.limites.porDia} por dia · ${cfg.limites.porSemana} por semana` : '3 por dia · 10 por semana'} />
+          <Item nome="Limites de mensagens por lead" texto="definidos em cada automação (JSON)" />
           <Item nome="Janela de texto livre" texto="24 horas após a última mensagem do cliente" />
           <Item nome="Horário comercial" texto="08:00 às 18:00 (Brasília)" />
         </section>

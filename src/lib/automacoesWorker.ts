@@ -33,11 +33,6 @@ export function dentroDaJanela24h(ultima: Date | null | undefined, agora: Date):
   return diff >= 0 && diff < 24 * 60 * 60 * 1000;
 }
 
-/** Horário comercial em Brasília: 08:00 às 18:00. Faixa provisória, decisão na fase F. */
-export function dentroDoHorarioComercial(agora: Date): boolean {
-  const hora = Number(new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', hour12: false, timeZone: 'America/Sao_Paulo' }).format(agora));
-  return hora >= 8 && hora < 18;
-}
 
 export interface DepsWorker {
   buscarVencidos: (agora: Date, limite: number) => Promise<ItemFila[]>;
@@ -52,7 +47,6 @@ export interface DepsWorker {
 export interface OpcoesWorker {
   /** Pausa geral: não reserva nem executa nada. A fila fica intacta. */
   pausaGeral?: boolean;
-  limites?: LimitesLead;
 }
 
 export interface ResumoWorker {
@@ -96,7 +90,7 @@ export async function processarVencidos(
         optout: Boolean(ctxCond?.optout),
         pausado: Boolean(ctxCond?.pausado),
         janela24h: dentroDaJanela24h(ctxCond?.ultimaMensagemDoCliente, agora),
-        horarioComercial: dentroDoHorarioComercial(agora),
+        agora,
         ultimoComando: ctxCond?.ultimoComando ?? null,
       });
       if (!av.ok) {
@@ -136,7 +130,7 @@ export async function processarVencidos(
       // Limites por lead: texto automático só sai se o lead ainda estiver dentro dos limites.
       if (deps.enviosRecentes) {
         const envios = await deps.enviosRecentes(it.leadId, agora);
-        const lim = dentroDosLimites(envios, agora, opcoes.limites);
+        const lim = dentroDosLimites(envios, agora, it.limites);
         if (!lim.ok) {
           resumo.cancelados++;
           resumo.auditoria.push(registroAuditoria('bloqueou', lim.motivo, agora, { leadId: it.leadId, regraId: it.automacaoId }));

@@ -12,7 +12,7 @@ import type { Express, Request, Response } from 'express';
 import type pg from 'pg';
 import { validarAutomacao, type Automacao } from './automacoes';
 import { processarVencidos } from './automacoesWorker';
-import { pausaGeralAtiva, aplicarVersao, LIMITES_PADRAO } from './automacoesLimites';
+import { pausaGeralAtiva, aplicarVersao } from './automacoesLimites';
 
 interface AutomacoesDeps {
   getPool: () => pg.Pool | null;
@@ -158,7 +158,8 @@ export function registerAutomacoesRoutes(app: Express, deps: AutomacoesDeps): vo
       persistenciaLigada: automacoesPersistenciaOn(),
       execucaoLigada: process.env.NYROH_AUTOMACOES_EXECUCAO === 'true',
       pausaGeral: pausaGeralAtiva(),
-      limites: LIMITES_PADRAO,
+      // Limites não são mais globais: vêm do JSON de cada automação.
+      limites: null,
     }]);
   });
 
@@ -200,7 +201,7 @@ export function iniciarWorkerAutomacoes(pool: pg.Pool): void {
       const resumo = await processarVencidos(new Date(), {
         buscarVencidos: async (agora, limite) => {
           const r = await pool.query(
-            `SELECT id, automacao_id, lead_id, passo_ordem, acao, texto, executar_em, condicoes
+            `SELECT id, automacao_id, lead_id, passo_ordem, acao, texto, executar_em, condicoes, limites
              FROM automacoes_fila WHERE status = 'pendente' AND executar_em <= $1
              ORDER BY executar_em LIMIT $2`,
             [agora.toISOString(), limite]
@@ -214,6 +215,7 @@ export function iniciarWorkerAutomacoes(pool: pg.Pool): void {
             texto: x.texto,
             executarEm: new Date(x.executar_em),
             condicoes: Array.isArray(x.condicoes) ? x.condicoes : [],
+            limites: x.limites ?? undefined,
           }));
         },
         reservar: async (id) => {
