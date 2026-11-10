@@ -25,6 +25,7 @@ import { detectOptOut, sanitizeTemplateVariable } from '../src/lib/leadIntent';
 import { isPubliclyFetchableUrl } from '../src/lib/auditEngine';
 import { validarAutomacao, logicaEmPalavras, conversaSimulada, renderPrevia, tokensDesconhecidos, type Automacao } from '../src/lib/automacoes';
 import { planejarEvento, type RegistroAutomacao } from '../src/lib/automacoesExecucao';
+import { colunaPermitida, TABELAS_BACKUP } from '../src/lib/backupRoutes';
 import { resolveLeadTokens, TOKEN_NAMES } from '../src/lib/leadTokens';
 import { validateTemplateCategory, buildMetaButtons, defaultExamples, countBodyVariables, validateTemplateVariables } from '../src/lib/templateRules';
 import {
@@ -944,6 +945,20 @@ test('filtro de texto e condição de opt-out são respeitados', () => {
   assert.equal(planejarEvento('cliente_clicou', regras, { texto: 'Outro' }).length, 0, 'texto diferente não dispara');
   assert.equal(planejarEvento('cliente_clicou', regras, { texto: 'Acessar Link', optout: true }).length, 0, 'opt-out bloqueia');
   assert.equal(planejarEvento('cliente_clicou', regras, { texto: 'Acessar Link', optout: false }).length, 1, 'caso normal dispara');
+});
+
+group('Backup do banco (exportação)');
+test('colunas de senha, hash, token e chave nunca entram no backup', () => {
+  for (const c of ['password_hash', 'password_salt', 'access_token', 'api_key', 'secret_value']) {
+    assert.equal(colunaPermitida(c), false, c);
+  }
+  for (const c of ['name', 'phone', 'created_at', 'message_text']) {
+    assert.equal(colunaPermitida(c), true, c);
+  }
+});
+test('tabelas de tokens e chaves ficam fora da exportação', () => {
+  assert.equal((TABELAS_BACKUP as readonly string[]).includes('auth_sessions'), false);
+  assert.equal((TABELAS_BACKUP as readonly string[]).includes('system_settings'), false);
 });
   await Promise.all(pending);
 

@@ -65,6 +65,20 @@ export const AdminEstruturaView: React.FC<Props> = ({ leads, currentUser, onShow
             ? 'Central de leads, remessas, blocos salvos e pedidos de bloqueio.'
             : 'Marcas, números, regras de contato e integrações com a Meta e a FluxoAPI.'}
         </p>
+        {secao === 'configuracoes' && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-white px-4 py-3">
+            <div>
+              <p className="text-sm font-semibold text-neutral-900">Baixar backup do banco</p>
+              <p className="text-xs text-neutral-500">Arquivo JSON com leads, conversas, vendedores e registros. Contém dados pessoais: guarde com cuidado. Cada download fica na auditoria.</p>
+            </div>
+            <a
+              href="/api/admin/backup/exportar"
+              className="inline-flex items-center rounded-lg border border-neutral-900 bg-neutral-900 px-3 py-2 text-sm font-semibold text-white hover:bg-neutral-800"
+            >
+              Baixar backup
+            </a>
+          </div>
+        )}
         <nav className="flex gap-6 mt-5 overflow-x-auto no-scrollbar">
           {tabsDaSecao.map(t => {
             const ativa = tab === t.id;

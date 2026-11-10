@@ -15,6 +15,7 @@ import { Lead, CallLog, ColumnStatus, PIPELINE_COLUMNS, CustomTag, Salesperson, 
 import { getLeadNiche } from './src/lib/niche.js';
 import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regrasDeContatoSql, instanciaDaSafra } from './src/lib/uxRoutes.js';
 import { registerAutomacoesRoutes, applyAutomacoesMigration, automacoesPersistenciaOn } from './src/lib/automacoesRoutes.js';
+import { registerBackupRoutes } from './src/lib/backupRoutes.js';
 import { hashPassword, verifyPassword, generateSessionToken, DEFAULT_USERS, StoredUser, isUserAdmin } from './src/lib/serverAuth.js';
 import { performWebsiteAudit } from './src/lib/auditEngine.js';
 import { missingFluxoVars, summarizeFluxoInstance } from './src/lib/fluxoInstanceStatus.js';
@@ -12859,6 +12860,14 @@ registerUxRoutes(app, {
   currentUser: (req: any) => req.user,
   isAdmin: (user: any) => isUserAdmin(user),
   getLeadOwnerId,
+});
+
+// Backup manual do banco (download, só admin, sem restauração).
+registerBackupRoutes(app, {
+  getPool: () => (usePostgres ? pgPool : null),
+  currentUser: (req: any) => req.user,
+  isAdmin: (user: any) => isUserAdmin(user),
+  logAudit: (action: string, details?: string, req?: any) => logAudit(action, details, req),
 });
 
 // Automações de resposta: só persistem regras (admin). Nenhum envio.
