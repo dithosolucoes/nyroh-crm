@@ -1,0 +1,109 @@
+/**
+ * Rotas de persistência das automações de resposta (só admin).
+ *
+ * Não envia nada: só guarda as regras. As tabelas vêm de migrations/2026-11-automacoes-respostas.sql
+ * e a criação só roda com NYROH_AUTOMACOES_PERSISTENCIA=true. Sem isso, as rotas respondem 503.
+ *
+ * Validação no servidor: a mesma do motor (validarAutomacao). Regra com erro não é salva;
+ * regra com conflito não pode ficar ativa.
+ */
+import type { Express, Request, Response } from 'express';
+import type pg from 'pg';
+import { validarAutomacao, type Automacao } from './automacoes';
+
+interface AutomacoesDeps {
+  getPool: () => pg.Pool | null;
+  currentUser: (req: Request) => any;
+  isAdmin: (user: any) => boolean;
+}
+
+const FLAG = 'NYROH_AUTOMACOES_PERSISTENCIA';
+const STATUS_VALIDOS = ['ativa', 'inativa', 'rascunho'] as const;
+const ID_VALIDO = /^[a-zA-Z0-9_-]{1,64}$/;
+
+/** Verdadeiro quando a persistência de automações está liberada (flag ligada). */
+export const automacoesPersistenciaOn = (): boolean => process.env[FLAG] === 'true';
+
+/** Aplica a migração de automações (idempotente). Chamado no boot só com a flag ligada. */
+export async function applyAutomacoesMigration(pool: pg.Pool): Promise<void> {
+  const { default: fs } = await import('fs');
+  const path = await import('path');
+  const sql = fs.readFileSync(path.resolve(process.cwd(), 'migrations', '2026-11-automacoes-respostas.sql'), 'utf8');
+  await pool.query(sql);
+  console.log('[AUTOMACOES] migração aplicada (flag NYROH_AUTOMACOES_PERSISTENCIA=true).');
+}
+
+export function registerAutomacoesRoutes(app: Express, deps: AutomacoesDeps): void {
+  const soAdmin = (req: Request, res: Response): boolean => {
+    if (!deps.isAdmin(deps.currentUser(req))) {
+      res.status(403).json({ error: 'Acesso restrito ao Administrador.' });
+      return false;
+    }
+    return true;
+  };
+
+  const pronto = (res: Response): import('pg').Pool | null => {
+    const pool = deps.getPool();
+    if (!automacoesPersistenciaOn() || !pool) {
+      res.status(503).json({ error: 'Persistência de automações desligada neste ambiente.' });
+      return null;
+    }
+    return pool;
+  };
+
+  app.get('/api/admin/automacoes', async (req: Request, res: Response) => {
+    if (!soAdmin(req, res)) return;
+    const pool = pronto(res);
+    if (!pool) return;
+    try {
+      const r = await pool.query(`SELECT id, status, definicao FROM automacoes_respostas ORDER BY criado_em, id`);
+      res.json(r.rows.map((x: any) => ({ id: x.id, status: x.status, def: x.definicao })));
+    } catch {
+      res.status(500).json({ error: 'Erro ao carregar automações.' });
+    }
+  });
+
+  app.put('/api/admin/automacoes/:id', async (req: Request, res: Response) => {
+    if (!soAdmin(req, res)) return;
+    const pool = pronto(res);
+    if (!pool) return;
+    const id = String(req.params.id);
+    const status = req.body?.status;
+    const def = req.body?.def as Automacao | undefined;
+    if (!ID_VALIDO.test(id)) return res.status(400).json({ error: 'Identificador inválido.' });
+    if (!STATUS_VALIDOS.includes(status)) return res.status(400).json({ error: 'Situação inválida.' });
+
+    try {
+      const outras = await pool.query(`SELECT id, status, definicao FROM automacoes_respostas WHERE id <> $1`, [id]);
+      const lista = outras.rows.map((x: any) => ({ id: x.id, status: x.status, def: x.definicao }));
+      const val = validarAutomacao(def, lista, id);
+      if (val.erros.length > 0) return res.status(422).json({ error: 'A automação tem erros.', erros: val.erros });
+      if (status === 'ativa' && val.conflitos.length > 0) {
+        return res.status(422).json({ error: 'Não dá para ativar: há conflito com outra automação.', conflitos: val.conflitos });
+      }
+      await pool.query(
+        `INSERT INTO automacoes_respostas (id, status, definicao, atualizado_em)
+         VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
+         ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status, definicao = EXCLUDED.definicao, atualizado_em = CURRENT_TIMESTAMP`,
+        [id, status, JSON.stringify(def)]
+      );
+      res.json({ ok: true, id, status });
+    } catch {
+      res.status(500).json({ error: 'Erro ao salvar automação.' });
+    }
+  });
+
+  app.delete('/api/admin/automacoes/:id', async (req: Request, res: Response) => {
+    if (!soAdmin(req, res)) return;
+    const pool = pronto(res);
+    if (!pool) return;
+    const id = String(req.params.id);
+    if (!ID_VALIDO.test(id)) return res.status(400).json({ error: 'Identificador inválido.' });
+    try {
+      await pool.query(`DELETE FROM automacoes_respostas WHERE id = $1`, [id]);
+      res.json({ ok: true });
+    } catch {
+      res.status(500).json({ error: 'Erro ao excluir automação.' });
+    }
+  });
+}
