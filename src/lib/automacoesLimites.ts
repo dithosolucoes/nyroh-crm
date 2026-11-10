@@ -1,3 +1,4 @@
+import { flagLigada } from './flagLigada';
 /**
  * Limites por lead, pausa geral, versão e auditoria das automações (blueprint, seção 8).
  * PURO: sem banco, sem rede.
@@ -37,7 +38,7 @@ export function dentroDosLimites(
  * Enquanto ligada, o processador não reserva nem executa nenhum item.
  */
 export function pausaGeralAtiva(env: Record<string, string | undefined> = process.env): boolean {
-  return env.NYROH_AUTOMACOES_PAUSA_GERAL === 'true';
+  return flagLigada(env.NYROH_AUTOMACOES_PAUSA_GERAL);
 }
 
 /** Próxima versão de uma regra. A versão anterior continua guardada no histórico. */

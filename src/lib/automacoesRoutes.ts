@@ -10,6 +10,7 @@ import { randomUUID } from 'crypto';
  */
 import type { Express, Request, Response } from 'express';
 import type pg from 'pg';
+import { flagLigada } from './flagLigada';
 import { validarAutomacao, type Automacao } from './automacoes';
 import { processarVencidos } from './automacoesWorker';
 import { criarExecutorAcoes, camposDoLead, tabelaExiste } from './automacoesExecutores';
@@ -100,7 +101,7 @@ const STATUS_VALIDOS = ['ativa', 'inativa', 'rascunho'] as const;
 const ID_VALIDO = /^[a-zA-Z0-9_-]{1,64}$/;
 
 /** Verdadeiro quando a persistência de automações está liberada (flag ligada). */
-export const automacoesPersistenciaOn = (): boolean => process.env[FLAG] === 'true';
+export const automacoesPersistenciaOn = (): boolean => flagLigada(process.env[FLAG]);
 
 /** Aplica a migração de automações (idempotente). Chamado no boot só com a flag ligada. */
 export async function applyAutomacoesMigration(pool: pg.Pool): Promise<void> {
@@ -231,7 +232,7 @@ export function registerAutomacoesRoutes(app: Express, deps: AutomacoesDeps): vo
     // Lista de um item, como as outras leituras da tela.
     res.json([{
       persistenciaLigada: automacoesPersistenciaOn(),
-      execucaoLigada: process.env.NYROH_AUTOMACOES_EXECUCAO === 'true',
+      execucaoLigada: flagLigada(process.env.NYROH_AUTOMACOES_EXECUCAO),
       pausaGeral: await lerPausaGeral(deps.getPool()).catch(() => pausaGeralAtiva()),
       // Limites não são mais globais: vêm do JSON de cada automação.
       limites: null,
