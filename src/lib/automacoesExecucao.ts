@@ -9,6 +9,7 @@ import { renderPrevia, type Automacao, type AcaoV, type EventoV } from './automa
 import { contemPalavra, quandoExecutar } from './automacoesFila';
 import { randomUUID } from 'crypto';
 import type { CondicaoDefinida } from './automacoesEstado';
+import { detectOptOut } from './leadIntent';
 
 export interface ContextoEvento {
   /** Texto exato que o cliente mandou (ex.: "Acessar Link"), quando o gatilho exige. */
@@ -83,6 +84,21 @@ export function planejarEvento(
     planos.push({ id: r.id, nome: r.def.nome, passos, condicoes: r.def.condicoes || [], limites: r.def.limites });
   }
   return planos;
+}
+
+/**
+ * O cliente pediu para parar? As palavras vêm SOMENTE dos gatilhos "pediu para parar" das
+ * automações ativas no JSON. Sem essas automações, ninguém é marcado como opt-out pelo texto.
+ */
+export function pedidoDePararPelasRegras(texto: string, regras: RegistroAutomacao[]): boolean {
+  const palavras: string[] = [];
+  for (const r of regras) {
+    if (r.status !== 'ativa' || r.def?.gatilho?.evento !== 'cliente_pediu_parar') continue;
+    const f = r.def.gatilho.filtro;
+    if (f?.texto_contem) palavras.push(f.texto_contem);
+    if (f?.texto_igual) palavras.push(f.texto_igual);
+  }
+  return detectOptOut(texto, palavras);
 }
 
 /** Evento do cliente a partir da resposta recebida. */

@@ -4,23 +4,6 @@
  * Fica em arquivo próprio (e não dentro do server.ts) para poder ser testado sem subir o servidor.
  */
 
-/**
- * Pedidos de descadastro, casados por PALAVRA INTEIRA (frases, por frase inteira).
- * Acentos são ignorados na comparação ("não quero" casa com "nao quero").
- */
-export const OPT_OUT_PHRASES = [
-  'não tenho interesse',
-  'não quero',
-  'não enviar',
-  'não me envie',
-  'sai fora',
-  'me tira da lista',
-  'tira da lista',
-  'tirar da lista'
-];
-
-export const OPT_OUT_WORDS = ['pare', 'parar', 'remover', 'bloquear', 'descadastrar', 'descadastre', 'cancelar', 'stop'];
-
 export function normalizeForMatch(text: string): string {
   return String(text || '')
     .toLowerCase()
@@ -35,16 +18,17 @@ export function normalizeForMatch(text: string): string {
  * descadastro e o lead quente saía do funil. Agora "pare" só conta quando é a palavra
  * inteira — e o mesmo vale para "remover" dentro de "removeram", etc.
  */
-export function detectOptOut(text: string): boolean {
+export function detectOptOut(text: string, palavras: string[] = []): boolean {
   const normalized = normalizeForMatch(text);
   if (!normalized.trim()) return false;
-
-  for (const phrase of OPT_OUT_PHRASES) {
-    if (normalized.includes(normalizeForMatch(phrase))) return true;
-  }
-
   const tokens = normalized.split(/[^a-z0-9]+/).filter(Boolean);
-  return tokens.some(t => OPT_OUT_WORDS.includes(t));
+  for (const p of palavras) {
+    const alvo = normalizeForMatch(p).trim();
+    if (!alvo) continue;
+    // Frase (com espaço) casa dentro do texto; palavra casa só como palavra inteira.
+    if (alvo.includes(' ') ? normalized.includes(alvo) : tokens.includes(alvo)) return true;
+  }
+  return false;
 }
 
 /**
@@ -67,8 +51,8 @@ export function sanitizeTemplateVariable(value: string): string {
  * Um pedido de descadastro NUNCA vira interesse, mesmo que quem registrou a resposta
  * tenha marcado "interessado" por padrão.
  */
-export function resolveManualInterest(text: string, wantsInterest: boolean): boolean {
-  if (detectOptOut(text)) return false;
+export function resolveManualInterest(text: string, wantsInterest: boolean, palavras: string[] = []): boolean {
+  if (detectOptOut(text, palavras)) return false;
   return wantsInterest;
 }
 

@@ -15,7 +15,7 @@ import { Lead, CallLog, ColumnStatus, PIPELINE_COLUMNS, CustomTag, Salesperson, 
 import { getLeadNiche } from './src/lib/niche.js';
 import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regrasDeContatoSql, instanciaDaSafra } from './src/lib/uxRoutes.js';
 import { registerAutomacoesRoutes, applyAutomacoesMigration, applyAutomacoesFilaMigration, automacoesPersistenciaOn, iniciarWorkerAutomacoes } from './src/lib/automacoesRoutes.js';
-import { registrarEventoCliente, type ItemFila } from './src/lib/automacoesExecucao.js';
+import { registrarEventoCliente, pedidoDePararPelasRegras, type ItemFila } from './src/lib/automacoesExecucao.js';
 import { registerBackupRoutes } from './src/lib/backupRoutes.js';
 import { hashPassword, verifyPassword, generateSessionToken, DEFAULT_USERS, StoredUser, isUserAdmin } from './src/lib/serverAuth.js';
 import { performWebsiteAudit } from './src/lib/auditEngine.js';
@@ -28,7 +28,7 @@ import { executeFluxoRequest, downloadFluxoMediaBinary, prepareOutboundMedia, fl
 import { setMetaRegistry, listMetaRegistry, encryptMetaToken, decryptMetaToken, metaDownloadMedia, metaSyncAccount, metaValidateToken, resolveMetaAccount, receivingPhoneNumberId, parseCoexistenceEchoes, getEmbeddedSignupConfig, metaExchangeSignupCode, metaSubscribeWaba, metaDiscoverWabaIds, type MetaAccountRecord, type MetaNumberRecord } from './src/lib/metaClient.js';
 import type { FluxoApiResult } from './src/lib/fluxoClient.js';
 import { verifyFluxoWebhook } from './src/lib/webhookAuth.js';
-import { detectOptOut, sanitizeTemplateVariable, resolveManualInterest, SEM_INTERESSE_TAG } from './src/lib/leadIntent.js';
+import { sanitizeTemplateVariable, resolveManualInterest, SEM_INTERESSE_TAG } from './src/lib/leadIntent.js';
 import { distributionByCount } from './src/lib/distribution.js';
 import { getMetaProvider, getMetaCredentials, verifyMetaSignature, metaSendText, metaSendTemplate, metaSendMedia, metaMarkRead, metaCreateTemplate, metaDeleteTemplate, metaListPhoneNumbers, metaListTemplates } from './src/lib/metaClient.js';
 import { resolveLeadTokens, TOKEN_NAMES } from './src/lib/leadTokens.js';
@@ -4883,7 +4883,9 @@ async function processIncomingWhatsAppMessage(params: {
   // Antes era `texto.includes('pare')`, então "parece ótimo, quanto custa?" era lido como
   // pedido de descadastro e o lead quente saía do funil. Agora "pare" só conta quando é a
   // palavra "pare" de verdade ("remover" não dispara dentro de "removeram", etc.).
-  const isOptOut = detectOptOut(effectiveText);
+  // Opt-out: palavras vêm só das automações ativas no JSON (gatilho "pediu para parar").
+  const regrasParaParar = await carregarRegrasAutomacoes().catch(() => []);
+  const isOptOut = pedidoDePararPelasRegras(String(effectiveText || ''), regrasParaParar);
 
   // Qualquer resposta do lead (exceto opt-out explícito) é engajamento e demonstra interesse ativo
   const isPositiveInterest = !isOptOut;

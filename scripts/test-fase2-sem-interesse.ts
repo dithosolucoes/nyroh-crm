@@ -14,8 +14,8 @@ function test(name: string, fn: () => void) {
 console.log('\nTag Sem interesse');
 test('nome exato da tag é "Sem interesse"', () => assert.equal(SEM_INTERESSE_TAG.name, 'Sem interesse'));
 test('id estável (não muda a cada deploy)', () => assert.equal(SEM_INTERESSE_TAG.id, 'tag-sem-interesse'));
-test('pedido de descadastro é o gatilho da tag', () => assert.equal(detectOptOut('não quero mais'), true));
-test('resposta comum NÃO recebe a tag', () => assert.equal(detectOptOut('quanto custa?'), false));
+test('pedido de descadastro é o gatilho da tag', () => assert.equal(detectOptOut('não quero mais', ['pare', 'parar', 'remover', 'bloquear', 'descadastrar', 'descadastre', 'cancelar', 'stop', 'não quero', 'não tenho interesse']), true));
+test('resposta comum NÃO recebe a tag', () => assert.equal(detectOptOut('quanto custa?', ['pare', 'parar', 'remover', 'bloquear', 'descadastrar', 'descadastre', 'cancelar', 'stop', 'não quero', 'não tenho interesse']), false));
 
 console.log(`\n${passed} passaram, ${failed} falharam`);
 process.exit(failed ? 1 : 0);
