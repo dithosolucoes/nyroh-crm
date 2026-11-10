@@ -11462,6 +11462,54 @@ app.post('/api/campaign/batches/:batchId/return-unsent', async (req: any, res) =
   }
 });
 
+// Devolve para Novos Leads TODOS os leads em "Em Espera" (QUARENTENA) da safra.
+// Trava: o cliente informa quantos espera devolver (expectedCount); se não bater, nada é alterado.
+app.post('/api/campaign/batches/:batchId/return-quarantine', async (req: any, res) => {
+  const { batchId } = req.params;
+  const expected = Number(req.body?.expectedCount);
+  try {
+    if (!usePostgres || !pgPool) {
+      return res.status(400).json({ success: false, error: 'Recurso disponível apenas com banco Postgres.' });
+    }
+    if (!Number.isInteger(expected) || expected < 0) {
+      return res.status(400).json({ success: false, error: 'Informe expectedCount (quantos leads devolver).' });
+    }
+    const atualRes = await pgPool.query(
+      `SELECT COUNT(*)::int AS n FROM campaign_leads WHERE batch_id = $1 AND status = 'QUARENTENA'`,
+      [batchId]
+    );
+    const atual = Number(atualRes.rows[0]?.n || 0);
+    if (atual !== expected) {
+      return res.status(409).json({ success: false, error: `Esperava ${expected} leads em Em Espera, mas há ${atual}. Nada foi alterado.` });
+    }
+    const removedFromQueue = await removeBatchWaitingJobs(batchId);
+    const upd = await pgPool.query(
+      `UPDATE campaign_leads
+          SET status = 'STAGING', sent_at = NULL, quarantine_expires_at = NULL
+        WHERE batch_id = $1 AND status = 'QUARENTENA'`,
+      [batchId]
+    );
+    const returned = upd.rowCount || 0;
+    await pgPool.query(
+      `UPDATE campaign_batches
+          SET dispatched_count = (SELECT COUNT(*) FROM campaign_leads
+                                   WHERE batch_id = $1 AND status IN ('QUARENTENA', 'INTERESSADO'))
+        WHERE id = $1`,
+      [batchId]
+    );
+    broadcastSocketEvent('LEAD_UPDATED', { batchId, count: returned });
+    return res.json({
+      success: true,
+      returned,
+      removedFromQueue,
+      message: `${returned} lead(s) voltaram para Novos Leads. ${removedFromQueue} mensagem(ns) removida(s) da fila.`
+    });
+  } catch (err: any) {
+    console.error('[Retorno-Quarentena] Erro:', err);
+    return res.status(500).json({ success: false, error: `Erro ao devolver leads: ${err.message}` });
+  }
+});
+
 // Resetar Safra para Staging (Recuperação e recomeço limpo de disparos)
 app.post('/api/campaign/batches/:batchId/reset-staging', async (req: any, res) => {
   const { batchId } = req.params;

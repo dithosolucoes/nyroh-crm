@@ -2595,7 +2595,15 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
 
                         <select
                           value={selectedTemplate}
-                          onChange={e => setSelectedTemplate(e.target.value)}
+                          onChange={e => {
+                            const novo = e.target.value;
+                            setSelectedTemplate(novo);
+                            // Se a copy escolhida era de outro modelo, ela sai da seleção (o texto de cada modelo fica separado)
+                            const copiaAtual = copyTemplates.find(c => c.id === selectedCopyTemplateId);
+                            if (copiaAtual && copiaAtual.metaTemplateName && copiaAtual.metaTemplateName !== novo) {
+                              setSelectedCopyTemplateId('');
+                            }
+                          }}
                           className="w-full px-3 py-2.5 bg-white border border-neutral-300 rounded-xl text-xs font-bold text-neutral-900 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-2xs"
                         >
                           <option value="" disabled>Escolha um modelo aprovado…</option>
@@ -2692,17 +2700,30 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
                             <label className="block text-[11px] font-bold text-neutral-600 mb-1">
                               Selecionar Copy Salva:
                             </label>
-                            <select
-                              value={selectedCopyTemplateId}
-                              onChange={e => handleSelectCopyTemplate(e.target.value)}
-                              className="w-full px-2.5 py-1.5 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-bold text-neutral-800 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-                            >
-                              {copyTemplates.map(c => (
-                                <option key={c.id} value={c.id}>
-                                  {c.name} {c.isDefault ? '(Padrão)' : ''}
-                                </option>
-                              ))}
-                            </select>
+                            {(() => {
+                              // Só aparecem copies do modelo escolhido (ou antigas, sem modelo). Sem modelo, nada aparece.
+                              const copiasDoModelo = selectedTemplate
+                                ? copyTemplates.filter(c => !c.metaTemplateName || c.metaTemplateName === selectedTemplate)
+                                : [];
+                              const valorSelect = copiasDoModelo.some(c => c.id === selectedCopyTemplateId) ? selectedCopyTemplateId : '';
+                              return (
+                                <select
+                                  value={valorSelect}
+                                  disabled={!selectedTemplate}
+                                  onChange={e => { if (e.target.value) handleSelectCopyTemplate(e.target.value); }}
+                                  className="w-full px-2.5 py-1.5 bg-neutral-50 border border-neutral-200 rounded-lg text-xs font-bold text-neutral-800 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  <option value="" disabled>
+                                    {selectedTemplate ? 'Escolha uma copy para este modelo…' : 'Escolha o modelo da Meta primeiro'}
+                                  </option>
+                                  {copiasDoModelo.map(c => (
+                                    <option key={c.id} value={c.id}>
+                                      {c.name} {c.isDefault ? '(Padrão)' : ''}
+                                    </option>
+                                  ))}
+                                </select>
+                              );
+                            })()}
                           </div>
 
                           <div className="text-[10px] text-neutral-500 sm:text-right shrink-0">
