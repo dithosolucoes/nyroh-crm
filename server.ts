@@ -11767,10 +11767,10 @@ app.delete('/api/campaign/uploads/:uploadId', async (req: any, res) => {
 
     if (batchId) {
       const naoStaging = await pgPool.query(
-        `SELECT COUNT(*)::int AS n FROM campaign_leads WHERE batch_id = $1 AND status <> 'STAGING'`, [batchId]);
+        `SELECT COUNT(*)::int AS n FROM campaign_leads WHERE batch_id = $1 AND status <> 'STAGING' AND (sent_at IS NOT NULL OR status <> 'DESCARTADO')`, [batchId]);
       if (naoStaging.rows[0].n > 0) {
         return res.status(409).json({
-          error: `Não dá para apagar: ${naoStaging.rows[0].n} lead(s) desta safra já foram disparados ou atualizados. Nada foi apagado.`
+          error: `Não dá para apagar: ${naoStaging.rows[0].n} lead(s) desta safra já foram disparados ou têm resposta do cliente. Nada foi apagado.`
         });
       }
       const outrosZips = await pgPool.query(
@@ -11798,10 +11798,10 @@ app.delete('/api/campaign/batches/:batchId', async (req: any, res) => {
   try {
     if (usePostgres && pgPool) {
       const naoStaging = await pgPool.query(
-        `SELECT COUNT(*)::int AS n FROM campaign_leads WHERE batch_id = $1 AND status <> 'STAGING'`, [batchId]);
+        `SELECT COUNT(*)::int AS n FROM campaign_leads WHERE batch_id = $1 AND status <> 'STAGING' AND (sent_at IS NOT NULL OR status <> 'DESCARTADO')`, [batchId]);
       if (naoStaging.rows[0].n > 0) {
         return res.status(409).json({
-          error: `Não dá para apagar esta safra: ${naoStaging.rows[0].n} lead(s) já foram disparados ou atualizados. Nada foi apagado.`
+          error: `Não dá para apagar esta safra: ${naoStaging.rows[0].n} lead(s) já foram disparados ou têm resposta do cliente. Nada foi apagado.`
         });
       }
       await pgPool.query('DELETE FROM campaign_leads WHERE batch_id = $1', [batchId]);
