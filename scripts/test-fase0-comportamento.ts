@@ -25,13 +25,13 @@ function test(name: string, fn: () => void) {
 }
 
 console.log('\nOpt-out: detecção do pedido de descadastro');
-test('"não quero" é descadastro', () => assert.equal(detectOptOut('não quero mais'), true));
-test('"nao quero" sem acento também é', () => assert.equal(detectOptOut('nao quero'), true));
-test('"pare" como palavra inteira é descadastro', () => assert.equal(detectOptOut('pare de me mandar'), true));
-test('"parece ótimo" NÃO é descadastro (palavra inteira)', () => assert.equal(detectOptOut('parece ótimo, quanto custa?'), false));
-test('texto do botão "Parar Mensagens" é descadastro', () => assert.equal(detectOptOut('Parar Mensagens'), true));
-test('"tenho interesse" NÃO é descadastro', () => assert.equal(detectOptOut('tenho interesse'), false));
-test('texto vazio NÃO é descadastro', () => assert.equal(detectOptOut('   '), false));
+test('"não quero" é descadastro', () => assert.equal(detectOptOut('não quero mais', ['pare', 'parar', 'remover', 'bloquear', 'descadastrar', 'descadastre', 'cancelar', 'stop', 'não quero', 'não tenho interesse', 'sair']), true));
+test('"nao quero" sem acento também é', () => assert.equal(detectOptOut('nao quero', ['pare', 'parar', 'remover', 'bloquear', 'descadastrar', 'descadastre', 'cancelar', 'stop', 'não quero', 'não tenho interesse', 'sair']), true));
+test('"pare" como palavra inteira é descadastro', () => assert.equal(detectOptOut('pare de me mandar', ['pare', 'parar', 'remover', 'bloquear', 'descadastrar', 'descadastre', 'cancelar', 'stop', 'não quero', 'não tenho interesse', 'sair']), true));
+test('"parece ótimo" NÃO é descadastro (palavra inteira)', () => assert.equal(detectOptOut('parece ótimo, quanto custa?', ['pare', 'parar', 'remover', 'bloquear', 'descadastrar', 'descadastre', 'cancelar', 'stop', 'não quero', 'não tenho interesse', 'sair']), false));
+test('texto do botão "Parar Mensagens" é descadastro', () => assert.equal(detectOptOut('Parar Mensagens', ['pare', 'parar', 'remover', 'bloquear', 'descadastrar', 'descadastre', 'cancelar', 'stop', 'não quero', 'não tenho interesse', 'sair']), true));
+test('"tenho interesse" NÃO é descadastro', () => assert.equal(detectOptOut('tenho interesse', ['pare', 'parar', 'remover', 'bloquear', 'descadastrar', 'descadastre', 'cancelar', 'stop', 'não quero', 'não tenho interesse', 'sair']), false));
+test('texto vazio NÃO é descadastro', () => assert.equal(detectOptOut('   ', ['pare', 'parar', 'remover', 'bloquear', 'descadastrar', 'descadastre', 'cancelar', 'stop', 'não quero', 'não tenho interesse', 'sair']), false));
 
 console.log('\nVariável de modelo: sem corte e sem quebra de linha');
 test('URL longa passa inteira', () => {

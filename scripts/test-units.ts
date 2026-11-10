@@ -32,7 +32,8 @@ import { processarVencidos, type DepsWorker } from '../src/lib/automacoesWorker'
 import { decidirEvento, estadoInicial, pausarLead, liberarLead } from '../src/lib/automacoesEstado';
 import { dentroDosLimites, pausaGeralAtiva, proximaVersao, registroAuditoria, aplicarVersao } from '../src/lib/automacoesLimites';
 const LIMITES_TESTE = { porDia: 3, porSemana: 10 };
-import { avaliarCondicoes, dentroDaFaixaHoraria } from '../src/lib/automacoesEstado';
+import { avaliarCondicoes, dentroDaFaixaHoraria, proximaOcorrencia, avaliarNo } from '../src/lib/automacoesEstado';
+import { substituirVariaveis } from '../src/lib/automacoes';
 import { pedidoDePararPelasRegras, pedidoDeAlertaPelasRegras } from '../src/lib/automacoesExecucao';
 import { dentroDaJanela24h } from '../src/lib/automacoesWorker';
 import { resolveLeadTokens, TOKEN_NAMES } from '../src/lib/leadTokens';
@@ -1400,6 +1401,136 @@ test('alerta vence texto livre, mas opt-out vence alerta', () => {
   assert.equal(eventoDaResposta('quero saber', false, true), 'cliente_ameacou');
   assert.equal(eventoDaResposta('pare', true, true), 'cliente_pediu_parar');
   assert.equal(eventoDaResposta('quero saber', false), 'cliente_respondeu');
+});
+
+group('Catálogo no JSON (blueprint v2: gatilhos, condições, ações, tempo, variáveis)');
+test('catálogo tem os gatilhos, condições e ações novos do blueprint', () => {
+  for (const e of ['tag_mudou', 'status_mudou', 'funil_entrou', 'agenda_horario']) assert.ok(EVENTOS.some((x) => x.v === e), e);
+  for (const c of ['status.igual', 'tag.presente', 'campo.igual', 'campo.contem', 'campo.vazio', 'envios.periodo', 'tempo.desde_ultimo_envio', 'regra.ja_executou', 'cliente_respondeu_depois']) assert.ok(CONDICOES.some((x) => x.v === c), c);
+  for (const a of ['esperar_ate', 'gravar_variavel', 'mudar_status', 'mudar_funil', 'encerrar']) assert.ok(ACOES.some((x) => x.v === a), a);
+});
+test('grupo "e", "ou" e "nao" são validados; grupo vazio ou com duas chaves é erro', () => {
+  const base = { nome: 'x', gatilho: { evento: 'cliente_respondeu' as const }, passos: [{ acao: 'enviar_texto' as const, params: { texto: 'oi' } }] };
+  assert.equal(validarAutomacao({ ...base, condicoes: { ou: [{ var: 'lead.pausado', op: 'falso' }, { var: 'janela_24h', op: 'verdadeiro' }] } }, [], 's').erros.length, 0);
+  assert.equal(validarAutomacao({ ...base, condicoes: { nao: { var: 'lead.optout', op: 'verdadeiro' } } }, [], 's').erros.length, 0);
+  assert.ok(validarAutomacao({ ...base, condicoes: { e: [] } }, [], 's').erros.length > 0);
+  assert.ok(validarAutomacao({ ...base, condicoes: { e: [{ var: 'lead.pausado', op: 'falso' }], ou: [] } as never }, [], 's').erros.length > 0);
+});
+test('condição nova sem o dado obrigatório é erro (campo sem nome, periodo inválido, tag vazia)', () => {
+  const base = { nome: 'x', gatilho: { evento: 'cliente_respondeu' as const }, passos: [{ acao: 'enviar_texto' as const, params: { texto: 'oi' } }] };
+  assert.ok(validarAutomacao({ ...base, condicoes: [{ var: 'campo.igual', op: 'igual', valor: { valor: 'x' } }] }, [], 's').erros.some((e) => /campo/.test(e)));
+  assert.ok(validarAutomacao({ ...base, condicoes: [{ var: 'envios.periodo', op: 'menor_que', valor: { periodo: 'mes', max: 2 } }] }, [], 's').erros.some((e) => /periodo/.test(e)));
+  assert.ok(validarAutomacao({ ...base, condicoes: [{ var: 'tag.presente', op: 'verdadeiro', valor: '' }] }, [], 's').erros.some((e) => /nome/.test(e)));
+  assert.equal(validarAutomacao({ ...base, condicoes: [{ var: 'envios.periodo', op: 'menor_que', valor: { periodo: 'dia', max: 2 } }] }, [], 's').erros.length, 0);
+});
+test('"negar" sem "se" é erro; "esperar_ate" exige hora HH:MM e fuso', () => {
+  const base = { nome: 'x', gatilho: { evento: 'cliente_respondeu' as const } };
+  assert.ok(validarAutomacao({ ...base, passos: [{ acao: 'enviar_texto', params: { texto: 'oi' }, negar: true }] }, [], 's').erros.some((e) => /negar/.test(e)));
+  assert.ok(validarAutomacao({ ...base, passos: [{ acao: 'esperar_ate', params: { hora: '9h', fuso: 'America/Sao_Paulo' } }] }, [], 's').erros.some((e) => /hora/.test(e)));
+  assert.ok(validarAutomacao({ ...base, passos: [{ acao: 'esperar_ate', params: { hora: '09:00' } }] }, [], 's').erros.some((e) => /fuso/.test(e)));
+  assert.equal(validarAutomacao({ ...base, passos: [{ acao: 'esperar_ate', params: { hora: '09:00', fuso: 'America/Sao_Paulo', dias: [1, 2, 3] } }] }, [], 's').erros.length, 0);
+});
+test('variáveis do JSON valem como {nome} e não são tratadas como token desconhecido', () => {
+  const base = { nome: 'x', gatilho: { evento: 'cliente_respondeu' as const }, passos: [{ acao: 'enviar_texto' as const, params: { texto: 'Oi {saudacao}, {nome}' } }] };
+  assert.equal(validarAutomacao({ ...base, variaveis: { saudacao: 'bom dia' } }, [], 's').erros.length, 0);
+  assert.ok(validarAutomacao(base, [], 's').erros.some((e) => /saudacao/.test(e)));
+  assert.equal(substituirVariaveis('Oi {saudacao}', { saudacao: 'bom dia' }), 'Oi bom dia');
+});
+test('filtros novos do gatilho: começa com, lista e tag exigida', () => {
+  const base = { nome: 'x', passos: [{ acao: 'notificar' as const, params: { mensagem: 'a' } }] };
+  assert.ok(validarAutomacao({ ...base, gatilho: { evento: 'tag_mudou' } }, [], 's').erros.some((e) => /tag/.test(e)));
+  assert.ok(validarAutomacao({ ...base, gatilho: { evento: 'agenda_horario' } }, [], 's').erros.some((e) => /agenda/.test(e)));
+});
+test('condição de grupo: "ou", "nao" e dado ausente (falso)', () => {
+  const ctx = { optout: false, pausado: false, janela24h: false, agora: new Date('2026-11-10T13:00:00Z'), ultimoComando: null, tags: ['quente'] };
+  assert.equal(avaliarCondicoes({ ou: [{ var: 'janela_24h', op: 'verdadeiro' }, { var: 'tag.presente', op: 'verdadeiro', valor: 'Quente' }] }, ctx).ok, true, 'ou: uma basta; tag sem acento/maiúscula');
+  assert.equal(avaliarCondicoes({ nao: { var: 'tag.presente', op: 'verdadeiro', valor: 'quente' } }, ctx).ok, false, 'nao inverte');
+  assert.equal(avaliarCondicoes({ e: [{ var: 'campo.igual', op: 'igual', valor: { campo: 'cidade', valor: 'BH' } }] }, ctx).ok, false, 'campo sem dado = falso');
+  assert.equal(avaliarCondicoes({ e: [{ var: 'tag.presente', op: 'falso', valor: 'frio' }] }, { ...ctx, tags: undefined }).ok, false, 'tags indisponíveis = falso, nunca dispara por engano');
+});
+test('campo, envios no período, tempo desde o último envio e resposta depois do gatilho', () => {
+  const agora = new Date('2026-11-10T13:00:00Z');
+  const ctx = { optout: false, pausado: false, janela24h: true, agora, ultimoComando: null, campos: { cidade: ' Belo Horizonte ' }, status: 'INTERESSADO' };
+  assert.equal(avaliarCondicoes({ e: [{ var: 'campo.igual', op: 'igual', valor: { campo: 'cidade', valor: 'belo horizonte' } }] }, ctx).ok, true, 'campo normalizado (espaço, maiúscula)');
+  assert.equal(avaliarCondicoes({ e: [{ var: 'campo.contem', op: 'contem', valor: { campo: 'cidade', valor: 'horizonte' } }] }, ctx).ok, true);
+  assert.equal(avaliarCondicoes({ e: [{ var: 'status.igual', op: 'igual', valor: 'interessado' }] }, ctx).ok, true);
+  const envios = [new Date('2026-11-10T10:00:00Z'), new Date('2026-11-10T11:00:00Z')];
+  assert.equal(avaliarCondicoes({ e: [{ var: 'envios.periodo', op: 'menor_que', valor: { periodo: 'dia', max: 3 } }] }, { ...ctx, envios }).ok, true, '2 envios < máximo 3');
+  assert.equal(avaliarCondicoes({ e: [{ var: 'envios.periodo', op: 'menor_que', valor: { periodo: 'dia', max: 2 } }] }, { ...ctx, envios }).ok, false, '2 envios não é menor que 2');
+  assert.equal(avaliarCondicoes({ e: [{ var: 'tempo.desde_ultimo_envio', op: 'maior_que', valor: 24 }] }, { ...ctx, envios }).ok, false, 'último envio há 2h');
+  assert.equal(avaliarCondicoes({ e: [{ var: 'tempo.desde_ultimo_envio', op: 'maior_que', valor: 1 }] }, { ...ctx, envios: [] }).ok, true, 'nunca enviou = passa');
+  const gatilho = new Date('2026-11-10T12:00:00Z');
+  assert.equal(avaliarCondicoes({ e: [{ var: 'cliente_respondeu_depois', op: 'verdadeiro' }] }, { ...ctx, eventoEm: gatilho, ultimaMensagemDoCliente: new Date('2026-11-10T12:30:00Z') }).ok, true);
+  assert.equal(avaliarCondicoes({ e: [{ var: 'cliente_respondeu_depois', op: 'falso' }] }, { ...ctx, eventoEm: gatilho, ultimaMensagemDoCliente: new Date('2026-11-10T11:00:00Z') }).ok, true, 'não respondeu depois = passa no "falso"');
+  assert.equal(avaliarCondicoes({ e: [{ var: 'regra.ja_executou', op: 'falso' }] }, ctx).ok, false, 'sem dado = falso');
+});
+test('próxima ocorrência de um horário no fuso do JSON', () => {
+  // 09:00 de São Paulo = 12:00Z. Depois de 12:30Z, o próximo 10:00 SP é 13:00Z do mesmo dia.
+  const p = proximaOcorrencia(new Date('2026-11-10T12:30:00Z'), { hora: '10:00', fuso: 'America/Sao_Paulo' });
+  assert.equal(p?.toISOString(), '2026-11-10T13:00:00.000Z');
+  // Só segundas (1): 10/11/2026 é terça; a próxima segunda às 10:00 SP é 16/11 13:00Z.
+  const seg = proximaOcorrencia(new Date('2026-11-10T12:30:00Z'), { hora: '10:00', fuso: 'America/Sao_Paulo', dias: [1] });
+  assert.equal(seg?.toISOString(), '2026-11-16T13:00:00.000Z');
+  assert.equal(proximaOcorrencia(new Date(), { hora: 'x', fuso: 'America/Sao_Paulo' }), null);
+});
+test('planejamento: "esperar até" calcula o tempo e o "se" com "negar" vira condição do passo', () => {
+  const em = new Date('2026-11-10T12:30:00Z');
+  const regra = { id: 'r1', status: 'ativa', def: {
+    nome: 'r', gatilho: { evento: 'cliente_respondeu' as const }, variaveis: { saudacao: 'Olá' },
+    passos: [
+      { acao: 'esperar_ate' as const, params: { hora: '10:00', fuso: 'America/Sao_Paulo' } },
+      { acao: 'enviar_texto' as const, params: { texto: '{saudacao} {nome}' }, se: { var: 'cliente_respondeu_depois', op: 'verdadeiro' }, negar: true },
+    ] } } as never;
+  const planos = planejarEvento('cliente_respondeu', [regra], { texto: 'oi', em }, (t) => t);
+  assert.equal(planos.length, 1);
+  assert.equal(planos[0].passos[0].horasDesdeEvento, 0.5, 'de 12:30Z até 13:00Z = 0,5 h');
+  assert.equal(planos[0].passos[1].texto, 'Olá {nome}', 'variável do JSON já trocada');
+  const cond = planos[0].passos[1].condicoes;
+  assert.equal(avaliarNo(cond, { optout: false, pausado: false, janela24h: true, agora: em, ultimoComando: null, eventoEm: em, ultimaMensagemDoCliente: null }), true, 'cliente não respondeu: segue');
+});
+test('planejamento: filtro de etiqueta, status e lista de palavras', () => {
+  const r = (filtro: object, evento = 'tag_mudou' as const) => ({ id: 'f', status: 'ativa', def: { nome: 'f', gatilho: { evento, filtro }, passos: [{ acao: 'notificar' as const, params: { mensagem: 'x' } }] } } as never);
+  assert.equal(planejarEvento('tag_mudou', [r({ tag: 'quente' })], { tag: 'Quente' }).length, 1);
+  assert.equal(planejarEvento('tag_mudou', [r({ tag: 'quente' })], { tag: 'frio' }).length, 0);
+  assert.equal(planejarEvento('cliente_respondeu', [{ id: 'l', status: 'ativa', def: { nome: 'l', gatilho: { evento: 'cliente_respondeu', filtro: { texto_lista: ['preço', 'quanto'] } }, passos: [{ acao: 'notificar' as const, params: { mensagem: 'x' } }] } } as never], { texto: 'Quanto custa?' }).length, 1);
+});
+group('Worker das ações novas (sem executor = cancela com motivo)');
+test('ação sem executor é cancelada com motivo, nunca "sucesso" em silêncio', async () => {
+  const marcados: Array<{ status: string; resultado: string }> = [];
+  const deps: DepsWorker = {
+    reservar: async () => true,
+    buscarVencidos: async () => [{ id: 'g', automacaoId: 'a', leadId: 'L', passoOrdem: 1, acao: 'etiqueta' as const, texto: null, executarEm: new Date() }],
+    contextoDoLead: async () => ({ leadName: 'Bia' }),
+    marcarResultado: async (_id, status, resultado) => { marcados.push({ status, resultado }); },
+  };
+  await processarVencidos(new Date(), deps);
+  assert.equal(marcados[0].status, 'cancelado');
+  assert.match(marcados[0].resultado, /Sem executor/);
+});
+test('enviar_template fica desligado nesta fase (fase H)', async () => {
+  const marcados: Array<{ status: string; resultado: string }> = [];
+  const deps: DepsWorker = {
+    reservar: async () => true,
+    buscarVencidos: async () => [{ id: 't', automacaoId: 'a', leadId: 'L', passoOrdem: 1, acao: 'enviar_template' as const, texto: null, executarEm: new Date() }],
+    contextoDoLead: async () => ({ leadName: 'Bia' }),
+    marcarResultado: async (_id, status, resultado) => { marcados.push({ status, resultado }); },
+  };
+  await processarVencidos(new Date(), deps);
+  assert.equal(marcados[0].status, 'cancelado');
+  assert.match(marcados[0].resultado, /fase H/);
+});
+test('com executor, a ação roda e o resultado é o do executor', async () => {
+  const marcados: Array<{ status: string; resultado: string }> = [];
+  const deps: DepsWorker = {
+    reservar: async () => true,
+    buscarVencidos: async () => [{ id: 'v', automacaoId: 'a', leadId: 'L', passoOrdem: 1, acao: 'gravar_variavel' as const, texto: null, executarEm: new Date() }],
+    contextoDoLead: async () => ({ leadName: 'Bia' }),
+    marcarResultado: async (_id, status, resultado) => { marcados.push({ status, resultado }); },
+    aplicarAcao: async () => ({ ok: true, resultado: 'Variável gravada' }),
+  };
+  await processarVencidos(new Date(), deps);
+  assert.equal(marcados[0].status, 'executado');
+  assert.equal(marcados[0].resultado, 'Variável gravada');
 });
 
   await Promise.all(pending);

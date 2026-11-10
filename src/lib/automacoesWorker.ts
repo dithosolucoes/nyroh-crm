@@ -13,7 +13,7 @@
 import { resolveLeadTokens, type LeadTokenContext } from './leadTokens';
 import type { ItemFila } from './automacoesExecucao';
 import { dentroDosLimites, registroAuditoria, type LimitesLead, type RegistroAuditoria } from './automacoesLimites';
-import { avaliarCondicoes, type EventoLead } from './automacoesEstado';
+import { avaliarCondicoes, type EventoLead, type ContextoAvaliacao } from './automacoesEstado';
 
 export interface ContextoLeadWorker extends LeadTokenContext {
   /** Lead que pediu para não receber mensagens. Lido de novo antes de cada passo. */
@@ -24,6 +24,14 @@ export interface ContextoLeadWorker extends LeadTokenContext {
   ultimoComando?: EventoLead | null;
   /** Data da última mensagem enviada pelo cliente. Base da janela de 24h. */
   ultimaMensagemDoCliente?: Date | null;
+  /** Etiquetas do lead. Ausente = dado indisponível (a condição de etiqueta fica falsa). */
+  tags?: string[];
+  /** Campos do lead, para as condições de campo. Ausente = indisponível. */
+  campos?: Record<string, unknown>;
+  /** Status do lead. */
+  status?: string;
+  /** Se a regra já executou para o lead nesta versão. Ausente = indisponível. */
+  regraExecutou?: boolean;
 }
 
 /** Janela de 24h: texto livre só vale até 24h depois da última mensagem do cliente. */
@@ -42,6 +50,11 @@ export interface DepsWorker {
   marcarResultado: (id: string, status: 'executado' | 'cancelado', resultado: string, textoFinal: string | null) => Promise<void>;
   /** Datas dos envios automáticos recentes do lead (para os limites). Opcional. */
   enviosRecentes?: (leadId: string, agora: Date) => Promise<Date[]>;
+  /**
+   * Executor das ações que mudam dados do lead (etiqueta, campo, status, funil, variável, revisão,
+   * opt-out, pausa, aviso). Sem ele, a ação é CANCELADA com motivo: nada é aplicado em silêncio.
+   */
+  aplicarAcao?: (it: ItemFila, ctx: ContextoLeadWorker) => Promise<{ ok: boolean; resultado: string }>;
 }
 
 export interface OpcoesWorker {
@@ -83,16 +96,26 @@ export async function processarVencidos(
     }
     resumo.processados++;
 
-    // Condições da regra: lidas agora, com o estado atual do lead. Falhou = cancela com o motivo.
-    if (it.condicoes && it.condicoes.length > 0) {
-      const ctxCond = await deps.contextoDoLead(it.leadId);
-      const av = avaliarCondicoes(it.condicoes, {
+    // Condições (regra + passo): lidas agora, com o estado atual do lead. Falhou = cancela com o motivo.
+    const temCondicao = it.condicoes !== undefined && !(Array.isArray(it.condicoes) ? it.condicoes.length === 0 : 'e' in it.condicoes && it.condicoes.e.length === 0);
+    const ctxCond = it.acao === 'esperar' || it.acao === 'esperar_ate' ? (temCondicao ? await deps.contextoDoLead(it.leadId) : null) : await deps.contextoDoLead(it.leadId);
+    if (temCondicao) {
+      const envios = deps.enviosRecentes ? await deps.enviosRecentes(it.leadId, agora) : undefined;
+      const ctxAv: ContextoAvaliacao = {
         optout: Boolean(ctxCond?.optout),
         pausado: Boolean(ctxCond?.pausado),
         janela24h: dentroDaJanela24h(ctxCond?.ultimaMensagemDoCliente, agora),
         agora,
         ultimoComando: ctxCond?.ultimoComando ?? null,
-      });
+        tags: ctxCond?.tags,
+        campos: ctxCond?.campos,
+        status: ctxCond?.status,
+        envios,
+        regraExecutou: ctxCond?.regraExecutou,
+        eventoEm: it.eventoEm ? new Date(it.eventoEm) : null,
+        ultimaMensagemDoCliente: ctxCond?.ultimaMensagemDoCliente ?? null,
+      };
+      const av = avaliarCondicoes(it.condicoes, ctxAv);
       if (!av.ok) {
         resumo.cancelados++;
         const motivo = `Condição não atendida: ${av.falhas.join(', ')}`;
@@ -102,18 +125,18 @@ export async function processarVencidos(
       }
     }
 
-    if (it.acao === 'esperar') {
-      await deps.marcarResultado(it.id, 'executado', 'Espera concluída', null);
+    if (it.acao === 'esperar' || it.acao === 'esperar_ate') {
+      await deps.marcarResultado(it.id, 'executado', it.acao === 'esperar' ? 'Espera concluída' : 'Horário marcado alcançado', null);
       continue;
     }
 
     if (it.acao === 'enviar_texto') {
-      const ctx = await deps.contextoDoLead(it.leadId);
-      if (!ctx) {
+      if (!ctxCond) {
         resumo.cancelados++;
         await deps.marcarResultado(it.id, 'cancelado', 'Lead não encontrado', null);
         continue;
       }
+      const ctx = ctxCond;
       // Opt-out: lido de novo neste passo. Se o lead saiu, o passo não executa.
       if (ctx.optout) {
         resumo.cancelados++;
@@ -152,8 +175,36 @@ export async function processarVencidos(
       continue;
     }
 
-    resumo.simulados++;
-    await deps.marcarResultado(it.id, 'executado', `Ação ${it.acao} registrada, não aplicada nesta etapa`, null);
+    // Modelo aprovado: envio ainda desligado (fase H). Nunca sai nesta etapa.
+    if (it.acao === 'enviar_template') {
+      resumo.cancelados++;
+      const motivo = 'Envio de modelo aprovado ainda desligado (fase H): nada foi enviado';
+      resumo.auditoria.push(registroAuditoria('bloqueou', motivo, agora, { leadId: it.leadId, regraId: it.automacaoId }));
+      await deps.marcarResultado(it.id, 'cancelado', motivo, null);
+      continue;
+    }
+
+    // Demais ações: só com executor. Sem executor, cancela com motivo (nunca "sucesso" em silêncio).
+    if (!ctxCond) {
+      resumo.cancelados++;
+      await deps.marcarResultado(it.id, 'cancelado', 'Lead não encontrado', null);
+      continue;
+    }
+    if (!deps.aplicarAcao) {
+      resumo.cancelados++;
+      const motivo = `Sem executor para "${it.acao}" neste ambiente: nada foi aplicado`;
+      resumo.auditoria.push(registroAuditoria('pulou', motivo, agora, { leadId: it.leadId, regraId: it.automacaoId }));
+      await deps.marcarResultado(it.id, 'cancelado', motivo, null);
+      continue;
+    }
+    const feito = await deps.aplicarAcao(it, ctxCond);
+    if (feito.ok) {
+      resumo.simulados++;
+      await deps.marcarResultado(it.id, 'executado', feito.resultado, null);
+    } else {
+      resumo.cancelados++;
+      await deps.marcarResultado(it.id, 'cancelado', feito.resultado, null);
+    }
   }
 
   return resumo;
