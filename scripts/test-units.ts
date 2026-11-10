@@ -33,6 +33,7 @@ import { decidirEvento, estadoInicial, pausarLead, liberarLead } from '../src/li
 import { dentroDosLimites, pausaGeralAtiva, proximaVersao, registroAuditoria, aplicarVersao } from '../src/lib/automacoesLimites';
 const LIMITES_TESTE = { porDia: 3, porSemana: 10 };
 import { avaliarCondicoes, dentroDaFaixaHoraria } from '../src/lib/automacoesEstado';
+import { pedidoDePararPelasRegras } from '../src/lib/automacoesExecucao';
 import { dentroDaJanela24h } from '../src/lib/automacoesWorker';
 import { resolveLeadTokens, TOKEN_NAMES } from '../src/lib/leadTokens';
 import { validateTemplateCategory, buildMetaButtons, defaultExamples, countBodyVariables, validateTemplateVariables } from '../src/lib/templateRules';
@@ -392,27 +393,27 @@ async function main() {
   group('Descadastro: palavra inteira, nunca pedaço de palavra');
   await sequential([
     ['"parece ótimo, quanto custa?" NÃO é descadastro (continha "pare")', () => {
-      assert.equal(detectOptOut('parece ótimo, quanto custa?'), false);
+      assert.equal(detectOptOut('parece ótimo, quanto custa?', ['pare', 'parar', 'remover', 'bloquear', 'descadastrar', 'descadastre', 'cancelar', 'stop', 'não quero', 'não tenho interesse']), false);
     }],
     ['"pare" sozinho é descadastro', () => {
-      assert.equal(detectOptOut('pare'), true);
-      assert.equal(detectOptOut('PARE de me mandar mensagem'), true);
+      assert.equal(detectOptOut('pare', ['pare', 'parar', 'remover', 'bloquear', 'descadastrar', 'descadastre', 'cancelar', 'stop', 'não quero', 'não tenho interesse']), true);
+      assert.equal(detectOptOut('PARE de me mandar mensagem', ['pare', 'parar', 'remover', 'bloquear', 'descadastrar', 'descadastre', 'cancelar', 'stop', 'não quero', 'não tenho interesse']), true);
     }],
     ['"removeram o produto do site" NÃO é descadastro', () => {
-      assert.equal(detectOptOut('removeram o produto do site'), false);
+      assert.equal(detectOptOut('removeram o produto do site', ['pare', 'parar', 'remover', 'bloquear', 'descadastrar', 'descadastre', 'cancelar', 'stop', 'não quero', 'não tenho interesse']), false);
     }],
     ['"remover" como palavra é descadastro', () => {
-      assert.equal(detectOptOut('quero remover meu número'), true);
+      assert.equal(detectOptOut('quero remover meu número', ['pare', 'parar', 'remover', 'bloquear', 'descadastrar', 'descadastre', 'cancelar', 'stop', 'não quero', 'não tenho interesse']), true);
     }],
     ['frases com e sem acento funcionam igual', () => {
-      assert.equal(detectOptOut('não tenho interesse'), true);
-      assert.equal(detectOptOut('nao tenho interesse'), true);
-      assert.equal(detectOptOut('nao quero'), true);
+      assert.equal(detectOptOut('não tenho interesse', ['pare', 'parar', 'remover', 'bloquear', 'descadastrar', 'descadastre', 'cancelar', 'stop', 'não quero', 'não tenho interesse']), true);
+      assert.equal(detectOptOut('nao tenho interesse', ['pare', 'parar', 'remover', 'bloquear', 'descadastrar', 'descadastre', 'cancelar', 'stop', 'não quero', 'não tenho interesse']), true);
+      assert.equal(detectOptOut('nao quero', ['pare', 'parar', 'remover', 'bloquear', 'descadastrar', 'descadastre', 'cancelar', 'stop', 'não quero', 'não tenho interesse']), true);
     }],
     ['mensagem comum não descadastra', () => {
-      assert.equal(detectOptOut('bom dia, pode me mandar o orçamento?'), false);
-      assert.equal(detectOptOut('comparei com o concorrente'), false);
-      assert.equal(detectOptOut(''), false);
+      assert.equal(detectOptOut('bom dia, pode me mandar o orçamento?', ['pare', 'parar', 'remover', 'bloquear', 'descadastrar', 'descadastre', 'cancelar', 'stop', 'não quero', 'não tenho interesse']), false);
+      assert.equal(detectOptOut('comparei com o concorrente', ['pare', 'parar', 'remover', 'bloquear', 'descadastrar', 'descadastre', 'cancelar', 'stop', 'não quero', 'não tenho interesse']), false);
+      assert.equal(detectOptOut('', ['pare', 'parar', 'remover', 'bloquear', 'descadastrar', 'descadastre', 'cancelar', 'stop', 'não quero', 'não tenho interesse']), false);
     }]
   ]);
 
@@ -1373,6 +1374,17 @@ test('limites do JSON precisam ser inteiros de pelo menos 1', () => {
   assert.equal(validarAutomacao({ ...base, limites: { porDia: 2.5 } }, [], 'self').erros.length, 1);
   assert.equal(validarAutomacao({ ...base, limites: { porDia: 2, porSemana: 9 } }, [], 'self').erros.length, 0);
   assert.equal(validarAutomacao({ ...base }, [], 'self').erros.length, 0, 'sem limites é válido');
+});
+
+group('Opt-out pelas automações do JSON (sem palavra fixa no código)');
+test('sem automação de "pediu para parar" ativa, nenhuma palavra vira opt-out', () => {
+  assert.equal(pedidoDePararPelasRegras('pare', []), false);
+  assert.equal(pedidoDePararPelasRegras('pare', [{ id: 'x', status: 'inativa', def: { nome: 'x', gatilho: { evento: 'cliente_pediu_parar', filtro: { texto_contem: 'pare' } }, passos: [] } } as never]), false);
+});
+test('a palavra do JSON, numa automação ativa, marca opt-out', () => {
+  const regras = [{ id: 'p', status: 'ativa', def: { nome: 'parar', gatilho: { evento: 'cliente_pediu_parar', filtro: { texto_contem: 'sair' } }, passos: [] } } as never];
+  assert.equal(pedidoDePararPelasRegras('quero sair', regras), true);
+  assert.equal(pedidoDePararPelasRegras('quanto custa?', regras), false);
 });
 
   await Promise.all(pending);

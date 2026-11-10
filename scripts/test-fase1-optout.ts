@@ -13,13 +13,13 @@ function test(name: string, fn: () => void) {
 
 console.log('\nResposta manual: opt-out nunca vira interesse');
 test('"Parar Mensagens" marcado como interessado vira NÃO interessado', () =>
-  assert.equal(resolveManualInterest('Parar Mensagens', true), false));
+  assert.equal(resolveManualInterest('Parar Mensagens', true, ['pare', 'parar', 'remover', 'bloquear', 'descadastrar', 'descadastre', 'cancelar', 'stop', 'não quero', 'não tenho interesse']), false));
 test('"não quero mais" vira NÃO interessado', () =>
-  assert.equal(resolveManualInterest('não quero mais', true), false));
+  assert.equal(resolveManualInterest('não quero mais', true, ['pare', 'parar', 'remover', 'bloquear', 'descadastrar', 'descadastre', 'cancelar', 'stop', 'não quero', 'não tenho interesse']), false));
 test('resposta comum continua interessada quando marcada', () =>
-  assert.equal(resolveManualInterest('quanto custa?', true), true));
+  assert.equal(resolveManualInterest('quanto custa?', true, ['pare', 'parar', 'remover', 'bloquear', 'descadastrar', 'descadastre', 'cancelar', 'stop', 'não quero', 'não tenho interesse']), true));
 test('resposta marcada como não interessada continua não interessada', () =>
-  assert.equal(resolveManualInterest('quanto custa?', false), false));
+  assert.equal(resolveManualInterest('quanto custa?', false, ['pare', 'parar', 'remover', 'bloquear', 'descadastrar', 'descadastre', 'cancelar', 'stop', 'não quero', 'não tenho interesse']), false));
 
 console.log(`\n${passed} passaram, ${failed} falharam`);
 process.exit(failed ? 1 : 0);
