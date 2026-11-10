@@ -15,7 +15,7 @@ import { Lead, CallLog, ColumnStatus, PIPELINE_COLUMNS, CustomTag, Salesperson, 
 import { getLeadNiche } from './src/lib/niche.js';
 import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regrasDeContatoSql, instanciaDaSafra } from './src/lib/uxRoutes.js';
 import { registerAutomacoesRoutes, applyAutomacoesMigration, applyAutomacoesFilaMigration, automacoesPersistenciaOn, iniciarWorkerAutomacoes } from './src/lib/automacoesRoutes.js';
-import { registrarEventoCliente, pedidoDePararPelasRegras, type ItemFila } from './src/lib/automacoesExecucao.js';
+import { registrarEventoCliente, pedidoDePararPelasRegras, pedidoDeAlertaPelasRegras, type ItemFila } from './src/lib/automacoesExecucao.js';
 import { registerBackupRoutes } from './src/lib/backupRoutes.js';
 import { hashPassword, verifyPassword, generateSessionToken, DEFAULT_USERS, StoredUser, isUserAdmin } from './src/lib/serverAuth.js';
 import { performWebsiteAudit } from './src/lib/auditEngine.js';
@@ -4886,6 +4886,8 @@ async function processIncomingWhatsAppMessage(params: {
   // Opt-out: palavras vêm só das automações ativas no JSON (gatilho "pediu para parar").
   const regrasParaParar = await carregarRegrasAutomacoes().catch(() => []);
   const isOptOut = pedidoDePararPelasRegras(String(effectiveText || ''), regrasParaParar);
+  // Palavra de alerta: também só do JSON (gatilho "cliente_ameacou"). Usada só pela automação.
+  const isAlerta = pedidoDeAlertaPelasRegras(String(effectiveText || ''), regrasParaParar);
 
   // Qualquer resposta do lead (exceto opt-out explícito) é engajamento e demonstra interesse ativo
   const isPositiveInterest = !isOptOut;
@@ -4893,7 +4895,7 @@ async function processIncomingWhatsAppMessage(params: {
   // Automações de resposta: só agenda na fila com NYROH_AUTOMACOES_EXECUCAO=true (padrão: desligada).
   // Nunca envia. Não aguarda o resultado, para não atrasar o recebimento da mensagem.
   registrarEventoCliente(
-    { leadId: String(matched?.id ?? targetId ?? ''), texto: String(effectiveText || ''), optout: isOptOut },
+    { leadId: String(matched?.id ?? targetId ?? ''), texto: String(effectiveText || ''), optout: isOptOut, alerta: isAlerta },
     new Date(),
     { carregarRegras: carregarRegrasAutomacoes, gravarFila: gravarFilaAutomacoes }
   ).catch((e: any) => console.warn('[AUTOMACOES] não agendei a resposta:', e?.message));

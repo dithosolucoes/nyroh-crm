@@ -33,7 +33,7 @@ import { decidirEvento, estadoInicial, pausarLead, liberarLead } from '../src/li
 import { dentroDosLimites, pausaGeralAtiva, proximaVersao, registroAuditoria, aplicarVersao } from '../src/lib/automacoesLimites';
 const LIMITES_TESTE = { porDia: 3, porSemana: 10 };
 import { avaliarCondicoes, dentroDaFaixaHoraria } from '../src/lib/automacoesEstado';
-import { pedidoDePararPelasRegras } from '../src/lib/automacoesExecucao';
+import { pedidoDePararPelasRegras, pedidoDeAlertaPelasRegras } from '../src/lib/automacoesExecucao';
 import { dentroDaJanela24h } from '../src/lib/automacoesWorker';
 import { resolveLeadTokens, TOKEN_NAMES } from '../src/lib/leadTokens';
 import { validateTemplateCategory, buildMetaButtons, defaultExamples, countBodyVariables, validateTemplateVariables } from '../src/lib/templateRules';
@@ -1385,6 +1385,21 @@ test('a palavra do JSON, numa automação ativa, marca opt-out', () => {
   const regras = [{ id: 'p', status: 'ativa', def: { nome: 'parar', gatilho: { evento: 'cliente_pediu_parar', filtro: { texto_contem: 'sair' } }, passos: [] } } as never];
   assert.equal(pedidoDePararPelasRegras('quero sair', regras), true);
   assert.equal(pedidoDePararPelasRegras('quanto custa?', regras), false);
+});
+group('Palavra de alerta pelas automações do JSON (sem palavra fixa no código)');
+test('sem automação de "cliente_ameacou" ativa, nenhuma palavra vira alerta', () => {
+  assert.equal(pedidoDeAlertaPelasRegras('vou processar', []), false);
+  assert.equal(pedidoDeAlertaPelasRegras('vou processar', [{ id: 'x', status: 'inativa', def: { nome: 'x', gatilho: { evento: 'cliente_ameacou', filtro: { texto_contem: 'processar' } }, passos: [] } } as never]), false);
+});
+test('a palavra do JSON, numa automação de alerta ativa, marca alerta', () => {
+  const regras = [{ id: 'a', status: 'ativa', def: { nome: 'alerta', gatilho: { evento: 'cliente_ameacou', filtro: { texto_contem: 'processar' } }, passos: [] } } as never];
+  assert.equal(pedidoDeAlertaPelasRegras('vou te processar', regras), true);
+  assert.equal(pedidoDeAlertaPelasRegras('quanto custa?', regras), false);
+});
+test('alerta vence texto livre, mas opt-out vence alerta', () => {
+  assert.equal(eventoDaResposta('quero saber', false, true), 'cliente_ameacou');
+  assert.equal(eventoDaResposta('pare', true, true), 'cliente_pediu_parar');
+  assert.equal(eventoDaResposta('quero saber', false), 'cliente_respondeu');
 });
 
   await Promise.all(pending);
