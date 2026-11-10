@@ -10,6 +10,7 @@
 import type { Express, Request, Response } from 'express';
 import type pg from 'pg';
 import { validarAutomacao, type Automacao } from './automacoes';
+import { processarVencidos } from './automacoesWorker';
 
 interface AutomacoesDeps {
   getPool: () => pg.Pool | null;
@@ -115,4 +116,67 @@ export async function applyAutomacoesFilaMigration(pool: pg.Pool): Promise<void>
   const sql = fs.readFileSync(path.resolve(process.cwd(), 'migrations', '2026-11-automacoes-fila.sql'), 'utf8');
   await pool.query(sql);
   console.log('[AUTOMACOES] fila criada (flag NYROH_AUTOMACOES_EXECUCAO=true).');
+}
+
+/**
+ * Liga o processador da fila a cada minuto. Só com NYROH_AUTOMACOES_EXECUCAO=true.
+ * Não envia nada: ver src/lib/automacoesWorker.ts.
+ */
+export function iniciarWorkerAutomacoes(pool: pg.Pool): void {
+  if (process.env.NYROH_AUTOMACOES_EXECUCAO !== 'true') return;
+  let rodando = false;
+  const tick = async () => {
+    if (rodando) return;
+    rodando = true;
+    try {
+      const resumo = await processarVencidos(new Date(), {
+        buscarVencidos: async (agora, limite) => {
+          const r = await pool.query(
+            `SELECT id, automacao_id, lead_id, passo_ordem, acao, texto, executar_em
+             FROM automacoes_fila WHERE status = 'pendente' AND executar_em <= $1
+             ORDER BY executar_em LIMIT $2`,
+            [agora.toISOString(), limite]
+          );
+          return r.rows.map((x: any) => ({
+            id: x.id,
+            automacaoId: x.automacao_id,
+            leadId: x.lead_id,
+            passoOrdem: x.passo_ordem,
+            acao: x.acao,
+            texto: x.texto,
+            executarEm: new Date(x.executar_em),
+          }));
+        },
+        contextoDoLead: async (leadId) => {
+          const r = await pool.query(
+            `SELECT name, phone_number, public_url, website, niche, salesperson_name FROM leads WHERE id = $1`,
+            [leadId]
+          );
+          const x = r.rows[0];
+          if (!x) return null;
+          return {
+            leadName: x.name,
+            phoneNumber: x.phone_number,
+            publicUrl: x.public_url,
+            website: x.website,
+            niche: x.niche,
+            sellerName: x.salesperson_name,
+          };
+        },
+        marcarResultado: async (id, status, resultado, textoFinal) => {
+          await pool.query(
+            `UPDATE automacoes_fila SET status = $2, resultado = $3, texto_final = $4, processado_em = CURRENT_TIMESTAMP WHERE id = $1`,
+            [id, status, resultado, textoFinal]
+          );
+        },
+      });
+      if (resumo.processados > 0) console.log('[AUTOMACOES] fila processada (sem envio):', resumo);
+    } catch (e: any) {
+      console.warn('[AUTOMACOES] falha ao processar a fila:', e?.message);
+    } finally {
+      rodando = false;
+    }
+  };
+  setInterval(tick, 60_000);
+  console.log('[AUTOMACOES] worker da fila ligado (sem envio).');
 }
