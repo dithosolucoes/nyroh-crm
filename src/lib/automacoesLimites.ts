@@ -63,7 +63,7 @@ export function aplicarVersao(
   return { ...nova, versao: proximaVersao(versaoAnterior), historico: historico.slice(-20) };
 }
 
-export type DecisaoMotor = 'executou' | 'bloqueou' | 'pulou' | 'agendou' | 'cancelou';
+export type DecisaoMotor = 'executou' | 'bloqueou' | 'pulou' | 'agendou' | 'cancelou' | 'avisou';
 
 export interface RegistroAuditoria {
   quando: string;

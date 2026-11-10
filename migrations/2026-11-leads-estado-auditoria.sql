@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS leads_estado (
 CREATE TABLE IF NOT EXISTS automacoes_auditoria (
   id VARCHAR(64) PRIMARY KEY,
   quando TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  decisao VARCHAR(16) NOT NULL CHECK (decisao IN ('executou', 'bloqueou', 'pulou', 'agendou', 'cancelou')),
+  decisao VARCHAR(16) NOT NULL CHECK (decisao IN ('executou', 'bloqueou', 'pulou', 'agendou', 'cancelou', 'avisou')),
   motivo TEXT NOT NULL,
   lead_id VARCHAR(255),
   regra_id VARCHAR(64),
