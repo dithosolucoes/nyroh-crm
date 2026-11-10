@@ -118,7 +118,10 @@ export const MenuLateral: React.FC<MenuLateralProps> = ({
       itens: [
         { label: 'Leads e bloqueios', icon: <Briefcase className={`${iconeCls} text-neutral-500`} />, destino: { tab: 'admin', section: 'estrutura' } },
         { label: 'Importar leads (ZIP)', icon: <FileArchive className={`${iconeCls} text-neutral-500`} />, acao: onOpenZipModal },
-        { label: 'Campanhas', icon: <Rocket className={`${iconeCls} text-blue-600`} />, destino: { tab: 'admin', section: 'disparos' } }
+        { label: 'Campanhas', icon: <Rocket className={`${iconeCls} text-blue-600`} />, destino: { tab: 'admin', section: 'disparos' } },
+        ...(AUTOMACOES_ON
+          ? [{ label: 'Automações', icon: <Layers className={`${iconeCls} text-violet-600`} />, destino: { tab: 'admin' as const, section: 'automacoes' as const } }]
+          : [])
       ]
     });
     grupos.push({
@@ -136,9 +139,6 @@ export const MenuLateral: React.FC<MenuLateralProps> = ({
         { label: 'Mensagem do WhatsApp', icon: <MessageSquare className={`${iconeCls} text-neutral-500`} />, acao: onOpenWhatsAppSettings },
         { label: 'Histórico', icon: <Clock className={`${iconeCls} text-neutral-500`} />, destino: { tab: 'admin', section: 'auditoria' } },
         { label: 'Logs do sistema', icon: <Database className={`${iconeCls} text-neutral-500`} />, destino: { tab: 'admin', section: 'logs' } },
-        ...(AUTOMACOES_ON
-          ? [{ label: 'Automações de resposta', icon: <Layers className={`${iconeCls} text-neutral-500`} />, destino: { tab: 'admin' as const, section: 'automacoes' as const } }]
-          : []),
         ...(INFRA_ON
           ? [{ label: 'Infraestrutura', icon: <Database className={`${iconeCls} text-neutral-500`} />, destino: { tab: 'admin' as const, section: 'blindagem' as const } }]
           : [])
