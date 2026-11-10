@@ -23,7 +23,7 @@ import { registerBackupRoutes } from './src/lib/backupRoutes.js';
 import { hashPassword, verifyPassword, generateSessionToken, DEFAULT_USERS, StoredUser, isUserAdmin } from './src/lib/serverAuth.js';
 import { performWebsiteAudit } from './src/lib/auditEngine.js';
 import { missingFluxoVars, summarizeFluxoInstance } from './src/lib/fluxoInstanceStatus.js';
-import { buildTemplateVariables } from './src/lib/templateCopy.js';
+import { buildLeadVariables } from './src/lib/templateCopy.js';
 import { buildFluxoAudioMedia, isFluxoAudioVoiceEnabled } from './src/lib/fluxoAudio.js';
 import { installLogBuffer, readLogs, logCategories } from './src/lib/logBuffer.js';
 installLogBuffer();
@@ -34,7 +34,7 @@ import { verifyFluxoWebhook } from './src/lib/webhookAuth.js';
 import { sanitizeTemplateVariable, resolveManualInterest, SEM_INTERESSE_TAG } from './src/lib/leadIntent.js';
 import { distributionByCount } from './src/lib/distribution.js';
 import { getMetaProvider, getMetaCredentials, verifyMetaSignature, metaSendText, metaSendTemplate, metaSendMedia, metaMarkRead, metaCreateTemplate, metaDeleteTemplate, metaListPhoneNumbers, metaListTemplates } from './src/lib/metaClient.js';
-import { resolveLeadTokens, TOKEN_NAMES } from './src/lib/leadTokens.js';
+import { listExtraFieldKeys, normalizeFieldKey, TOKEN_NAMES } from './src/lib/leadTokens.js';
 import { validateTemplateCategory, buildMetaButtons, defaultExamples as neutralExamples, validateTemplateVariables } from './src/lib/templateRules.js';
 import { arePhonesEquivalent, normalizeE164Phone, phoneDigitVariants, formatAndValidateE164Phone } from './src/lib/phone.js';
 import { getUploadsDir, getInboxDir, INBOX_SUBDIR, isUploadsDirDurable, publicBaseUrl, saveMediaBuffer, extensionFor } from './src/lib/mediaStorage.js';
@@ -513,6 +513,7 @@ export interface StoredCampaignBatch {
 }
 
 export interface StoredCampaignLead {
+  rawData?: Record<string, string> | null;
   id: string;
   batchId: string;
   name: string;
@@ -1098,6 +1099,7 @@ async function initDatabase(retries = 5, delayMs = 3000) {
           );
 
           ALTER TABLE campaign_leads ADD COLUMN IF NOT EXISTS is_mobile BOOLEAN DEFAULT TRUE;
+          ALTER TABLE campaign_leads ADD COLUMN IF NOT EXISTS raw_data JSONB;
           ALTER TABLE campaign_leads ADD COLUMN IF NOT EXISTS public_url TEXT;
           ALTER TABLE campaign_leads ADD COLUMN IF NOT EXISTS website TEXT;
           ALTER TABLE campaign_leads ADD COLUMN IF NOT EXISTS niche VARCHAR(255);
@@ -9503,6 +9505,27 @@ app.post('/api/campaign/batches', async (req: any, res) => {
 });
 
 // Helper para inserção em lote (bulk insert) no PostgreSQL sem sobrecarregar conexões
+// Guarda o item completo do arquivo do lead (campos extras viram tags da copy). Limite para não inflar o banco.
+function sanitizeRawLead(item: any): Record<string, string> | null {
+  if (!item || typeof item !== 'object') return null;
+  const out: Record<string, string> = {};
+  let n = 0;
+  for (const [k, v] of Object.entries(item)) {
+    if (n >= 80) break;
+    if (v === null || v === undefined || k.length > 80) continue;
+    if (typeof v === 'object') {
+      try {
+        const j = JSON.stringify(v);
+        if (j.length <= 500) { out[k] = j; n++; }
+      } catch {}
+      continue;
+    }
+    out[k] = String(v).slice(0, 500);
+    n++;
+  }
+  return out;
+}
+
 async function bulkInsertCampaignLeads(
   pool: any,
   leads: Array<{
@@ -9516,6 +9539,7 @@ async function bulkInsertCampaignLeads(
     niche: string;
     status: string;
     responsePreview: string | null;
+    rawData?: Record<string, string> | null;
   }>
 ) {
   if (!leads || leads.length === 0) return;
@@ -9526,25 +9550,17 @@ async function bulkInsertCampaignLeads(
 
   for (const l of leads) {
     valueRows.push(
-      `($${paramIdx}, $${paramIdx + 1}, $${paramIdx + 2}, $${paramIdx + 3}, $${paramIdx + 4}, $${paramIdx + 5}, $${paramIdx + 6}, $${paramIdx + 7}, $${paramIdx + 8}, $${paramIdx + 9}, CURRENT_TIMESTAMP)`
+      `($${paramIdx}, $${paramIdx + 1}, $${paramIdx + 2}, $${paramIdx + 3}, $${paramIdx + 4}, $${paramIdx + 5}, $${paramIdx + 6}, $${paramIdx + 7}, $${paramIdx + 8}, $${paramIdx + 9}, $${paramIdx + 10}::jsonb, CURRENT_TIMESTAMP)`
     );
     params.push(
-      l.id,
-      l.batchId,
-      l.name,
-      l.phoneNumber,
-      l.isMobile,
-      l.publicUrl,
-      l.website,
-      l.niche,
-      l.status,
-      l.responsePreview
+      l.id, l.batchId, l.name, l.phoneNumber, l.isMobile, l.publicUrl, l.website, l.niche, l.status, l.responsePreview,
+      l.rawData ? JSON.stringify(l.rawData) : null
     );
-    paramIdx += 10;
+    paramIdx += 11;
   }
 
   const query = `
-    INSERT INTO campaign_leads (id, batch_id, name, phone_number, is_mobile, public_url, website, niche, status, response_preview, created_at)
+    INSERT INTO campaign_leads (id, batch_id, name, phone_number, is_mobile, public_url, website, niche, status, response_preview, raw_data, created_at)
     VALUES ${valueRows.join(', ')}
     ON CONFLICT (id) DO UPDATE SET
       name = EXCLUDED.name,
@@ -9553,6 +9569,7 @@ async function bulkInsertCampaignLeads(
       public_url = EXCLUDED.public_url,
       website = EXCLUDED.website,
       niche = EXCLUDED.niche,
+      raw_data = EXCLUDED.raw_data,
       status = EXCLUDED.status,
       response_preview = EXCLUDED.response_preview
   `;
@@ -9797,6 +9814,7 @@ app.post('/api/campaign/upload-zip', diskUpload.single('zipFile') as any, async 
       niche: string;
       status: string;
       responsePreview: string | null;
+      rawData?: Record<string, string> | null;
     }> = [];
 
     for (const item of rawLeads) {
@@ -9840,7 +9858,8 @@ app.post('/api/campaign/upload-zip', diskUpload.single('zipFile') as any, async 
         website,
         niche,
         status: initialStatus,
-        responsePreview: descReason
+        responsePreview: descReason,
+        rawData: sanitizeRawLead(item)
       });
     }
 
@@ -9925,6 +9944,7 @@ app.post('/api/campaign/upload-zip', diskUpload.single('zipFile') as any, async 
             niche: l.niche,
             status: l.status as any,
             responsePreview: l.responsePreview || undefined,
+            rawData: l.rawData || null,
             createdAt: new Date().toISOString()
           });
         }
@@ -10225,6 +10245,34 @@ function garantirSchemaCopias(): Promise<void> {
   return copiaSchemaPronto;
 }
 
+// Campos do arquivo importado das safras (viram tags da copy: {cidade}, {endereco}...)
+async function camposDoLoteParaCopy(batchId: string): Promise<string[]> {
+  const rows: Array<Record<string, unknown> | null> = [];
+  if (usePostgres && pgPool) {
+    const r = await pgPool.query(
+      `SELECT raw_data FROM campaign_leads WHERE raw_data IS NOT NULL ${batchId ? 'AND batch_id = $1' : ''} LIMIT 300`,
+      batchId ? [batchId] : []
+    );
+    for (const row of r.rows) rows.push(row.raw_data);
+  } else {
+    for (const l of memoryCampaignLeadsMap.values()) {
+      if (!batchId || l.batchId === batchId) rows.push(l.rawData || null);
+    }
+  }
+  return listExtraFieldKeys(rows);
+}
+
+app.get('/api/campaign/lead-fields', async (req: any, res) => {
+  const batchId = String(req.query.batchId || '').trim();
+  try {
+    const fields = await camposDoLoteParaCopy(batchId);
+    return res.json({ fields });
+  } catch (err: any) {
+    console.error('Erro ao listar campos do lead:', err);
+    return res.status(500).json({ error: 'Erro ao listar campos do lead.' });
+  }
+});
+
 app.get('/api/campaign/copies', async (req: any, res) => {
   try {
     if (usePostgres && pgPool) {
@@ -10504,16 +10552,19 @@ app.post('/api/campaign/dispatch', async (req: any, res) => {
     return res.status(400).json({ error: 'Número de envio inválido. Escolha um número da lista.' });
   }
 
-  // Flag CAMPAIGN_GENERIC_TOKENS (desligada por padrão): copy com campo desconhecido não sai para o cliente.
-  // Bloqueia ANTES de qualquer alteração no banco.
-  if (process.env.CAMPAIGN_GENERIC_TOKENS === 'true') {
-    const unknownInCopy = new Set<string>();
-    for (const t of [variableValues?.var1, variableValues?.var2, variableValues?.var3]) {
-      if (t) resolveLeadTokens(String(t), {}).unknown.forEach(u => unknownInCopy.add(u));
+  // Campo que não existe nas safras bloqueia o disparo ANTES de qualquer alteração no banco.
+  {
+    const conhecidos = new Set<string>([...TOKEN_NAMES, ...(await camposDoLoteParaCopy(String(batchId)))]);
+    const desconhecidos = new Set<string>();
+    for (const texto of Object.values(copiesByIndexFromBody(variableValues))) {
+      for (const m of String(texto).matchAll(/\{([a-zA-Z_][^{}\n]{0,59})\}/g)) {
+        const campo = normalizeFieldKey(m[1]);
+        if (!conhecidos.has(campo)) desconhecidos.add(campo);
+      }
     }
-    if (unknownInCopy.size > 0) {
+    if (desconhecidos.size > 0) {
       return res.status(400).json({
-        error: `Campos desconhecidos na copy: ${[...unknownInCopy].map(u => `{${u}}`).join(', ')}. Campos disponíveis: ${TOKEN_NAMES.map(t => `{${t}}`).join(', ')}.`
+        error: `Campos que não existem nas safras escolhidas: ${[...desconhecidos].map(u => `{${u}}`).join(', ')}. Use um campo da lista de tags.`
       });
     }
   }
@@ -10593,7 +10644,7 @@ app.post('/api/campaign/dispatch', async (req: any, res) => {
                sent_at = CURRENT_TIMESTAMP,
                quarantine_expires_at = $1
            WHERE batch_id = $2 AND id = ANY($3::text[]) ${foraDoDisparo}
-           RETURNING id, name, phone_number AS "phoneNumber", is_mobile AS "isMobile", public_url AS "publicUrl", website, niche`,
+           RETURNING id, name, phone_number AS "phoneNumber", is_mobile AS "isMobile", public_url AS "publicUrl", website, niche, raw_data AS "rawData"`,
           [quarantineEnds, batchId, leadIds]
         );
         dispatchedLeads = updateRes.rows || [];
@@ -10616,7 +10667,7 @@ app.post('/api/campaign/dispatch', async (req: any, res) => {
              ORDER BY created_at ASC
              LIMIT $3
            )
-           RETURNING id, name, phone_number AS "phoneNumber", is_mobile AS "isMobile", public_url AS "publicUrl", website, niche`,
+           RETURNING id, name, phone_number AS "phoneNumber", is_mobile AS "isMobile", public_url AS "publicUrl", website, niche, raw_data AS "rawData"`,
           [quarantineEnds, batchId, numLimit]
         );
         dispatchedLeads = updateRes.rows || [];
@@ -10639,7 +10690,7 @@ app.post('/api/campaign/dispatch', async (req: any, res) => {
                ) ${foraDoDisparo}
              ORDER BY created_at ASC
            )
-           RETURNING id, name, phone_number AS "phoneNumber", is_mobile AS "isMobile", public_url AS "publicUrl", website, niche`,
+           RETURNING id, name, phone_number AS "phoneNumber", is_mobile AS "isMobile", public_url AS "publicUrl", website, niche, raw_data AS "rawData"`,
           [quarantineEnds, batchId]
         );
         dispatchedLeads = updateRes.rows || [];
@@ -10687,36 +10738,26 @@ app.post('/api/campaign/dispatch', async (req: any, res) => {
         const company = (dLead.name && dLead.name !== 'Cliente' ? dLead.name : 'sua empresa').trim();
         const nyrohUrl = dLead.publicUrl || 'https://nyroh.app/preview';
 
-        const copiesMapPre: Record<number, string> = copiesByIndexFromBody(variableValues);
-
-        // Flag CAMPAIGN_GENERIC_TOKENS: resolve qualquer campo do lead/vendedor (ver src/lib/leadTokens.ts)
-        if (process.env.CAMPAIGN_GENERIC_TOKENS === 'true') {
-          const tokenCtx = { leadName: dLead.name, phoneNumber: dLead.phoneNumber, publicUrl: dLead.publicUrl, website: dLead.website, niche: dLead.niche, sellerName };
-          const resolved = Object.values(copiesMapPre).map(t => resolveLeadTokens(String(t), tokenCtx));
-          const emptyFields = [...new Set(resolved.flatMap(r => r.empty))];
-          if (emptyFields.length > 0) {
-            // Lead sem dado exigido pela copy: não enfileira (a Meta recusaria o parâmetro vazio)
-            console.warn(`[Disparo] lead ${dLead.id} sem dado para: ${emptyFields.join(', ')}. Não enfileirado.`);
-            await pgPool.query(
-              `UPDATE campaign_leads SET status = 'ERRO_VARIAVEL', notes = $2 WHERE id = $1`,
-              [dLead.id, `Não enviado: sem dado para ${emptyFields.join(', ')}`]
-            ).catch(() => {});
-            continue;
-          }
-        }
-
-        // Sem corte por tamanho: os limites de 100/160/120 caracteres cortavam o valor no meio
-        // e o link do site do cliente chegava quebrado (a variável {{2}} costuma ser a URL).
-        // A Meta só exige que a variável não tenha quebra de linha nem espaços repetidos.
-        // Variáveis do modelo da Meta: uma por índice escrito na copy ({{1}}, {{2}}...). Sem byIndex, usa var1..var3.
         const copiesMap: Record<number, string> = copiesByIndexFromBody(variableValues);
-        const built = buildTemplateVariables(copiesMap, { firstName, company, seller: sellerName, url: await trackedLinkFor(dLead.id, nyrohUrl) });
-        const sanitizedVariables: Record<string, string> = built.variables;
-        if (built.empty.length > 0) {
-          console.warn(`[Disparo] lead sem texto para as variáveis ${built.empty.join(', ')}. Não enfileirado.`);
+        const trackedUrl = await trackedLinkFor(dLead.id, nyrohUrl);
+        const built = buildLeadVariables(copiesMap, { leadName: dLead.name, phoneNumber: dLead.phoneNumber, publicUrl: trackedUrl, website: dLead.website, niche: dLead.niche, sellerName, extra: dLead.rawData });
+        const problemas = [
+          ...built.unknown.map(c => `campo desconhecido {${c}}`),
+          ...built.emptyFields.map(c => `sem dado para {${c}}`),
+          ...built.empty.map(n => `variável {{${n}}} vazia`)
+        ];
+        if (problemas.length > 0) {
+          const motivo = problemas.join('; ');
+          console.warn(`[Disparo] lead ${dLead.id}: ${motivo}. Não enfileirado.`);
+          if (usePostgres && pgPool) {
+            await pgPool.query(`UPDATE campaign_leads SET status = 'ERRO_VARIAVEL', notes = $2 WHERE id = $1`, [dLead.id, `Não enviado: ${motivo}`]).catch(() => {});
+          } else {
+            const m = memoryCampaignLeadsMap.get(dLead.id);
+            if (m) m.status = 'ERRO_VARIAVEL' as any;
+          }
           continue;
         }
-
+        const sanitizedVariables: Record<string, string> = built.variables;
         const cleanDigits = String(dLead.phoneNumber || '').replace(/\D/g, '');
         let formattedE164 = '';
         if (cleanDigits.length >= 10) {
@@ -10837,34 +10878,26 @@ app.post('/api/campaign/dispatch', async (req: any, res) => {
         const company = (lead.name && lead.name !== 'Cliente' ? lead.name : 'sua empresa').trim();
         const nyrohUrl = lead.publicUrl || 'https://nyroh.app/preview';
 
-        const copiesMapPre: Record<number, string> = copiesByIndexFromBody(variableValues);
-
-        // Flag CAMPAIGN_GENERIC_TOKENS: resolve qualquer campo do lead/vendedor (ver src/lib/leadTokens.ts)
-        if (process.env.CAMPAIGN_GENERIC_TOKENS === 'true') {
-          const tokenCtx = { leadName: lead.name, phoneNumber: lead.phoneNumber, publicUrl: lead.publicUrl, website: lead.website, niche: lead.niche, sellerName };
-          const resolved = Object.values(copiesMapPre).map(t => resolveLeadTokens(String(t), tokenCtx));
-          const emptyFields = [...new Set(resolved.flatMap(r => r.empty))];
-          if (emptyFields.length > 0) {
-            // Lead sem dado exigido pela copy: não enfileira (a Meta recusaria o parâmetro vazio)
-            console.warn(`[Disparo] lead ${lead.id} sem dado para: ${emptyFields.join(', ')}. Não enfileirado.`);
-            (lead as any).status = 'ERRO_VARIAVEL';
-            (lead as any).notes = `Não enviado: sem dado para ${emptyFields.join(', ')}`;
-            continue;
-          }
-        }
-
-        // Sem corte por tamanho: os limites de 100/160/120 caracteres cortavam o valor no meio
-        // e o link do site do cliente chegava quebrado (a variável {{2}} costuma ser a URL).
-        // A Meta só exige que a variável não tenha quebra de linha nem espaços repetidos.
-        // Variáveis do modelo da Meta: uma por índice escrito na copy ({{1}}, {{2}}...). Sem byIndex, usa var1..var3.
         const copiesMap: Record<number, string> = copiesByIndexFromBody(variableValues);
-        const built = buildTemplateVariables(copiesMap, { firstName, company, seller: sellerName, url: await trackedLinkFor(lead.id, nyrohUrl) });
-        const sanitizedVariables: Record<string, string> = built.variables;
-        if (built.empty.length > 0) {
-          console.warn(`[Disparo] lead sem texto para as variáveis ${built.empty.join(', ')}. Não enfileirado.`);
+        const trackedUrl = await trackedLinkFor(lead.id, nyrohUrl);
+        const built = buildLeadVariables(copiesMap, { leadName: lead.name, phoneNumber: lead.phoneNumber, publicUrl: trackedUrl, website: lead.website, niche: lead.niche, sellerName, extra: lead.rawData });
+        const problemas = [
+          ...built.unknown.map(c => `campo desconhecido {${c}}`),
+          ...built.emptyFields.map(c => `sem dado para {${c}}`),
+          ...built.empty.map(n => `variável {{${n}}} vazia`)
+        ];
+        if (problemas.length > 0) {
+          const motivo = problemas.join('; ');
+          console.warn(`[Disparo] lead ${lead.id}: ${motivo}. Não enfileirado.`);
+          if (usePostgres && pgPool) {
+            await pgPool.query(`UPDATE campaign_leads SET status = 'ERRO_VARIAVEL', notes = $2 WHERE id = $1`, [lead.id, `Não enviado: ${motivo}`]).catch(() => {});
+          } else {
+            const m = memoryCampaignLeadsMap.get(lead.id);
+            if (m) m.status = 'ERRO_VARIAVEL' as any;
+          }
           continue;
         }
-
+        const sanitizedVariables: Record<string, string> = built.variables;
         const cleanDigits = String(lead.phoneNumber || '').replace(/\D/g, '');
         let formattedE164 = '';
         if (cleanDigits.length >= 10) {

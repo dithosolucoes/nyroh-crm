@@ -19,7 +19,8 @@ import { verifyFluxoWebhook } from '../src/lib/webhookAuth';
 import { missingFluxoVars, summarizeFluxoInstance } from '../src/lib/fluxoInstanceStatus';
 import { buildFluxoAudioMedia, isFluxoAudioVoiceEnabled } from '../src/lib/fluxoAudio';
 import { parseTemplateBody, templateVarIndexes, renderTemplateBody } from '../src/lib/templateSegments';
-import { buildTemplateVariables, fillLeadTokens } from '../src/lib/templateCopy';
+import { buildTemplateVariables, buildLeadVariables, fillLeadTokens } from '../src/lib/templateCopy';
+import { listExtraFieldKeys } from '../src/lib/leadTokens';
 import { buildFluxoAuthHeaders, fluxoInstancePath, prepareOutboundMedia } from '../src/lib/fluxoClient';
 import { extensionFor, saveMediaBuffer } from '../src/lib/mediaStorage';
 import { effectiveSpeedPerSecond, dispatchRpm, planRpm, delayForIndex, maxDispatchPerSecond, FluxoRateLimitedError } from '../src/lib/dispatchRate';
@@ -470,6 +471,37 @@ async function main() {
       const r = buildTemplateVariables({ 1: 'Oi {nome}', 2: 'Falo da {empresa}', 3: '{vendedor}', 4: '{site_novo}' }, ctx);
       assert.deepEqual(r.variables, { '1': 'Oi Ana', '2': 'Falo da Loja X', '3': 'Thomas', '4': 'https://x.app/a' });
       assert.deepEqual(r.empty, []);
+    });
+
+    test('campos do arquivo do lead viram variáveis (acento e espaço normalizados)', () => {
+      const r = buildLeadVariables({ 1: 'Moramos em {Cidade} na {Rua da Loja}' }, { leadName: 'Padaria Estrela', extra: { Cidade: 'Betim', 'Rua da Loja': 'Av. Central, 10' } });
+      assert.deepEqual(r.variables, { '1': 'Moramos em Betim na Av. Central, 10' });
+      assert.deepEqual(r.unknown, []);
+      assert.deepEqual(r.emptyFields, []);
+    });
+
+    test('campo que não existe no lead é reportado, não sai literal para o cliente', () => {
+      const r = buildLeadVariables({ 1: 'Oi {nome}, sobre {avaliacao}' }, { leadName: 'Ana Souza' });
+      assert.deepEqual(r.unknown, ['avaliacao']);
+    });
+
+    test('campo do lead sem dado é reportado (bloqueia o envio)', () => {
+      const r = buildLeadVariables({ 1: 'Ligue para {telefone} ou {cidade}' }, { leadName: 'Ana', phoneNumber: '', extra: { Cidade: '' } });
+      assert.deepEqual(r.emptyFields.sort(), ['cidade', 'telefone']);
+    });
+
+    test('telefone e nicho saem do lead (antes ficavam literais)', () => {
+      const r = buildLeadVariables({ 1: '{telefone} | {nicho} | {data}' }, { phoneNumber: '+5531999990000', niche: 'Marcenaria', now: new Date(2026, 10, 6) });
+      assert.deepEqual(r.variables, { '1': '+5531999990000 | Marcenaria | 06/11/2026' });
+    });
+
+    test('valor do lead que contém {campo} não é expandido de novo', () => {
+      const r = buildLeadVariables({ 1: '{nome}' }, { leadName: '{vendedor}', sellerName: 'Thomas' });
+      assert.deepEqual(r.variables, { '1': '{vendedor}' });
+    });
+
+    test('campos disponíveis entre leads: normalizados e sem repetição', () => {
+      assert.deepEqual(listExtraFieldKeys([{ Cidade: 'A', 'Rua da Loja': 'x' }, { cidade: 'B', Avaliação: '4' }, null]), ['avaliacao', 'cidade', 'rua_da_loja']);
     });
 
     test('modelo com 4 variáveis: a 4ª vazia bloqueia o lead (vai para empty)', () => {

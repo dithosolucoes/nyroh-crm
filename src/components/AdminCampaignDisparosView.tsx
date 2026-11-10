@@ -305,6 +305,29 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
     return idx;
   }, [activeMetaTemplate]);
 
+  // Tags fixas (dados do lead e do vendedor) + campos do arquivo importado das safras escolhidas
+  const TAGS_FIXAS = [
+    { tag: '{nome}', desc: 'Primeiro nome do responsável' },
+    { tag: '{empresa}', desc: 'Razão social ou fantasia' },
+    { tag: '{site_novo}', desc: 'Link do site criado no Nyroh' },
+    { tag: '{vendedor}', desc: 'Nome do closer ou admin' },
+    { tag: '{telefone}', desc: 'Telefone do lead' },
+    { tag: '{site_antigo}', desc: 'Site antigo (se tiver)' },
+    { tag: '{data}', desc: 'Data do disparo' },
+    { tag: '{nicho}', desc: 'Nicho do lead' }
+  ];
+  const [camposLead, setCamposLead] = useState<string[]>([]);
+  useEffect(() => {
+    const qs = selectedBatchId ? `?batchId=${encodeURIComponent(selectedBatchId)}` : '';
+    fetch(`/api/campaign/lead-fields${qs}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => setCamposLead(Array.isArray(d?.fields) ? d.fields : []))
+      .catch(() => setCamposLead([]));
+  }, [selectedBatchId]);
+  const camposTag = camposLead
+    .filter(c => !TAGS_FIXAS.some(t => t.tag === `{${c}}`))
+    .map(c => ({ tag: `{${c}}`, desc: 'Campo do arquivo importado' }));
+
   // Valores da copy do modelo escolhido: só os índices {{n}} DESTE modelo
   const valoresParaSalvar = (): Record<string, string> => {
     const out: Record<string, string> = {};
@@ -314,8 +337,16 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   // Nada sai sem modelo escolhido e sem todas as variáveis do modelo escritas
   const erroCopyParaDisparo = (): string | null => {
     if (!selectedTemplate) return 'Escolha um modelo aprovado antes de disparar.';
+    const conhecidos = new Set<string>([...TAGS_FIXAS.map(t => t.tag.slice(1, -1)), ...camposLead]);
     for (const n of activeVarIndexes) {
-      if (!(copiesByIdx[n] ?? '').trim()) return `Escreva a variável {{${n}}} da copy antes de disparar.`;
+      const texto = copiesByIdx[n] ?? '';
+      if (!texto.trim()) return `Escreva a variável {{${n}}} da copy antes de disparar.`;
+      for (const m of texto.matchAll(/\{([a-zA-Z_][^{}\n]{0,59})\}/g)) {
+        const campo = m[1].trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[\s-]+/g, '_');
+        if (selectedBatchId && !conhecidos.has(campo)) {
+          return `A variável {{${n}}} usa {${m[1]}}, que não existe nas safras escolhidas. Use um campo da lista de tags.`;
+        }
+      }
     }
     return null;
   };
@@ -324,6 +355,11 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   const [testPhone, setTestPhone] = useState<string>('5511988216073');
   const [testSending, setTestSending] = useState<boolean>(false);
   const handleSendTestToPhone = async () => {
+    const erroTeste = erroCopyParaDisparo();
+    if (erroTeste) {
+      setActionNotification({ type: 'error', message: erroTeste });
+      return;
+    }
     const sample = { firstName: 'Thomas', company: 'Teste', seller: 'Thomas', url: 'https://hf-retifica-de-motores-desde-1990-11940829913.nyroh.com.br' };
     const idx = activeVarIndexes;
     const vars: Record<string, string> = {};
@@ -2597,15 +2633,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
 
                         {/* Pills de variáveis principais */}
                         <div className="flex flex-wrap gap-1.5 pt-1">
-                          {[
-                            { tag: '{nome}', desc: 'Primeiro nome do responsável' },
-                            { tag: '{empresa}', desc: 'Razão social ou fantasia' },
-                            { tag: '{site_novo}', desc: 'Link do site criado no Nyroh' },
-                            { tag: '{vendedor}', desc: 'Nome do closer ou admin' },
-                            { tag: '{telefone}', desc: 'Telefone do lead' },
-                            { tag: '{site_antigo}', desc: 'Site antigo (se tiver)' },
-                            { tag: '{data}', desc: 'Data do disparo' }
-                          ].map(v => (
+                          {[...TAGS_FIXAS, ...camposTag].map(v => (
                             <button
                               key={v.tag}
                               type="button"

@@ -2,12 +2,13 @@
  * Tokens da copy de disparo: {campo} dentro do texto de uma variável do template da Meta.
  *
  * Regras:
- * - Os valores vêm do lead do disparo (campaign_leads) e do vendedor atribuído.
- * - Fallbacks iguais aos que já existiam: lead sem nome vira "Cliente"; sem empresa vira "sua empresa";
- *   sem link de prévia vira https://nyroh.app/preview.
- * - Troca de UMA passada: o valor inserido nunca é expandido de novo (um nome com "{vendedor}" sai literal).
- * - Token desconhecido não é trocado e é devolvido em `unknown`; campo vazio é devolvido em `empty`.
- *   Quem chama decide se bloqueia o envio.
+ * - Campos fixos (nome, empresa, vendedor, site_novo, site_antigo, telefone, data, nicho) vêm do lead/vendedor.
+ * - Qualquer OUTRO campo vem do arquivo importado do lead (extra), com a chave normalizada
+ *   (sem acento, minúsculo, espaço e hífen viram "_"). Ex.: "Cidade" -> {cidade}.
+ * - Fallbacks: lead sem nome vira "Cliente"; sem empresa vira "sua empresa"; sem link vira https://nyroh.app/preview.
+ * - Troca de UMA passada: o valor inserido nunca é expandido de novo.
+ * - Token desconhecido NÃO é trocado (volta em `unknown`); campo vazio volta em `empty`.
+ *   Quem chama decide: no disparo, qualquer um dos dois bloqueia o lead.
  */
 
 export const TOKEN_NAMES = ['nome', 'empresa', 'vendedor', 'site_novo', 'site_antigo', 'telefone', 'data', 'nicho'] as const;
@@ -19,6 +20,8 @@ export interface LeadTokenContext {
   website?: string | null;
   niche?: string | null;
   sellerName?: string | null;
+  /** Dados extras do arquivo importado (chave -> valor) */
+  extra?: Record<string, unknown> | null;
   now?: Date;
 }
 
@@ -36,7 +39,21 @@ function formatDate(d: Date): string {
   return `${dd}/${mm}/${d.getFullYear()}`;
 }
 
-/** Valores de cada token para um lead. Vazio = o lead não tem esse dado. */
+function hasOwn(obj: object, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(obj, key);
+}
+
+/** Chave de campo normalizada: "Endereço da Loja" -> "endereco_da_loja". */
+export function normalizeFieldKey(raw: string): string {
+  return String(raw || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\s-]+/g, '_');
+}
+
+/** Valores de cada token fixo para um lead. Vazio = o lead não tem esse dado. */
 export function buildTokenValues(ctx: LeadTokenContext): Record<string, string> {
   const leadName = String(ctx.leadName || '').trim();
   const firstName = leadName ? leadName.split(' ')[0] : 'Cliente';
@@ -53,18 +70,42 @@ export function buildTokenValues(ctx: LeadTokenContext): Record<string, string> 
   };
 }
 
-/** Substitui os {tokens} do texto de uma só vez, sem expandir valores já inseridos. */
+/** Campos extras do lead com chave normalizada. Valores de objeto viram JSON. */
+export function extraFieldValues(extra: Record<string, unknown> | null | undefined): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!extra || typeof extra !== 'object') return out;
+  for (const [k, v] of Object.entries(extra)) {
+    const nk = normalizeFieldKey(k);
+    if (!nk || hasOwn(out, nk)) continue;
+    out[nk] = v === null || v === undefined ? '' : typeof v === 'object' ? JSON.stringify(v) : String(v).trim();
+  }
+  return out;
+}
+
+/** Nomes de campos disponíveis entre vários leads (para montar as tags da copy). */
+export function listExtraFieldKeys(samples: Array<Record<string, unknown> | null | undefined>): string[] {
+  const set = new Set<string>();
+  for (const s of samples) {
+    for (const k of Object.keys(extraFieldValues(s || null))) set.add(k);
+  }
+  return [...set].sort();
+}
+
+/** Substitui os {campos} do texto de uma só vez, sem expandir valores já inseridos. */
 export function resolveLeadTokens(text: string, ctx: LeadTokenContext): ResolveResult {
   const values = buildTokenValues(ctx);
+  const extra = extraFieldValues(ctx.extra);
   const unknown = new Set<string>();
   const empty = new Set<string>();
-  const out = String(text || '').replace(/\{([a-zA-Z_]+)\}/g, (match, rawKey: string) => {
-    const key = rawKey.toLowerCase();
-    if (!(key in values)) {
-      unknown.add(rawKey.toLowerCase());
+  const out = String(text || '').replace(/\{([a-zA-Z_][^{}\n]{0,59})\}/g, (match, rawKey: string) => {
+    const key = normalizeFieldKey(rawKey);
+    let value: string | undefined;
+    if (hasOwn(values, key)) value = values[key];
+    else if (hasOwn(extra, key)) value = extra[key];
+    if (value === undefined) {
+      unknown.add(key);
       return match;
     }
-    const value = values[key];
     if (!value) empty.add(key);
     return value;
   });
