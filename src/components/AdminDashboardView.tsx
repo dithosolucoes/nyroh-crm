@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { isUiFlagOn } from '../lib/uiFlags';
-const AUTOMACOES_ON = isUiFlagOn(import.meta.env.VITE_MOSTRAR_AUTOMACOES);
+// Ligada por padrão. Só some se VITE_MOSTRAR_AUTOMACOES=false.
+const AUTOMACOES_ON = import.meta.env.VITE_MOSTRAR_AUTOMACOES !== 'false';
 const INFRA_ON = isUiFlagOn(import.meta.env.VITE_MOSTRAR_INFRA);
 import { User, Salesperson, Lead, AuditLog, PIPELINE_COLUMNS, PIPELINE_STAGE_META } from '../types';
 import { BulkCreateSalespeopleModal } from './BulkCreateSalespeopleModal';

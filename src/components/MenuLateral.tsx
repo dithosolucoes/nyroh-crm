@@ -24,7 +24,8 @@ import {
 } from 'lucide-react';
 
 const INFRA_ON = isUiFlagOn(import.meta.env.VITE_MOSTRAR_INFRA);
-const AUTOMACOES_ON = isUiFlagOn(import.meta.env.VITE_MOSTRAR_AUTOMACOES);
+// Ligada por padrão. Só some se VITE_MOSTRAR_AUTOMACOES=false.
+const AUTOMACOES_ON = import.meta.env.VITE_MOSTRAR_AUTOMACOES !== 'false';
 
 interface MenuLateralProps {
   currentUser: User;
