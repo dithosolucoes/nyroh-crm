@@ -107,3 +107,12 @@ export function registerAutomacoesRoutes(app: Express, deps: AutomacoesDeps): vo
     }
   });
 }
+
+/** Cria a fila das esperas (idempotente). Só roda com NYROH_AUTOMACOES_EXECUCAO=true. */
+export async function applyAutomacoesFilaMigration(pool: pg.Pool): Promise<void> {
+  const { default: fs } = await import('fs');
+  const path = await import('path');
+  const sql = fs.readFileSync(path.resolve(process.cwd(), 'migrations', '2026-11-automacoes-fila.sql'), 'utf8');
+  await pool.query(sql);
+  console.log('[AUTOMACOES] fila criada (flag NYROH_AUTOMACOES_EXECUCAO=true).');
+}

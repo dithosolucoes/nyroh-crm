@@ -14,7 +14,8 @@ import pg from 'pg';
 import { Lead, CallLog, ColumnStatus, PIPELINE_COLUMNS, CustomTag, Salesperson, DistributeLeadsParams, User, AuditLog, QuickReply } from './src/types.js';
 import { getLeadNiche } from './src/lib/niche.js';
 import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regrasDeContatoSql, instanciaDaSafra } from './src/lib/uxRoutes.js';
-import { registerAutomacoesRoutes, applyAutomacoesMigration, automacoesPersistenciaOn } from './src/lib/automacoesRoutes.js';
+import { registerAutomacoesRoutes, applyAutomacoesMigration, applyAutomacoesFilaMigration, automacoesPersistenciaOn } from './src/lib/automacoesRoutes.js';
+import { registrarEventoCliente, type ItemFila } from './src/lib/automacoesExecucao.js';
 import { registerBackupRoutes } from './src/lib/backupRoutes.js';
 import { hashPassword, verifyPassword, generateSessionToken, DEFAULT_USERS, StoredUser, isUserAdmin } from './src/lib/serverAuth.js';
 import { performWebsiteAudit } from './src/lib/auditEngine.js';
@@ -1491,6 +1492,7 @@ async function initDatabase(retries = 5, delayMs = 3000) {
         usePostgres = true;
         if (uxSchemaOn()) { await applyUxMigration(pool).catch((e: any) => console.error('[UX] migração falhou:', e?.message)); }
         if (automacoesPersistenciaOn()) { await applyAutomacoesMigration(pool).catch((e: any) => console.error('[AUTOMACOES] migração falhou:', e?.message)); }
+        if (process.env.NYROH_AUTOMACOES_EXECUCAO === 'true') { await applyAutomacoesFilaMigration(pool).catch((e: any) => console.error('[AUTOMACOES] fila falhou:', e?.message)); }
         await loadMetaRegistryFromDb().catch((e: any) => console.error('[Meta] falha ao carregar contas:', e?.message));
         dbBootDone = true;
         if (dbReconnectTimer) {
@@ -1798,6 +1800,22 @@ const MIN_PASSWORD_LENGTH = 8;
  * editava, registrava ligação, mandava WhatsApp e APAGAVA lead de qualquer colega, só
  * trocando o id na URL.
  */
+async function carregarRegrasAutomacoes() {
+  if (!usePostgres || !pgPool) return [];
+  const r = await pgPool.query(`SELECT id, status, definicao FROM automacoes_respostas WHERE status = 'ativa'`);
+  return r.rows.map((x: any) => ({ id: x.id, status: x.status, def: x.definicao }));
+}
+
+async function gravarFilaAutomacoes(itens: ItemFila[]) {
+  if (!usePostgres || !pgPool) return;
+  for (const it of itens) {
+    await pgPool.query(
+      `INSERT INTO automacoes_fila (id, automacao_id, lead_id, passo_ordem, acao, texto, executar_em) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [it.id, it.automacaoId, it.leadId, it.passoOrdem, it.acao, it.texto, it.executarEm.toISOString()]
+    );
+  }
+}
+
 async function getLeadOwnerId(leadId: string): Promise<string | null | undefined> {
   try {
     if (usePostgres && pgPool) {
@@ -4868,6 +4886,14 @@ async function processIncomingWhatsAppMessage(params: {
 
   // Qualquer resposta do lead (exceto opt-out explícito) é engajamento e demonstra interesse ativo
   const isPositiveInterest = !isOptOut;
+
+  // Automações de resposta: só agenda na fila com NYROH_AUTOMACOES_EXECUCAO=true (padrão: desligada).
+  // Nunca envia. Não aguarda o resultado, para não atrasar o recebimento da mensagem.
+  registrarEventoCliente(
+    { leadId: String(matched?.id ?? targetId ?? ''), texto: String(effectiveText || ''), optout: isOptOut },
+    new Date(),
+    { carregarRegras: carregarRegrasAutomacoes, gravarFila: gravarFilaAutomacoes }
+  ).catch((e: any) => console.warn('[AUTOMACOES] não agendei a resposta:', e?.message));
 
   // FASE 2: quem pediu descadastro recebe a tag "Sem interesse" (atrás de flag, desligada por padrão).
   if (isOptOut && matched && process.env.NYROH_TAG_SEM_INTERESSE === 'true') {

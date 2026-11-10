@@ -27,6 +27,7 @@ import { validarAutomacao, logicaEmPalavras, conversaSimulada, renderPrevia, tok
 import { planejarEvento, type RegistroAutomacao } from '../src/lib/automacoesExecucao';
 import { colunaPermitida, TABELAS_BACKUP } from '../src/lib/backupRoutes';
 import { quandoExecutar, estaVencido, contemPalavra } from '../src/lib/automacoesFila';
+import { registrarEventoCliente, eventoDaResposta, type DepsRecebimento } from '../src/lib/automacoesExecucao';
 import { resolveLeadTokens, TOKEN_NAMES } from '../src/lib/leadTokens';
 import { validateTemplateCategory, buildMetaButtons, defaultExamples, countBodyVariables, validateTemplateVariables } from '../src/lib/templateRules';
 import {
@@ -982,6 +983,41 @@ test('planejador usa texto_contem como filtro do gatilho', () => {
   ];
   assert.equal(planejarEvento('cliente_respondeu', regras, { texto: 'Qual o PRECO?' }).length, 1);
   assert.equal(planejarEvento('cliente_respondeu', regras, { texto: 'oi' }).length, 0);
+});
+
+group('Recebimento de resposta (agenda, sem envio)');
+test('eventoDaResposta mapeia botão, parada e texto livre', () => {
+  assert.equal(eventoDaResposta('Acessar Link', false), 'cliente_clicou');
+  assert.equal(eventoDaResposta('Parar Mensagens', true), 'cliente_pediu_parar');
+  assert.equal(eventoDaResposta('quero saber o preço', false), 'cliente_respondeu');
+});
+test('com a flag desligada, nada é gravado na fila', async () => {
+  delete process.env.NYROH_AUTOMACOES_EXECUCAO;
+  let gravados = 0;
+  const deps: DepsRecebimento = {
+    carregarRegras: async () => [{ id: 'x', status: 'ativa', def: { nome: 'X', gatilho: { evento: 'cliente_respondeu' }, passos: [{ acao: 'enviar_texto', params: { texto: 'oi' } }] } }],
+    gravarFila: async () => { gravados++; },
+  };
+  const n = await registrarEventoCliente({ leadId: 'l1', texto: 'oi', optout: false }, new Date(), deps);
+  assert.equal(n, 0);
+  assert.equal(gravados, 0);
+});
+test('com a flag ligada, agenda os passos com o texto-modelo e não envia', async () => {
+  process.env.NYROH_AUTOMACOES_EXECUCAO = 'true';
+  let fila: any[] = [];
+  const deps: DepsRecebimento = {
+    carregarRegras: async () => [{ id: 'x', status: 'ativa', def: { nome: 'X', gatilho: { evento: 'cliente_respondeu' }, passos: [
+      { acao: 'esperar', params: { valor: 90, unidade: 'minutos' } },
+      { acao: 'enviar_texto', params: { texto: 'Oi {nome}' } },
+    ] } }],
+    gravarFila: async (itens) => { fila = itens; },
+  };
+  const agora = new Date('2026-11-10T13:00:00Z');
+  const n = await registrarEventoCliente({ leadId: 'l1', texto: 'quero preço', optout: false }, agora, deps);
+  delete process.env.NYROH_AUTOMACOES_EXECUCAO;
+  assert.equal(n, 2);
+  assert.equal(fila[1].texto, 'Oi {nome}', 'guarda o modelo, sem preencher variáveis');
+  assert.equal(fila[1].executarEm.toISOString(), '2026-11-10T14:30:00.000Z');
 });
   await Promise.all(pending);
 
