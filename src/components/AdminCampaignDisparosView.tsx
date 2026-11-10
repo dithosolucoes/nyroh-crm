@@ -867,7 +867,12 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
             `${String(h).padStart(2, '0')}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`
           );
         } else {
-          setQuarantineRemainingTime('Quarentena Expirada (Pronto para distribuição)');
+          const regraExpira: any = (currentBatch as any)?.onExpireAction;
+          setQuarantineRemainingTime(
+            regraExpira === 'manual_pool' || !regraExpira
+              ? 'Tempo acabou: aguardando sua liberação'
+              : 'Tempo acabou: distribuição automática ainda não está ligada, aguardando sua liberação'
+          );
         }
       }
     }, 1000);
