@@ -535,6 +535,8 @@ const memoryCampaignBatchesMap = new Map<string, StoredCampaignBatch>();
 const memoryCampaignLeadsMap = new Map<string, StoredCampaignLead>();
 
 export interface StoredCampaignCopyTemplate {
+  metaTemplateName?: string | null;
+  values?: Record<string, string>;
   id: string;
   name: string;
   description?: string;
@@ -3852,17 +3854,7 @@ app.post('/api/campaign/test-dispatch', async (req: any, res) => {
     };
   }
 
-  // Montar texto de fallback se as variáveis vierem vazias
-  const firstName = leadName.trim() ? leadName.trim().split(' ')[0] : 'Cliente';
-  if (!resolvedVariables['1']) {
-    resolvedVariables['1'] = `${firstName}! Bom diaaa! Ótima semana 😄 Falo com o responsável?`;
-  }
-  if (!resolvedVariables['2']) {
-    resolvedVariables['2'] = `Eu sou ${resolvedSellerName} e queria te fazer uma pergunta: você ficaria chateado se eu tivesse criado um site para a sua empresa sem você me pedir? 😂 Eu sou bem proativo e preferi criar algo primeiro para te mostrar.`;
-  }
-  if (!resolvedVariables['3']) {
-    resolvedVariables['3'] = `Realmente desenvolvi uma prévia exclusiva: 🔗 ${publicUrl || 'https://nyroh.app/preview'}\n\nConsegue me dar um feedback sincero do que achou?`;
-  }
+  // Sem texto padrão: variável vazia continua vazia e o envio informa qual falta (nada fixo é enviado)
 
   // Montar texto completo da mensagem para o histórico do chat
   const renderedFullText = messageText || (
@@ -10182,28 +10174,65 @@ app.get('/api/campaign/leads', async (req, res) => {
 });
 
 // 4.5. Campaign Copy Templates (Message Copies & Content Variables Library)
+// ---- Copy por MODELO: um valor por índice {{n}} do template escolhido. Nada fixo. ----
+const COPY_VALUE_MAX = 1024;
+function normalizarValoresCopy(input: any): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return out;
+  for (const [k, v] of Object.entries(input)) {
+    const n = Number(k);
+    if (Number.isInteger(n) && n > 0) out[String(n)] = String(v ?? '').slice(0, COPY_VALUE_MAX);
+  }
+  return out;
+}
+// Copy antiga (só var1..var3) continua valendo: vira {1,2,3}
+function valoresDaLinhaCopy(row: any): Record<string, string> {
+  const fromJson = normalizarValoresCopy(row.values);
+  if (Object.keys(fromJson).length > 0) return fromJson;
+  const legacy: Record<string, string> = {};
+  if (row.var1) legacy['1'] = String(row.var1);
+  if (row.var2) legacy['2'] = String(row.var2);
+  if (row.var3) legacy['3'] = String(row.var3);
+  return legacy;
+}
+let copiaSchemaPronto: Promise<void> | null = null;
+// Mudança ADITIVA: colunas novas e var1..3 deixam de ser obrigatórias. Nada é apagado.
+function garantirSchemaCopias(): Promise<void> {
+  if (!copiaSchemaPronto) {
+    copiaSchemaPronto = (async () => {
+      const pool = pgPool!;
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS campaign_copy_templates (
+          id VARCHAR(255) PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          description TEXT,
+          category VARCHAR(50) DEFAULT 'prospeccao',
+          var1 TEXT,
+          var2 TEXT,
+          var3 TEXT,
+          is_default BOOLEAN DEFAULT FALSE,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      await pool.query(`ALTER TABLE campaign_copy_templates ADD COLUMN IF NOT EXISTS meta_template_name TEXT`);
+      await pool.query(`ALTER TABLE campaign_copy_templates ADD COLUMN IF NOT EXISTS values_json JSONB`);
+      await pool.query(`ALTER TABLE campaign_copy_templates ALTER COLUMN var1 DROP NOT NULL`);
+      await pool.query(`ALTER TABLE campaign_copy_templates ALTER COLUMN var2 DROP NOT NULL`);
+      await pool.query(`ALTER TABLE campaign_copy_templates ALTER COLUMN var3 DROP NOT NULL`);
+    })().catch(err => { copiaSchemaPronto = null; throw err; });
+  }
+  return copiaSchemaPronto;
+}
+
 app.get('/api/campaign/copies', async (req: any, res) => {
   try {
     if (usePostgres && pgPool) {
       try {
-        // Garantir que a tabela existe
-        await pgPool.query(`
-          CREATE TABLE IF NOT EXISTS campaign_copy_templates (
-            id VARCHAR(255) PRIMARY KEY,
-            name VARCHAR(255) NOT NULL,
-            description TEXT,
-            category VARCHAR(50) DEFAULT 'prospeccao',
-            var1 TEXT NOT NULL,
-            var2 TEXT NOT NULL,
-            var3 TEXT NOT NULL,
-            is_default BOOLEAN DEFAULT FALSE,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-          );
-        `);
+        await garantirSchemaCopias();
 
         const result = await pgPool.query(`
-          SELECT id, name, description, category, var1, var2, var3, 
+          SELECT id, name, description, category, var1, var2, var3, meta_template_name AS "metaTemplateName", values_json AS "values", 
                  created_at AS "createdAt", updated_at AS "updatedAt", is_default AS "isDefault"
           FROM campaign_copy_templates
           ORDER BY is_default DESC, created_at DESC
@@ -10220,12 +10249,14 @@ app.get('/api/campaign/copies', async (req: any, res) => {
               var1: row.var1,
               var2: row.var2,
               var3: row.var3,
+              metaTemplateName: row.metaTemplateName || null,
+              values: valoresDaLinhaCopy(row),
               createdAt: row.createdAt,
               updatedAt: row.updatedAt,
               isDefault: row.isDefault
             });
           }
-          return res.json(result.rows);
+          return res.json(result.rows.map((r: any) => ({ ...r, values: valoresDaLinhaCopy(r) })));
         } else {
           // Se a tabela estiver vazia, semear com os padrões e retornar
           for (const defTpl of Array.from(memoryCampaignCopyTemplatesMap.values())) {
@@ -10237,20 +10268,20 @@ app.get('/api/campaign/copies', async (req: any, res) => {
             );
           }
           const seeded = await pgPool.query(`
-            SELECT id, name, description, category, var1, var2, var3, 
+            SELECT id, name, description, category, var1, var2, var3, meta_template_name AS "metaTemplateName", values_json AS "values", 
                    created_at AS "createdAt", updated_at AS "updatedAt", is_default AS "isDefault"
             FROM campaign_copy_templates
             ORDER BY is_default DESC, created_at DESC
           `);
           if (seeded.rows.length > 0) {
-            return res.json(seeded.rows);
+            return res.json(seeded.rows.map((r: any) => ({ ...r, values: valoresDaLinhaCopy(r) })));
           }
         }
       } catch (tableErr: any) {
         console.warn('[PostgreSQL] Erro ao buscar campaign_copy_templates:', tableErr.message);
       }
     }
-    const list = Array.from(memoryCampaignCopyTemplatesMap.values());
+    const list = Array.from(memoryCampaignCopyTemplatesMap.values()).map(r => ({ ...r, values: valoresDaLinhaCopy(r) }));
     return res.json(list);
   } catch (err: any) {
     console.error('Erro ao buscar templates de copy:', err);
@@ -10259,7 +10290,7 @@ app.get('/api/campaign/copies', async (req: any, res) => {
 });
 
 app.post('/api/campaign/copies', async (req: any, res) => {
-  const { name, description, category = 'prospeccao', var1, var2, var3 } = req.body;
+  const { name, description, category = 'prospeccao', var1, var2, var3, metaTemplateName, values } = req.body;
   if (!name || typeof name !== 'string' || !name.trim()) {
     return res.status(400).json({ error: 'Nome da copy de mensagem é obrigatório.' });
   }
@@ -10267,42 +10298,34 @@ app.post('/api/campaign/copies', async (req: any, res) => {
   const id = `tpl_copy_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   const now = new Date().toISOString();
 
+  const valoresNovos = values !== undefined
+    ? normalizarValoresCopy(values)
+    : normalizarValoresCopy({ 1: var1, 2: var2, 3: var3 });
   const newTemplate: StoredCampaignCopyTemplate = {
     id,
     name: name.trim(),
     description: description ? description.trim() : '',
     category: category || 'prospeccao',
-    var1: var1 || '',
-    var2: var2 || '',
-    var3: var3 || '',
+    var1: valoresNovos['1'] || '',
+    var2: valoresNovos['2'] || '',
+    var3: valoresNovos['3'] || '',
+    metaTemplateName: metaTemplateName ? String(metaTemplateName).trim() : null,
+    values: valoresNovos,
     createdAt: now,
     isDefault: false
   };
 
   try {
     if (usePostgres && pgPool) {
-      await pgPool.query(`
-        CREATE TABLE IF NOT EXISTS campaign_copy_templates (
-          id VARCHAR(255) PRIMARY KEY,
-          name VARCHAR(255) NOT NULL,
-          description TEXT,
-          category VARCHAR(50) DEFAULT 'prospeccao',
-          var1 TEXT NOT NULL,
-          var2 TEXT NOT NULL,
-          var3 TEXT NOT NULL,
-          is_default BOOLEAN DEFAULT FALSE,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-        );
-      `);
-
+      await garantirSchemaCopias();
       await pgPool.query(
-        `INSERT INTO campaign_copy_templates (id, name, description, category, var1, var2, var3, created_at, is_default)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, FALSE)
-         ON CONFLICT (id) DO UPDATE 
+        `INSERT INTO campaign_copy_templates (id, name, description, category, var1, var2, var3, meta_template_name, values_json, created_at, is_default)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, FALSE)
+         ON CONFLICT (id) DO UPDATE
          SET name = EXCLUDED.name, description = EXCLUDED.description, category = EXCLUDED.category,
-             var1 = EXCLUDED.var1, var2 = EXCLUDED.var2, var3 = EXCLUDED.var3, updated_at = CURRENT_TIMESTAMP`,
-        [id, newTemplate.name, newTemplate.description, newTemplate.category, newTemplate.var1, newTemplate.var2, newTemplate.var3, now]
+             var1 = EXCLUDED.var1, var2 = EXCLUDED.var2, var3 = EXCLUDED.var3,
+             meta_template_name = EXCLUDED.meta_template_name, values_json = EXCLUDED.values_json, updated_at = CURRENT_TIMESTAMP`,
+        [id, newTemplate.name, newTemplate.description, newTemplate.category, newTemplate.var1, newTemplate.var2, newTemplate.var3, newTemplate.metaTemplateName || null, JSON.stringify(valoresNovos), now]
       );
       console.log(`[Campaign Copies] Template "${newTemplate.name}" salvo no PostgreSQL com id ${id}`);
     }
@@ -10319,9 +10342,10 @@ app.post('/api/campaign/copies', async (req: any, res) => {
 
 app.put('/api/campaign/copies/:id', async (req: any, res) => {
   const { id } = req.params;
-  const { name, description, category, var1, var2, var3 } = req.body;
+  const { name, description, category, var1, var2, var3, metaTemplateName, values } = req.body;
 
   try {
+    await garantirSchemaCopias().catch(() => {});
     let existing = memoryCampaignCopyTemplatesMap.get(id);
 
     if (usePostgres && pgPool) {
@@ -10334,9 +10358,11 @@ app.put('/api/campaign/copies/:id', async (req: any, res) => {
             name: row.name,
             description: row.description,
             category: row.category,
-            var1: row.var1,
-            var2: row.var2,
-            var3: row.var3,
+            var1: row.var1 || '',
+            var2: row.var2 || '',
+            var3: row.var3 || '',
+            metaTemplateName: row.meta_template_name || null,
+            values: valoresDaLinhaCopy({ var1: row.var1, var2: row.var2, var3: row.var3, values: row.values_json }),
             createdAt: row.created_at,
             isDefault: row.is_default
           };
@@ -10348,14 +10374,24 @@ app.put('/api/campaign/copies/:id', async (req: any, res) => {
       return res.status(404).json({ error: 'Template de copy não encontrado.' });
     }
 
+    let valoresAtualizados: Record<string, string> = { ...(existing.values || {}) };
+    if (values !== undefined) {
+      valoresAtualizados = normalizarValoresCopy(values);
+    } else if (var1 !== undefined || var2 !== undefined || var3 !== undefined) {
+      if (var1 !== undefined) valoresAtualizados['1'] = String(var1).slice(0, COPY_VALUE_MAX);
+      if (var2 !== undefined) valoresAtualizados['2'] = String(var2).slice(0, COPY_VALUE_MAX);
+      if (var3 !== undefined) valoresAtualizados['3'] = String(var3).slice(0, COPY_VALUE_MAX);
+    }
     const updated: StoredCampaignCopyTemplate = {
       ...existing,
       name: name ? name.trim() : existing.name,
       description: description !== undefined ? description : existing.description,
       category: category || existing.category,
-      var1: var1 !== undefined ? var1 : existing.var1,
-      var2: var2 !== undefined ? var2 : existing.var2,
-      var3: var3 !== undefined ? var3 : existing.var3,
+      metaTemplateName: metaTemplateName !== undefined ? (metaTemplateName ? String(metaTemplateName).trim() : null) : (existing.metaTemplateName || null),
+      values: valoresAtualizados,
+      var1: valoresAtualizados['1'] || '',
+      var2: valoresAtualizados['2'] || '',
+      var3: valoresAtualizados['3'] || '',
       updatedAt: new Date().toISOString()
     };
 
@@ -10364,9 +10400,10 @@ app.put('/api/campaign/copies/:id', async (req: any, res) => {
     if (usePostgres && pgPool) {
       await pgPool.query(
         `UPDATE campaign_copy_templates
-         SET name = $1, description = $2, category = $3, var1 = $4, var2 = $5, var3 = $6, updated_at = CURRENT_TIMESTAMP
+         SET name = $1, description = $2, category = $3, var1 = $4, var2 = $5, var3 = $6,
+             meta_template_name = $8, values_json = $9::jsonb, updated_at = CURRENT_TIMESTAMP
          WHERE id = $7`,
-        [updated.name, updated.description, updated.category, updated.var1, updated.var2, updated.var3, id]
+        [updated.name, updated.description, updated.category, updated.var1, updated.var2, updated.var3, id, updated.metaTemplateName || null, JSON.stringify(updated.values || {})]
       );
     }
 
@@ -10429,11 +10466,13 @@ function copiesByIndexFromBody(variableValues: any): Record<number, string> {
     }
     return out;
   }
-  return {
-    1: String(variableValues?.var1 || '{nome}! Bom diaaa! Ótima semana 😄 Falo com o responsável pela {empresa}?'),
-    2: String(variableValues?.var2 || 'Eu sou {vendedor} e queria te fazer uma pergunta: você ficaria chateado se eu tivesse criado um site para a {empresa} sem pedir? 😂'),
-    3: String(variableValues?.var3 || 'Desenvolvi uma prévia exclusiva para vocês: 🔗 {site_novo}')
-  };
+  // Sem byIndex (formato antigo): só o que veio em var1..var3. Nunca texto padrão.
+  const out: Record<number, string> = {};
+  for (const n of [1, 2, 3]) {
+    const v = variableValues?.[`var${n}`];
+    if (v !== undefined && v !== null) out[n] = String(v);
+  }
+  return out;
 }
 
 app.post('/api/campaign/dispatch', async (req: any, res) => {
@@ -10648,32 +10687,12 @@ app.post('/api/campaign/dispatch', async (req: any, res) => {
         const company = (dLead.name && dLead.name !== 'Cliente' ? dLead.name : 'sua empresa').trim();
         const nyrohUrl = dLead.publicUrl || 'https://nyroh.app/preview';
 
-        const rawVar1 = variableValues?.var1 || '{nome}! Bom diaaa! Ótima semana 😄 Falo com o responsável pela {empresa}?';
-        const rawVar2 = variableValues?.var2 || 'Eu sou {vendedor} e queria te fazer uma pergunta: você ficaria chateado se eu tivesse criado um site para a {empresa} sem pedir? 😂';
-        const rawVar3 = variableValues?.var3 || 'Desenvolvi uma prévia exclusiva para vocês: 🔗 {site_novo}';
-
-        let leadVar1 = rawVar1
-          .replace(/\{nome\}/gi, firstName)
-          .replace(/\{empresa\}/gi, company)
-          .replace(/\{vendedor\}/gi, sellerName)
-          .replace(/\{site_novo\}/gi, nyrohUrl);
-
-        let leadVar2 = rawVar2
-          .replace(/\{nome\}/gi, firstName)
-          .replace(/\{empresa\}/gi, company)
-          .replace(/\{vendedor\}/gi, sellerName)
-          .replace(/\{site_novo\}/gi, nyrohUrl);
-
-        let leadVar3 = rawVar3
-          .replace(/\{nome\}/gi, firstName)
-          .replace(/\{empresa\}/gi, company)
-          .replace(/\{vendedor\}/gi, sellerName)
-          .replace(/\{site_novo\}/gi, nyrohUrl);
+        const copiesMapPre: Record<number, string> = copiesByIndexFromBody(variableValues);
 
         // Flag CAMPAIGN_GENERIC_TOKENS: resolve qualquer campo do lead/vendedor (ver src/lib/leadTokens.ts)
         if (process.env.CAMPAIGN_GENERIC_TOKENS === 'true') {
           const tokenCtx = { leadName: dLead.name, phoneNumber: dLead.phoneNumber, publicUrl: dLead.publicUrl, website: dLead.website, niche: dLead.niche, sellerName };
-          const resolved = [rawVar1, rawVar2, rawVar3].map(t => resolveLeadTokens(String(t), tokenCtx));
+          const resolved = Object.values(copiesMapPre).map(t => resolveLeadTokens(String(t), tokenCtx));
           const emptyFields = [...new Set(resolved.flatMap(r => r.empty))];
           if (emptyFields.length > 0) {
             // Lead sem dado exigido pela copy: não enfileira (a Meta recusaria o parâmetro vazio)
@@ -10684,9 +10703,6 @@ app.post('/api/campaign/dispatch', async (req: any, res) => {
             ).catch(() => {});
             continue;
           }
-          leadVar1 = resolved[0].text;
-          leadVar2 = resolved[1].text;
-          leadVar3 = resolved[2].text;
         }
 
         // Sem corte por tamanho: os limites de 100/160/120 caracteres cortavam o valor no meio
@@ -10821,32 +10837,12 @@ app.post('/api/campaign/dispatch', async (req: any, res) => {
         const company = (lead.name && lead.name !== 'Cliente' ? lead.name : 'sua empresa').trim();
         const nyrohUrl = lead.publicUrl || 'https://nyroh.app/preview';
 
-        const rawVar1 = variableValues?.var1 || '{nome}! Bom diaaa! Ótima semana 😄 Falo com o responsável pela {empresa}?';
-        const rawVar2 = variableValues?.var2 || 'Eu sou {vendedor} e queria te fazer uma pergunta: você ficaria chateado se eu tivesse criado um site para a {empresa} sem pedir? 😂';
-        const rawVar3 = variableValues?.var3 || 'Desenvolvi uma prévia exclusiva para vocês: 🔗 {site_novo}';
-
-        let leadVar1 = rawVar1
-          .replace(/\{nome\}/gi, firstName)
-          .replace(/\{empresa\}/gi, company)
-          .replace(/\{vendedor\}/gi, sellerName)
-          .replace(/\{site_novo\}/gi, nyrohUrl);
-
-        let leadVar2 = rawVar2
-          .replace(/\{nome\}/gi, firstName)
-          .replace(/\{empresa\}/gi, company)
-          .replace(/\{vendedor\}/gi, sellerName)
-          .replace(/\{site_novo\}/gi, nyrohUrl);
-
-        let leadVar3 = rawVar3
-          .replace(/\{nome\}/gi, firstName)
-          .replace(/\{empresa\}/gi, company)
-          .replace(/\{vendedor\}/gi, sellerName)
-          .replace(/\{site_novo\}/gi, nyrohUrl);
+        const copiesMapPre: Record<number, string> = copiesByIndexFromBody(variableValues);
 
         // Flag CAMPAIGN_GENERIC_TOKENS: resolve qualquer campo do lead/vendedor (ver src/lib/leadTokens.ts)
         if (process.env.CAMPAIGN_GENERIC_TOKENS === 'true') {
           const tokenCtx = { leadName: lead.name, phoneNumber: lead.phoneNumber, publicUrl: lead.publicUrl, website: lead.website, niche: lead.niche, sellerName };
-          const resolved = [rawVar1, rawVar2, rawVar3].map(t => resolveLeadTokens(String(t), tokenCtx));
+          const resolved = Object.values(copiesMapPre).map(t => resolveLeadTokens(String(t), tokenCtx));
           const emptyFields = [...new Set(resolved.flatMap(r => r.empty))];
           if (emptyFields.length > 0) {
             // Lead sem dado exigido pela copy: não enfileira (a Meta recusaria o parâmetro vazio)
@@ -10855,9 +10851,6 @@ app.post('/api/campaign/dispatch', async (req: any, res) => {
             (lead as any).notes = `Não enviado: sem dado para ${emptyFields.join(', ')}`;
             continue;
           }
-          leadVar1 = resolved[0].text;
-          leadVar2 = resolved[1].text;
-          leadVar3 = resolved[2].text;
         }
 
         // Sem corte por tamanho: os limites de 100/160/120 caracteres cortavam o valor no meio

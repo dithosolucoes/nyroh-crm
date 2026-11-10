@@ -302,8 +302,23 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   // Índices {{n}} do modelo ativo (uma caixa para cada). Sem corpo lido, cai em 1..3.
   const activeVarIndexes: number[] = useMemo(() => {
     const idx = templateVarIndexes(activeMetaTemplate?.bodyText || '');
-    return idx.length > 0 ? idx : [1, 2, 3];
+    return idx;
   }, [activeMetaTemplate]);
+
+  // Valores da copy do modelo escolhido: só os índices {{n}} DESTE modelo
+  const valoresParaSalvar = (): Record<string, string> => {
+    const out: Record<string, string> = {};
+    for (const n of activeVarIndexes) out[String(n)] = copiesByIdx[n] ?? '';
+    return out;
+  };
+  // Nada sai sem modelo escolhido e sem todas as variáveis do modelo escritas
+  const erroCopyParaDisparo = (): string | null => {
+    if (!selectedTemplate) return 'Escolha um modelo aprovado antes de disparar.';
+    for (const n of activeVarIndexes) {
+      if (!(copiesByIdx[n] ?? '').trim()) return `Escreva a variável {{${n}}} da copy antes de disparar.`;
+    }
+    return null;
+  };
 
   // Teste de envio: manda o modelo escolhido, com a copy montada, para um número (com um lead de exemplo)
   const [testPhone, setTestPhone] = useState<string>('5511988216073');
@@ -378,39 +393,19 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
     return renderTemplateBody(activeMetaTemplate?.bodyText || '', values).text.length;
   };
 
-  // Variáveis de Conteúdo (Nível 2: O que vai DENTRO de cada {{X}} do template)
-  // Copy por índice do modelo: { 1: texto, 2: texto, ... } — uma caixa por {{n}} do template
-  const [copiesByIdx, setCopiesByIdx] = useState<Record<number, string>>(() => {
-    const DEFAULTS: Record<number, string> = {
-      1: '{nome}! Bom diaaa! Ótima semana 😄 Falo com o responsável pela {empresa}?',
-      2: 'Eu sou {vendedor} e queria te fazer uma pergunta: você ficaria chateado se eu tivesse criado um site para a {empresa} sem pedir? 😂',
-      3: 'Desenvolvi uma prévia exclusiva para vocês: 🔗 {site_novo}'
-    };
+  // Variáveis de Conteúdo: uma caixa por {{n}} do modelo escolhido.
+  // Cada modelo guarda o SEU rascunho. Nada vem pré-preenchido: a copy é escrita em cima do template.
+  const [copiesMapByTemplate, setCopiesMapByTemplate] = useState<Record<string, Record<number, string>>>(() => {
     try {
-      const saved = localStorage.getItem('nyroh_campaign_copies');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        const out: Record<number, string> = {};
-        for (const k of Object.keys(parsed)) {
-          const n = Number(k);
-          if (n > 0) out[n] = String(parsed[k] ?? '');
-        }
-        return out;
-      }
+      const saved = localStorage.getItem('nyroh_copies_by_template');
+      if (saved) return JSON.parse(saved) || {};
     } catch {}
-    // Migração: copy salva no formato antigo (var1..var3)
-    const out: Record<number, string> = {};
-    for (const n of [1, 2, 3]) {
-      try {
-        out[n] = localStorage.getItem(`nyroh_campaign_var${n}`) ?? DEFAULTS[n];
-      } catch {
-        out[n] = DEFAULTS[n];
-      }
-    }
-    return out;
+    return {};
   });
-  const setCopyAt = (n: number, value: string) => setCopiesByIdx(prev => ({ ...prev, [n]: value }));
-  // Apelidos antigos (usados por dispatch e biblioteca): leem/gravam a mesma copy por índice
+  const copiesByIdx: Record<number, string> = copiesMapByTemplate[selectedTemplate] || {};
+  const setCopyAt = (n: number, value: string) =>
+    setCopiesMapByTemplate(prev => ({ ...prev, [selectedTemplate]: { ...(prev[selectedTemplate] || {}), [n]: value } }));
+  // Apelidos usados pelo disparo (var1..var3 seguem indo junto, para compatibilidade)
   const templateVar1 = copiesByIdx[1] ?? '';
   const templateVar2 = copiesByIdx[2] ?? '';
   const templateVar3 = copiesByIdx[3] ?? '';
@@ -434,15 +429,12 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   const [newCopyDesc, setNewCopyDesc] = useState<string>('');
   const [newCopyCategory, setNewCopyCategory] = useState<'prospeccao' | 'followup' | 'reativacao' | 'personalizado'>('prospeccao');
 
-  // Sincronizar variáveis da copy no localStorage para não perder ao dar F5
+  // Guarda os rascunhos por modelo para não perder ao dar F5
   useEffect(() => {
     try {
-      localStorage.setItem('nyroh_campaign_copies', JSON.stringify(copiesByIdx));
-      localStorage.setItem('nyroh_campaign_var1', templateVar1);
-      localStorage.setItem('nyroh_campaign_var2', templateVar2);
-      localStorage.setItem('nyroh_campaign_var3', templateVar3);
+      localStorage.setItem('nyroh_copies_by_template', JSON.stringify(copiesMapByTemplate));
     } catch {}
-  }, [copiesByIdx]);
+  }, [copiesMapByTemplate]);
 
   useEffect(() => {
     try {
@@ -504,28 +496,37 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
     try {
       localStorage.setItem('nyroh_selected_copy_id', copyId);
     } catch {}
-    const found = copyTemplates.find(c => c.id === copyId);
-    if (found) {
-      const v1 = (found.var1 || '').slice(0, META_CHAR_LIMITS.var1);
-      const v2 = (found.var2 || '').slice(0, META_CHAR_LIMITS.var2);
-      const v3 = (found.var3 || '').slice(0, META_CHAR_LIMITS.var3);
-      setTemplateVar1(v1);
-      setTemplateVar2(v2);
-      setTemplateVar3(v3);
-      try {
-        localStorage.setItem('nyroh_campaign_var1', v1);
-        localStorage.setItem('nyroh_campaign_var2', v2);
-        localStorage.setItem('nyroh_campaign_var3', v3);
-      } catch {}
-      setActionNotification({
-        type: 'success',
-        message: `Copy "${found.name}" carregada e selecionada para o disparo!`
-      });
+    const found: any = copyTemplates.find(c => c.id === copyId);
+    if (!found) return;
+    const valores: Record<number, string> = {};
+    for (const [k, v] of Object.entries(found.values || {})) valores[Number(k)] = String(v ?? '').slice(0, META_BODY_MAX);
+    if (found.metaTemplateName) {
+      const existe = availableTemplates.some((t: any) => t.name === found.metaTemplateName);
+      if (!existe) {
+        setActionNotification({ type: 'error', message: `A copy "${found.name}" foi feita para o modelo "${found.metaTemplateName}", que não está na sua conta. Escolha outro modelo ou edite a copy.` });
+        return;
+      }
+      setSelectedTemplate(found.metaTemplateName);
+      setCopiesMapByTemplate(prev => ({ ...prev, [found.metaTemplateName]: valores }));
+      setActionNotification({ type: 'success', message: `Copy "${found.name}" carregada no modelo ${found.metaTemplateName}.` });
+    } else {
+      // Copy antiga, sem modelo: entra no modelo que estiver escolhido agora
+      if (!selectedTemplate) {
+        setActionNotification({ type: 'error', message: 'Escolha o modelo da Meta antes de usar esta copy.' });
+        return;
+      }
+      setCopiesMapByTemplate(prev => ({ ...prev, [selectedTemplate]: valores }));
+      setActionNotification({ type: 'success', message: `Copy "${found.name}" carregada. Ela não tinha modelo salvo: confira se as variáveis batem com ${selectedTemplate}.` });
     }
   };
 
   // Atualizar copy atual selecionada na biblioteca
   const handleUpdateCurrentCopyTemplate = async () => {
+    const erroCopy = selectedTemplate ? erroCopyParaDisparo() : 'Escolha o modelo da Meta antes de salvar a copy.';
+    if (erroCopy) {
+      setActionNotification({ type: 'error', message: erroCopy });
+      return;
+    }
     if (!selectedCopyTemplateId) {
       setShowSaveCopyModal(true);
       return;
@@ -544,6 +545,8 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
           name: current.name,
           description: current.description,
           category: current.category,
+          metaTemplateName: selectedTemplate,
+          values: valoresParaSalvar(),
           var1: templateVar1.slice(0, META_CHAR_LIMITS.var1),
           var2: templateVar2.slice(0, META_CHAR_LIMITS.var2),
           var3: templateVar3.slice(0, META_CHAR_LIMITS.var3)
@@ -571,19 +574,20 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
     }
   };
 
-  // Restaurar para a copy oficial da Meta
+  // Limpa as variáveis do modelo escolhido: a copy é escrita do zero, em cima do template
   const handleResetToApprovedCopy = () => {
-    setTemplateVar1('{nome}! Bom diaaa! Ótima semana 😄 Falo com o responsável pela {empresa}?');
-    setTemplateVar2('Eu sou {vendedor} e queria te fazer uma pergunta: você ficaria chateado se eu tivesse criado um site para a {empresa} sem pedir? 😂');
-    setTemplateVar3('Desenvolvi uma prévia exclusiva para vocês: 🔗 {site_novo}');
-    setActionNotification({
-      type: 'success',
-      message: 'Copy restaurada para o padrão oficial aprovado da Meta!'
-    });
+    if (!selectedTemplate) return;
+    setCopiesMapByTemplate(prev => ({ ...prev, [selectedTemplate]: {} }));
+    setActionNotification({ type: 'success', message: 'Variáveis limpas. Escreva a copy deste modelo.' });
   };
 
   // Save current copy variables as a new copy template
   const handleSaveCurrentAsCopyTemplate = async () => {
+    const erroCopy = selectedTemplate ? erroCopyParaDisparo() : 'Escolha o modelo da Meta antes de salvar a copy.';
+    if (erroCopy) {
+      alert(erroCopy);
+      return;
+    }
     if (!newCopyName.trim()) {
       alert('Por favor, informe o nome do seu template de mensagem.');
       return;
@@ -597,6 +601,8 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
           name: newCopyName.trim(),
           description: newCopyDesc.trim(),
           category: newCopyCategory,
+          metaTemplateName: selectedTemplate,
+          values: valoresParaSalvar(),
           var1: templateVar1,
           var2: templateVar2,
           var3: templateVar3
@@ -1330,8 +1336,9 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   // Execute Batch Dispatch (Moves selected quantity from Staging -> Quarentena/Espera)
   // Dispara cada safra marcada, uma após a outra, com a mesma quantidade e copy escolhidas no modal
   const handleDispatchCheckedBatches = async () => {
-    if (!dispatchSelectedTemplate) {
-      showNotification('error', 'Escolha um modelo aprovado antes de disparar.');
+    const erroCopy = erroCopyParaDisparo();
+    if (erroCopy) {
+      showNotification('error', erroCopy);
       return;
     }
     const targets = checkedBatchIds.filter(id => batches.some(b => b.id === id));
@@ -1405,8 +1412,9 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   };
 
   const handleExecuteBatchDispatch = async () => {
-    if (!dispatchSelectedTemplate) {
-      showNotification('error', 'Escolha um modelo aprovado antes de disparar.');
+    const erroCopy = erroCopyParaDisparo();
+    if (erroCopy) {
+      showNotification('error', erroCopy);
       return;
     }
     if (stagingSelectedLeadIds.length === 0 && checkedBatchIds.length > 0) {
@@ -2748,6 +2756,12 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
                           </span>
                         </div>
 
+                        {!selectedTemplate && (
+                          <p className="text-xs text-neutral-500">Escolha um modelo acima para escrever a copy em cima dele.</p>
+                        )}
+                        {selectedTemplate && activeVarIndexes.length === 0 && (
+                          <p className="text-xs text-neutral-500">Este modelo não tem variáveis no corpo, então não há copy para escrever.</p>
+                        )}
                         {/* Uma caixa por {{n}} do modelo escolhido */}
                         {activeVarIndexes.map(n => {
                           const value = copiesByIdx[n] ?? '';
@@ -2911,7 +2925,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
                             className="py-2.5 px-3 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
                           >
                             <RefreshCw className="w-3.5 h-3.5 text-neutral-500" />
-                            <span>Restaurar Padrão</span>
+                            <span>Limpar variáveis</span>
                           </button>
                         </div>
                       </div>

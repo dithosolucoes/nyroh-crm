@@ -276,6 +276,7 @@ export interface CampaignCopyTemplate {
   description?: string;
   category?: 'prospeccao' | 'followup' | 'reativacao' | 'personalizado';
   metaTemplateName?: string;
+  values?: Record<string, string>;
   var1: string;
   var2: string;
   var3: string;
