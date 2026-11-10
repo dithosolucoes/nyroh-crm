@@ -23,12 +23,14 @@ import { extensionFor, saveMediaBuffer } from '../src/lib/mediaStorage';
 import { effectiveSpeedPerSecond, dispatchRpm, planRpm, delayForIndex, maxDispatchPerSecond, FluxoRateLimitedError } from '../src/lib/dispatchRate';
 import { detectOptOut, sanitizeTemplateVariable } from '../src/lib/leadIntent';
 import { isPubliclyFetchableUrl } from '../src/lib/auditEngine';
-import { validarAutomacao, logicaEmPalavras, conversaSimulada, renderPrevia, tokensDesconhecidos, type Automacao } from '../src/lib/automacoes';
+import { validarAutomacao, logicaEmPalavras, conversaSimulada, renderPrevia, tokensDesconhecidos, EVENTOS, ACOES, CONDICOES, type Automacao } from '../src/lib/automacoes';
 import { planejarEvento, type RegistroAutomacao } from '../src/lib/automacoesExecucao';
 import { colunaPermitida, TABELAS_BACKUP } from '../src/lib/backupRoutes';
 import { quandoExecutar, estaVencido, contemPalavra } from '../src/lib/automacoesFila';
 import { registrarEventoCliente, eventoDaResposta, type DepsRecebimento } from '../src/lib/automacoesExecucao';
 import { processarVencidos, type DepsWorker } from '../src/lib/automacoesWorker';
+import { decidirEvento, estadoInicial, pausarLead, liberarLead } from '../src/lib/automacoesEstado';
+import { dentroDosLimites, pausaGeralAtiva, proximaVersao, registroAuditoria, LIMITES_PADRAO } from '../src/lib/automacoesLimites';
 import { resolveLeadTokens, TOKEN_NAMES } from '../src/lib/leadTokens';
 import { validateTemplateCategory, buildMetaButtons, defaultExamples, countBodyVariables, validateTemplateVariables } from '../src/lib/templateRules';
 import {
@@ -1080,6 +1082,147 @@ test('lead com opt-out não recebe o passo, mesmo já na fila', async () => {
   assert.equal(marcados[0].status, 'cancelado');
   assert.match(marcados[0].resultado, /opt-out/);
   assert.equal(r.simulados, 0);
+});
+
+group('Estado do lead e prioridades (seção 7)');
+test('opt-out vence: clique depois de pedir para parar não executa nada', () => {
+  const agora = new Date('2026-11-10T13:00:00Z');
+  let e = estadoInicial();
+  const parar = decidirEvento(e, 'cliente_pediu_parar', agora);
+  assert.equal(parar.estado.statusGeral, 'optout');
+  const clique = decidirEvento(parar.estado, 'cliente_clicou', agora, { id: 'r1', versao: 1 });
+  assert.equal(clique.pode, false);
+  assert.match(clique.motivo, /opt-out/);
+});
+test('ameaça pausa o lead, e a regra não dispara depois', () => {
+  const agora = new Date('2026-11-10T13:00:00Z');
+  const a = decidirEvento(estadoInicial(), 'cliente_ameacou', agora);
+  assert.equal(a.estado.statusGeral, 'revisao');
+  const b = decidirEvento(a.estado, 'cliente_clicou', agora, { id: 'r1', versao: 1 });
+  assert.equal(b.pode, false);
+  assert.match(b.motivo, /só revisão/);
+});
+test('repetição não executa de novo: mesma regra na mesma versão é ignorada', () => {
+  const agora = new Date('2026-11-10T13:00:00Z');
+  const r = { id: 'r1', versao: 1 };
+  const primeira = decidirEvento(estadoInicial(), 'cliente_clicou', agora, r);
+  assert.equal(primeira.pode, true);
+  const segunda = decidirEvento(primeira.estado, 'cliente_clicou', agora, r);
+  assert.equal(segunda.pode, false);
+  assert.match(segunda.motivo, /já executou/);
+});
+test('nova versão da regra pode executar de novo para quem já recebeu a anterior', () => {
+  const agora = new Date('2026-11-10T13:00:00Z');
+  const v1 = decidirEvento(estadoInicial(), 'cliente_clicou', agora, { id: 'r1', versao: 1 });
+  const v2 = decidirEvento(v1.estado, 'cliente_clicou', agora, { id: 'r1', versao: 2 });
+  assert.equal(v2.pode, true);
+});
+test('pausa manual não reverte opt-out, e liberar só vale para pausa', () => {
+  const agora = new Date('2026-11-10T13:00:00Z');
+  const optout = decidirEvento(estadoInicial(), 'cliente_pediu_parar', agora).estado;
+  assert.equal(pausarLead(optout, 'pausado').statusGeral, 'optout');
+  assert.equal(liberarLead(optout).statusGeral, 'optout');
+  const pausado = pausarLead(estadoInicial(), 'pausado');
+  assert.equal(liberarLead(pausado).statusGeral, 'ativo');
+});
+test('a decisão não altera o estado original (sem efeito colateral)', () => {
+  const agora = new Date('2026-11-10T13:00:00Z');
+  const inicial = estadoInicial();
+  decidirEvento(inicial, 'cliente_pediu_parar', agora);
+  assert.equal(inicial.statusGeral, 'ativo');
+  assert.deepEqual(inicial.regrasExecutadas, {});
+});
+
+group('Catálogo completo (fase C)');
+test('catálogo traz os gatilhos, condições e ações do blueprint', () => {
+  const ev = new Set(EVENTOS.map((e) => e.v));
+  for (const v of ['cliente_clicou', 'cliente_pediu_parar', 'cliente_ameacou', 'cliente_respondeu', 'sem_resposta', 'falha_envio', 'resposta_automatica', 'passo_falhou']) {
+    assert.ok(ev.has(v as never), `gatilho ${v} ausente`);
+  }
+  const ac = new Set(ACOES.map((a) => a.v));
+  for (const v of ['enviar_texto', 'enviar_template', 'marcar_optout', 'pausar_lead', 'revisao', 'etiqueta', 'remover_etiqueta', 'cancelar_passos']) {
+    assert.ok(ac.has(v as never), `ação ${v} ausente`);
+  }
+  assert.ok(CONDICOES.length >= 5);
+});
+test('validação recusa condição fora do catálogo e operador errado', () => {
+  const base = { nome: 'x', gatilho: { evento: 'cliente_clicou' }, passos: [{ acao: 'enviar_texto', params: { texto: 'oi' } }] };
+  const r1 = validarAutomacao({ ...base, condicoes: [{ var: 'lead.inventada', op: 'falso' }] }, [], 'self');
+  assert.ok(r1.erros.some((e) => /não existe no catálogo/.test(e)));
+  const r2 = validarAutomacao({ ...base, condicoes: [{ var: 'lead.pausado', op: 'igual' }] }, [], 'self');
+  assert.ok(r2.erros.some((e) => /operador/.test(e)));
+  const ok = validarAutomacao({ ...base, condicoes: [{ var: 'lead.optout', op: 'falso' }] }, [], 'self');
+  assert.equal(ok.erros.length, 0);
+});
+test('ações novas passam na validação', () => {
+  const r = validarAutomacao({ nome: 'n', gatilho: { evento: 'sem_resposta' }, passos: [{ acao: 'enviar_template', params: { nome: 'modelo_1' } }, { acao: 'cancelar_passos' }] }, [], 'self');
+  assert.equal(r.erros.length, 0);
+});
+
+group('Limites, pausa geral, versão e auditoria (fase D)');
+test('limite diário bloqueia o 4º envio em 24h, com motivo', () => {
+  const agora = new Date('2026-11-10T13:00:00Z');
+  const envios = [1, 2, 3].map((h) => new Date(agora.getTime() - h * 3600_000));
+  const r = dentroDosLimites(envios, agora, LIMITES_PADRAO);
+  assert.equal(r.ok, false);
+  assert.match(r.motivo, /diário/);
+});
+test('limite semanal bloqueia mesmo fora das 24h', () => {
+  const agora = new Date('2026-11-10T13:00:00Z');
+  // 10 envios entre 25h e 133h atrás: fora das 24h, dentro dos 7 dias.
+  const envios = Array.from({ length: 10 }, (_, k) => new Date(agora.getTime() - (25 + 12 * k) * 3600_000));
+  const r = dentroDosLimites(envios, agora, LIMITES_PADRAO);
+  assert.equal(r.ok, false);
+  assert.match(r.motivo, /semanal/);
+});
+test('lead dentro dos limites pode receber', () => {
+  const agora = new Date('2026-11-10T13:00:00Z');
+  assert.equal(dentroDosLimites([], agora).ok, true);
+});
+test('pausa geral só vale com a variável exata', () => {
+  assert.equal(pausaGeralAtiva({ NYROH_AUTOMACOES_PAUSA_GERAL: 'true' }), true);
+  assert.equal(pausaGeralAtiva({ NYROH_AUTOMACOES_PAUSA_GERAL: 'sim' }), false);
+  assert.equal(pausaGeralAtiva({}), false);
+});
+test('versão começa em 1 e sobe a cada alteração', () => {
+  assert.equal(proximaVersao(undefined), 1);
+  assert.equal(proximaVersao(1), 2);
+  assert.equal(proximaVersao(7), 8);
+});
+test('registro de auditoria guarda decisão, motivo e alvo', () => {
+  const agora = new Date('2026-11-10T13:00:00Z');
+  const r = registroAuditoria('bloqueou', 'Limite diário atingido', agora, { leadId: 'L1', regraId: 'a', versao: 2 });
+  assert.equal(r.decisao, 'bloqueou');
+  assert.equal(r.leadId, 'L1');
+  assert.equal(r.versao, 2);
+  assert.equal(r.quando, '2026-11-10T13:00:00.000Z');
+});
+test('pausa geral para a fila sem tocar em nenhum item', async () => {
+  let buscou = false;
+  const deps: DepsWorker = {
+    buscarVencidos: async () => { buscou = true; return []; },
+    reservar: async () => true,
+    contextoDoLead: async () => null,
+    marcarResultado: async () => {},
+  };
+  const r = await processarVencidos(new Date(), deps, 50, { pausaGeral: true });
+  assert.equal(r.pausado, true);
+  assert.equal(buscou, false, 'nem busca os itens quando pausado');
+});
+test('item bloqueado pelo limite vira cancelado com motivo e entra na auditoria', async () => {
+  const agora = new Date('2026-11-10T13:00:00Z');
+  const marcados: Array<{ status: string; resultado: string }> = [];
+  const deps: DepsWorker = {
+    buscarVencidos: async () => [{ id: 'lim1', automacaoId: 'a', leadId: 'L9', passoOrdem: 1, acao: 'enviar_texto' as const, texto: 'Oi', executarEm: agora }],
+    reservar: async () => true,
+    contextoDoLead: async () => ({ leadName: 'Eva' }),
+    marcarResultado: async (_id, status, resultado) => { marcados.push({ status, resultado }); },
+    enviosRecentes: async () => [1, 2, 3].map((h) => new Date(agora.getTime() - h * 3600_000)),
+  };
+  const r = await processarVencidos(agora, deps);
+  assert.equal(marcados[0].status, 'cancelado');
+  assert.match(marcados[0].resultado, /Limite/);
+  assert.equal(r.auditoria[0].decisao, 'bloqueou');
 });
 
   await Promise.all(pending);

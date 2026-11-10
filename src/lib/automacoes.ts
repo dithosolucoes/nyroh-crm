@@ -16,6 +16,17 @@ export const EVENTOS = [
   { v: 'cliente_respondeu', label: 'Respondeu outro texto', desc: 'respondeu com texto livre (vai para sua revisão)' },
   { v: 'sem_resposta', label: 'Não respondeu no prazo', desc: 'não respondeu no prazo' },
   { v: 'falha_envio', label: 'Envio falhou', desc: 'o envio falhou' },
+  { v: 'resposta_automatica', label: 'Resposta automática detectada', desc: 'recebeu uma resposta automática (ausência, bot)' },
+  { v: 'passo_falhou', label: 'Passo falhou', desc: 'um passo anterior falhou' },
+] as const;
+
+/** Condições fechadas (blueprint, seção 5). `op` é o único operador aceito para cada uma. */
+export const CONDICOES = [
+  { v: 'lead.optout', label: 'Lead está em opt-out', ops: ['falso', 'verdadeiro'] },
+  { v: 'lead.pausado', label: 'Lead está pausado', ops: ['falso', 'verdadeiro'] },
+  { v: 'janela_24h', label: 'Dentro da janela de 24h', ops: ['verdadeiro'] },
+  { v: 'horario_comercial', label: 'Dentro do horário comercial (Brasília)', ops: ['verdadeiro'] },
+  { v: 'ultimo_comando', label: 'Último comando do lead é', ops: ['igual'] },
 ] as const;
 
 export const ACOES = [
@@ -27,6 +38,9 @@ export const ACOES = [
   { v: 'etiqueta', label: 'Adicionar etiqueta', params: 'op e nome' },
   { v: 'notificar', label: 'Avisar você', params: 'mensagem' },
   { v: 'definir_campo', label: 'Definir campo', params: 'campo e valor' },
+  { v: 'enviar_template', label: 'Enviar modelo aprovado (fora da janela de 24h)', params: 'nome do modelo' },
+  { v: 'remover_etiqueta', label: 'Remover etiqueta', params: 'op e nome' },
+  { v: 'cancelar_passos', label: 'Cancelar passos agendados deste lead', params: 'sem parâmetros' },
 ] as const;
 
 export type EventoV = (typeof EVENTOS)[number]['v'];
@@ -113,6 +127,15 @@ export function validarAutomacao(
   const filtro = d.gatilho?.filtro;
   if (filtro && filtro.texto_contem !== undefined && !String(filtro.texto_contem).trim()) {
     erros.push('A palavra-chave do gatilho está vazia.');
+  }
+
+  for (const [i, c] of (Array.isArray(d.condicoes) ? d.condicoes : []).entries()) {
+    const def = CONDICOES.find((x) => x.v === c.var);
+    if (!def) {
+      erros.push(`Condição ${i + 1}: "${c.var}" não existe no catálogo.`);
+    } else if (!(def.ops as readonly string[]).includes(c.op)) {
+      erros.push(`Condição ${i + 1}: operador "${c.op}" não serve para "${def.label}".`);
+    }
   }
 
   const passos = Array.isArray(d.passos) ? d.passos : [];
@@ -202,6 +225,8 @@ export function conversaSimulada(def: Automacao): BolhaConversa[] {
     cliente_respondeu: '(texto livre do cliente)',
     sem_resposta: '(sem resposta)',
     falha_envio: '(envio falhou)',
+    resposta_automatica: '(resposta automática)',
+    passo_falhou: '(passo anterior falhou)',
   };
   const out: BolhaConversa[] = [];
   const evento = def.gatilho?.evento;
