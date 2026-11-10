@@ -13,6 +13,53 @@ import type pg from 'pg';
 import { validarAutomacao, type Automacao } from './automacoes';
 import { processarVencidos } from './automacoesWorker';
 import { criarExecutorAcoes, camposDoLead, tabelaExiste } from './automacoesExecutores';
+import { registrarEventoGeral } from './automacoesExecucao';
+import { proximaOcorrencia } from './automacoesEstado';
+import type { ItemFila } from './automacoesExecucao';
+import type { RegistroAutomacao } from './automacoesExecucao';
+
+/**
+ * Pausa geral: vale o que está no banco (tabela automacoes_config, quando existir).
+ * Sem a tabela ou sem a linha, vale a variável de ambiente, como antes.
+ */
+export async function lerPausaGeral(pool: pg.Pool | null): Promise<boolean> {
+  if (pool && (await tabelaExiste(pool as any, 'automacoes_config').catch(() => false))) {
+    const r = await pool.query(`SELECT valor FROM automacoes_config WHERE chave = 'pausa_geral'`);
+    if (r.rows[0]) return r.rows[0].valor === 'true';
+  }
+  return pausaGeralAtiva();
+}
+
+/** Disparos de horário já feitos neste processo (regra + minuto). Evita repetir no mesmo minuto. */
+const agendasDisparadas = new Set<string>();
+
+/**
+ * Agenda do JSON: quando chega o horário de uma regra "agenda_horario" ativa, dispara o evento para
+ * os leads do funil indicado no filtro. Sem funil no filtro, a regra não dispara (evita atingir a base toda).
+ */
+export async function dispararAgendas(pool: pg.Pool, agora: Date, deps: { carregarRegras: () => Promise<RegistroAutomacao[]>; gravarFila: (itens: ItemFila[]) => Promise<void> }): Promise<number> {
+  const minuto = Math.floor(agora.getTime() / 60000) * 60000;
+  const regras = await deps.carregarRegras();
+  let disparos = 0;
+  for (const r of regras) {
+    const g = r.def?.gatilho;
+    if (r.status !== 'ativa' || g?.evento !== 'agenda_horario' || !g.agenda) continue;
+    const funil = g.filtro?.funil;
+    if (!funil) continue;
+    const prox = proximaOcorrencia(new Date(minuto - 60000), g.agenda);
+    if (!prox || prox.getTime() !== minuto) continue;
+    const chave = `${r.id}|${minuto}`;
+    if (agendasDisparadas.has(chave)) continue;
+    agendasDisparadas.add(chave);
+    if (agendasDisparadas.size > 500) agendasDisparadas.clear();
+    const leads = await pool.query(`SELECT id FROM leads WHERE column_status = $1 LIMIT 500`, [funil]);
+    for (const l of leads.rows) {
+      await registrarEventoGeral('agenda_horario', String(l.id), { funil: String(funil) }, agora, deps).catch(() => 0);
+      disparos++;
+    }
+  }
+  return disparos;
+}
 import { pausaGeralAtiva, aplicarVersao } from './automacoesLimites';
 
 interface AutomacoesDeps {
@@ -158,10 +205,28 @@ export function registerAutomacoesRoutes(app: Express, deps: AutomacoesDeps): vo
     res.json([{
       persistenciaLigada: automacoesPersistenciaOn(),
       execucaoLigada: process.env.NYROH_AUTOMACOES_EXECUCAO === 'true',
-      pausaGeral: pausaGeralAtiva(),
+      pausaGeral: await lerPausaGeral(deps.getPool()).catch(() => pausaGeralAtiva()),
       // Limites não são mais globais: vêm do JSON de cada automação.
       limites: null,
     }]);
+  });
+
+  // Liga ou desliga a pausa geral (dado no banco). Exige a migração de configuração.
+  app.put('/api/admin/automacoes/configuracoes', async (req: Request, res: Response) => {
+    if (!soAdmin(req, res)) return;
+    const pool = pronto(res);
+    if (!pool) return;
+    const { pausaGeral } = (req.body || {}) as { pausaGeral?: unknown };
+    if (typeof pausaGeral !== 'boolean') return res.status(400).json({ error: 'Informe pausaGeral como verdadeiro ou falso.' });
+    if (!(await tabelaExiste(pool as any, 'automacoes_config'))) {
+      return res.status(409).json({ error: 'Configuração ainda sem tabela (migração pendente). Nada foi alterado.' });
+    }
+    await pool.query(
+      `INSERT INTO automacoes_config (chave, valor, atualizado_em) VALUES ('pausa_geral', $1, CURRENT_TIMESTAMP)
+       ON CONFLICT (chave) DO UPDATE SET valor = EXCLUDED.valor, atualizado_em = CURRENT_TIMESTAMP`,
+      [String(pausaGeral)]
+    );
+    res.json({ pausaGeral });
   });
 
   app.delete('/api/admin/automacoes/:id', async (req: Request, res: Response) => {
@@ -192,13 +257,14 @@ export async function applyAutomacoesFilaMigration(pool: pg.Pool): Promise<void>
  * Liga o processador da fila a cada minuto. Só com NYROH_AUTOMACOES_EXECUCAO=true.
  * Não envia nada: ver src/lib/automacoesWorker.ts.
  */
-export function iniciarWorkerAutomacoes(pool: pg.Pool): void {
+export function iniciarWorkerAutomacoes(pool: pg.Pool, eventos: { carregarRegras: () => Promise<RegistroAutomacao[]>; gravarFila: (itens: ItemFila[]) => Promise<void> }): void {
   if (process.env.NYROH_AUTOMACOES_EXECUCAO !== 'true') return;
   let rodando = false;
   const tick = async () => {
     if (rodando) return;
     rodando = true;
     try {
+      await dispararAgendas(pool, new Date(), eventos).catch((e: any) => console.warn('[AUTOMACOES] agenda não disparada:', e?.message));
       const resumo = await processarVencidos(new Date(), {
         buscarVencidos: async (agora, limite) => {
           const r = await pool.query(
@@ -290,7 +356,7 @@ export function iniciarWorkerAutomacoes(pool: pg.Pool): void {
           );
           return r.rows.map((x: any) => new Date(x.processado_em));
         },
-      }, 50, { pausaGeral: pausaGeralAtiva() });
+      }, 50, { pausaGeral: await lerPausaGeral(pool) });
       // D4: auditoria gravada. Se a tabela ainda não existir, só registra o aviso.
       for (const a of resumo.auditoria) {
         try {

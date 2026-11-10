@@ -15,7 +15,9 @@ import { Lead, CallLog, ColumnStatus, PIPELINE_COLUMNS, CustomTag, Salesperson, 
 import { getLeadNiche } from './src/lib/niche.js';
 import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regrasDeContatoSql, instanciaDaSafra } from './src/lib/uxRoutes.js';
 import { registerAutomacoesRoutes, applyAutomacoesMigration, applyAutomacoesFilaMigration, automacoesPersistenciaOn, iniciarWorkerAutomacoes } from './src/lib/automacoesRoutes.js';
-import { registrarEventoCliente, pedidoDePararPelasRegras, pedidoDeAlertaPelasRegras, type ItemFila } from './src/lib/automacoesExecucao.js';
+import { registrarEventoCliente, registrarEventoGeral, pedidoDePararPelasRegras, pedidoDeAlertaPelasRegras, type ItemFila } from './src/lib/automacoesExecucao.js';
+import type { EventoV } from './src/lib/automacoes.js';
+import type { ContextoEvento } from './src/lib/automacoesExecucao.js';
 import { registerBackupRoutes } from './src/lib/backupRoutes.js';
 import { hashPassword, verifyPassword, generateSessionToken, DEFAULT_USERS, StoredUser, isUserAdmin } from './src/lib/serverAuth.js';
 import { performWebsiteAudit } from './src/lib/auditEngine.js';
@@ -1493,7 +1495,7 @@ async function initDatabase(retries = 5, delayMs = 3000) {
         if (uxSchemaOn()) { await applyUxMigration(pool).catch((e: any) => console.error('[UX] migração falhou:', e?.message)); }
         if (automacoesPersistenciaOn()) { await applyAutomacoesMigration(pool).catch((e: any) => console.error('[AUTOMACOES] migração falhou:', e?.message)); }
         if (process.env.NYROH_AUTOMACOES_EXECUCAO === 'true') { await applyAutomacoesFilaMigration(pool).catch((e: any) => console.error('[AUTOMACOES] fila falhou:', e?.message)); }
-        if (process.env.NYROH_AUTOMACOES_EXECUCAO === 'true') iniciarWorkerAutomacoes(pool);
+        if (process.env.NYROH_AUTOMACOES_EXECUCAO === 'true') iniciarWorkerAutomacoes(pool, { carregarRegras: carregarRegrasAutomacoes, gravarFila: gravarFilaAutomacoes });
         await loadMetaRegistryFromDb().catch((e: any) => console.error('[Meta] falha ao carregar contas:', e?.message));
         dbBootDone = true;
         if (dbReconnectTimer) {
@@ -1805,6 +1807,13 @@ async function carregarRegrasAutomacoes() {
   if (!usePostgres || !pgPool) return [];
   const r = await pgPool.query(`SELECT id, status, definicao FROM automacoes_respostas WHERE status = 'ativa'`);
   return r.rows.map((x: any) => ({ id: x.id, status: x.status, def: x.definicao }));
+}
+
+/** Dispara um evento de automação para um lead (etiqueta, status, funil). Sem flag, não faz nada. Não bloqueia a resposta. */
+function emitirEventoLead(evento: EventoV, leadId: string, contexto: ContextoEvento): void {
+  if (!usePostgres || !pgPool) return;
+  registrarEventoGeral(evento, leadId, contexto, new Date(), { carregarRegras: carregarRegrasAutomacoes, gravarFila: gravarFilaAutomacoes })
+    .catch((e: any) => console.warn('[AUTOMACOES] evento não agendado:', e?.message));
 }
 
 async function gravarFilaAutomacoes(itens: ItemFila[]) {
@@ -4919,6 +4928,8 @@ async function processIncomingWhatsAppMessage(params: {
 
   // Atualizar estágio do lead caso encontrado
   if (matched) {
+    if (isPositiveInterest) emitirEventoLead('status_mudou', matched.id, { status: 'INTERESSADO' });
+    else if (isOptOut) emitirEventoLead('status_mudou', matched.id, { status: 'DESCARTADO' });
     if (matched.isCampaign) {
       const cLead = memoryCampaignLeadsMap.get(matched.id) || matched.leadObject;
       if (cLead) {
@@ -8888,6 +8899,7 @@ app.put('/api/leads/:id/status', async (req, res) => {
       if (result.rowCount === 0) {
         return res.status(404).json({ error: 'Lead não encontrado.' });
       }
+      if (columnStatus) emitirEventoLead('funil_entrou', id, { funil: String(columnStatus) });
       return res.json({ success: true, lead: result.rows[0] });
     } else {
       const lead = memoryLeadsMap.get(id);
@@ -8992,6 +9004,8 @@ app.post('/api/leads/:id/calls', async (req, res) => {
          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
         [callId, id, tag, comment || '', duration, followUp, createdAt]
       );
+
+      emitirEventoLead('tag_mudou', id, { tag: String(tag) });
 
       // Touch lead updated_at and update next_follow_up_at
       if (followUp) {

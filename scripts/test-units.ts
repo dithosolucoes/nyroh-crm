@@ -26,6 +26,8 @@ import { isPubliclyFetchableUrl } from '../src/lib/auditEngine';
 import { validarAutomacao, logicaEmPalavras, conversaSimulada, renderPrevia, tokensDesconhecidos, EVENTOS, ACOES, CONDICOES, type Automacao } from '../src/lib/automacoes';
 import { planejarEvento, type RegistroAutomacao } from '../src/lib/automacoesExecucao';
 import { criarExecutorAcoes, camposDoLead } from '../src/lib/automacoesExecutores';
+import { dispararAgendas, lerPausaGeral } from '../src/lib/automacoesRoutes';
+import { registrarEventoGeral } from '../src/lib/automacoesExecucao';
 import { colunaPermitida, TABELAS_BACKUP } from '../src/lib/backupRoutes';
 import { quandoExecutar, estaVencido, contemPalavra } from '../src/lib/automacoesFila';
 import { registrarEventoCliente, eventoDaResposta, type DepsRecebimento } from '../src/lib/automacoesExecucao';
@@ -1697,6 +1699,60 @@ test('execução registra que a regra executou para o lead', async () => {
   };
   await processarVencidos(new Date(), deps);
   assert.deepEqual(registros, ['L9:regra-C']);
+});
+
+group('Eventos de etiqueta, status, funil e agenda; pausa geral no banco');
+test('agenda sem funil no filtro: erro de validação (não atinge a base toda)', () => {
+  const base = { nome: 'ag', passos: [{ acao: 'notificar' as const, params: { mensagem: 'x' } }] };
+  assert.ok(validarAutomacao({ ...base, gatilho: { evento: 'agenda_horario', agenda: { hora: '10:00', fuso: 'America/Sao_Paulo' } } }, [], 's').erros.some((e) => /funil/.test(e)));
+  assert.equal(validarAutomacao({ ...base, gatilho: { evento: 'agenda_horario', filtro: { funil: 'Interessado' }, agenda: { hora: '10:00', fuso: 'America/Sao_Paulo' } } }, [], 's').erros.length, 0);
+});
+test('agenda dispara uma vez por minuto para os leads do funil, sem repetir', async () => {
+  const regra = { id: 'ag1', status: 'ativa', def: { nome: 'ag', gatilho: { evento: 'agenda_horario', filtro: { funil: 'Interessado' }, agenda: { hora: '10:00', fuso: 'America/Sao_Paulo' } }, passos: [{ acao: 'notificar', params: { mensagem: 'x' } }] } } as never;
+  const gravados: unknown[] = [];
+  const pool = { query: async (sql: string, params: unknown[]) => { if (/FROM leads/.test(sql)) { assert.deepEqual(params, ['Interessado']); return { rows: [{ id: 'L1' }, { id: 'L2' }] }; } return { rows: [] }; } };
+  const deps = { carregarRegras: async () => [regra], gravarFila: async (itens: unknown[]) => { gravados.push(...itens); } };
+  const prev = process.env.NYROH_AUTOMACOES_EXECUCAO;
+  process.env.NYROH_AUTOMACOES_EXECUCAO = 'true';
+  try {
+    const agora = new Date('2026-11-10T13:00:20Z'); // 10:00:20 em São Paulo
+    const n1 = await dispararAgendas(pool as never, agora, deps);
+    assert.equal(n1, 2, 'dois leads do funil');
+    const n2 = await dispararAgendas(pool as never, new Date('2026-11-10T13:00:50Z'), deps);
+    assert.equal(n2, 0, 'mesmo minuto: não repete');
+    const n3 = await dispararAgendas(pool as never, new Date('2026-11-10T13:01:10Z'), deps);
+    assert.equal(n3, 0, 'minuto seguinte: não é o horário');
+  } finally {
+    if (prev === undefined) delete process.env.NYROH_AUTOMACOES_EXECUCAO; else process.env.NYROH_AUTOMACOES_EXECUCAO = prev;
+  }
+  assert.equal(gravados.length, 2);
+});
+test('evento de etiqueta enfileira só quando a flag está ligada', async () => {
+  const regra = { id: 't1', status: 'ativa', def: { nome: 't', gatilho: { evento: 'tag_mudou', filtro: { tag: 'quente' } }, passos: [{ acao: 'notificar', params: { mensagem: 'x' } }] } } as never;
+  const deps = { carregarRegras: async () => [regra], gravarFila: async () => undefined };
+  const prev = process.env.NYROH_AUTOMACOES_EXECUCAO;
+  delete process.env.NYROH_AUTOMACOES_EXECUCAO;
+  assert.equal(await registrarEventoGeral('tag_mudou', 'L', { tag: 'quente' }, new Date(), deps), 0, 'flag desligada: nada');
+  process.env.NYROH_AUTOMACOES_EXECUCAO = 'true';
+  try {
+    assert.equal(await registrarEventoGeral('tag_mudou', 'L', { tag: 'quente' }, new Date(), deps), 1, 'etiqueta certa: 1 passo');
+    assert.equal(await registrarEventoGeral('tag_mudou', 'L', { tag: 'frio' }, new Date(), deps), 0, 'outra etiqueta: nada');
+  } finally {
+    if (prev === undefined) delete process.env.NYROH_AUTOMACOES_EXECUCAO; else process.env.NYROH_AUTOMACOES_EXECUCAO = prev;
+  }
+});
+test('pausa geral: sem tabela, vale a variável de ambiente; com a linha no banco, vale o banco', async () => {
+  const prev = process.env.NYROH_AUTOMACOES_PAUSA_GERAL;
+  process.env.NYROH_AUTOMACOES_PAUSA_GERAL = 'true';
+  try {
+    assert.equal(await lerPausaGeral(null), true, 'sem banco: env');
+    const comLinha = { query: async (sql: string) => (/to_regclass/.test(sql) ? { rows: [{ ok: true }] } : { rows: [{ valor: 'false' }] }) };
+    assert.equal(await lerPausaGeral(comLinha as never), false, 'banco manda sobre a env');
+    const semTabela = { query: async (sql: string) => (/to_regclass/.test(sql) ? { rows: [{ ok: false }] } : { rows: [] }) };
+    assert.equal(await lerPausaGeral(semTabela as never), true, 'sem tabela: env');
+  } finally {
+    if (prev === undefined) delete process.env.NYROH_AUTOMACOES_PAUSA_GERAL; else process.env.NYROH_AUTOMACOES_PAUSA_GERAL = prev;
+  }
 });
 
   await Promise.all(pending);

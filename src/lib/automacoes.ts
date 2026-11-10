@@ -257,6 +257,8 @@ export function validarAutomacao(
   if (d.gatilho?.evento === 'agenda_horario') {
     const ag = d.gatilho.agenda;
     if (!ag || !HHMM.test(String(ag.hora)) || !ag.fuso) erros.push('Gatilho "agenda": informe "agenda.hora" (HH:MM) e "agenda.fuso".');
+    // A agenda só atinge os leads de um funil indicado. Sem isso, a regra não dispara (proteção contra envio em massa).
+    if (!String(filtro?.funil || '').trim()) erros.push('Gatilho "agenda": informe o funil em filtro.funil (para quais leads vale).');
   }
 
   if (d.variaveis !== undefined) {
