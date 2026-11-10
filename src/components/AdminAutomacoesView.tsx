@@ -232,6 +232,7 @@ export default function AdminAutomacoesView() {
           <Item nome="Limites de mensagens por lead" texto="definidos em cada automação (JSON)" />
           <Item nome="Janela de texto livre" texto="24 horas após a última mensagem do cliente" />
           <Item nome="Horário comercial" texto="definido em cada automação (JSON)" />
+          <BlocoEnvio automacoes={regras.map((r) => ({ id: r.id, nome: r.def.nome }))} />
         </section>
       )}
     </>
@@ -596,6 +597,89 @@ export default function AdminAutomacoesView() {
       )}
 
       {outrasAbas}
+    </div>
+  );
+}
+
+/** Fase H: envio real decidido nesta tela. Padrão desligado. Nada sai enquanto o transporte não estiver conectado. */
+type EnvioTela = { ligado: boolean; numeroTeste: string | null; limitePorDia: number; automacoesLiberadas: string[]; persistenciaLigada: boolean; envioRealConectado: boolean };
+
+function BlocoEnvio({ automacoes }: { automacoes: Array<{ id: string; nome: string }> }) {
+  const [cfg, setCfg] = useState<EnvioTela | null>(null);
+  const [numero, setNumero] = useState('');
+  const [limite, setLimite] = useState(0);
+  const [liberadas, setLiberadas] = useState<string[]>([]);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [salvando, setSalvando] = useState(false);
+
+  useEffect(() => {
+    let vivo = true;
+    fetch('/api/admin/automacoes/envio')
+      .then(async (r) => {
+        if (!r.ok || !vivo) return;
+        const j = (await r.json()) as EnvioTela;
+        setCfg(j);
+        setNumero(j.numeroTeste ?? '');
+        setLimite(j.limitePorDia);
+        setLiberadas(j.automacoesLiberadas);
+      })
+      .catch(() => {});
+    return () => { vivo = false; };
+  }, []);
+
+  if (!cfg) return <Item nome="Envio real" texto="indisponível neste ambiente" />;
+
+  const salvar = async (ligado: boolean) => {
+    setSalvando(true);
+    setMsg(null);
+    const r = await fetch('/api/admin/automacoes/envio', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ligado, numeroTeste: numero, limitePorDia: limite, automacoesLiberadas: liberadas }),
+    });
+    const j = (await r.json().catch(() => ({}))) as Partial<EnvioTela> & { error?: string };
+    setSalvando(false);
+    if (!r.ok) return setMsg(j.error || 'Não consegui salvar o envio.');
+    setCfg({ ...(cfg as EnvioTela), ...(j as EnvioTela) });
+    setMsg(ligado ? 'Envio ligado e salvo.' : 'Envio desligado e salvo: nada sai.');
+  };
+
+  const alternarLiberada = (id: string) =>
+    setLiberadas((ls) => (ls.includes(id) ? ls.filter((x) => x !== id) : [...ls, id]));
+
+  const podeSalvar = cfg.persistenciaLigada;
+
+  return (
+    <div className="mt-3 rounded-[10px] border border-[#E3E1DA] p-3">
+      <p className="mb-2 text-xs font-semibold text-[#191917]">Envio real (fase H)</p>
+      <p className="mb-2 text-xs text-[#6B6A64]">
+        {cfg.envioRealConectado
+          ? 'Transporte conectado.'
+          : 'Transporte ainda NÃO conectado nesta versão: mesmo ligado, nada sai.'}
+      </p>
+      <p className="mb-2 text-xs text-[#6B6A64]">Estado salvo: {cfg.ligado ? 'LIGADO' : 'DESLIGADO (padrão, nada sai)'}</p>
+
+      <label className={LABEL} htmlFor="envio-numero">Número de teste (com DDI e DDD)</label>
+      <input id="envio-numero" className={INP} inputMode="numeric" value={numero} onChange={(e) => setNumero(e.target.value)} placeholder="5531999999999" />
+
+      <label className={LABEL} htmlFor="envio-limite">Limite de envios por dia</label>
+      <input id="envio-limite" className={INP} type="number" min={0} max={1000} value={limite} onChange={(e) => setLimite(Number(e.target.value))} />
+
+      <p className={LABEL}>Automações liberadas para envio</p>
+      {automacoes.length === 0 && <p className="text-xs text-[#6B6A64]">Nenhuma automação salva ainda.</p>}
+      {automacoes.map((a) => (
+        <label key={a.id} className="flex items-center gap-2 py-1 text-[13px]">
+          <input type="checkbox" checked={liberadas.includes(a.id)} onChange={() => alternarLiberada(a.id)} />
+          {a.nome}
+        </label>
+      ))}
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button type="button" disabled={!podeSalvar || salvando} onClick={() => void salvar(false)} className={BTN}>Salvar desligado</button>
+        <button type="button" disabled={!podeSalvar || salvando} onClick={() => void salvar(true)} className={BTN_PRIMARY}>Salvar e ligar</button>
+      </div>
+      {!podeSalvar && <p className="mt-2 text-xs text-[#6B6A64]">Persistência desligada neste ambiente: não dá para salvar.</p>}
+      {msg && <p className="mt-2 text-xs text-[#6B6A64]">{msg}</p>}
     </div>
   );
 }

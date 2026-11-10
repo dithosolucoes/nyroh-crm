@@ -12,6 +12,7 @@
  */
 import { resolveLeadTokens, type LeadTokenContext } from './leadTokens';
 import type { ItemFila } from './automacoesExecucao';
+import { ENVIO_PADRAO, decidirEnvio, type ConfigEnvio } from './automacoesEnvio';
 import { dentroDosLimites, registroAuditoria, type LimitesLead, type RegistroAuditoria } from './automacoesLimites';
 import { avaliarCondicoes, type EventoLead, type ContextoAvaliacao } from './automacoesEstado';
 
@@ -57,6 +58,12 @@ export interface DepsWorker {
   aplicarAcao?: (it: ItemFila, ctx: ContextoLeadWorker) => Promise<{ ok: boolean; resultado: string }>;
   /** Marca que a regra executou para o lead (condição "regra já executou"). */
   registrarRegraExecutada?: (leadId: string, regraId: string, quando: Date) => Promise<void>;
+  /** Fase H: configuração de envio real, guardada no banco (decidida na tela). Ausente = desligado. */
+  lerEnvio?: () => Promise<ConfigEnvio>;
+  /** Fase H: quantos envios reais já saíram hoje. Em erro, o envio é bloqueado (falha fechada). */
+  contarEnviosReaisHoje?: (agora: Date) => Promise<number>;
+  /** Fase H: transporte real do texto. Ausente = envio real não conectado nesta versão (nada sai). */
+  enviarTextoReal?: (it: ItemFila, ctx: ContextoLeadWorker, texto: string) => Promise<{ ok: boolean; resultado: string }>;
 }
 
 export interface OpcoesWorker {
@@ -175,6 +182,38 @@ export async function processarVencidos(
         const motivo = 'Fora da janela de 24h: texto livre não enviado (use um modelo aprovado)';
         resumo.auditoria.push(registroAuditoria('bloqueou', motivo, agora, { leadId: it.leadId, regraId: it.automacaoId }));
         await deps.marcarResultado(it.id, 'cancelado', motivo, null);
+        continue;
+      }
+      // Fase H: com o envio ligado na tela, só sai pelo caminho real, depois da decisão (número de teste, liberada, limite).
+      const envio = deps.lerEnvio ? await deps.lerEnvio().catch(() => ENVIO_PADRAO) : ENVIO_PADRAO;
+      if (envio.ligado) {
+        const enviadosHoje = deps.contarEnviosReaisHoje
+          ? await deps.contarEnviosReaisHoje(agora).catch(() => Number.MAX_SAFE_INTEGER)
+          : Number.MAX_SAFE_INTEGER;
+        const d = decidirEnvio(envio, { automacaoId: it.automacaoId, telefone: ctx.phoneNumber, enviadosHoje });
+        if (!d.ok) {
+          resumo.cancelados++;
+          resumo.auditoria.push(registroAuditoria('bloqueou', d.motivo, agora, { leadId: it.leadId, regraId: it.automacaoId }));
+          await deps.marcarResultado(it.id, 'cancelado', d.motivo, null);
+          continue;
+        }
+        if (!deps.enviarTextoReal) {
+          resumo.cancelados++;
+          const motivo = 'Envio real ainda não conectado nesta versão: nada foi enviado';
+          resumo.auditoria.push(registroAuditoria('bloqueou', motivo, agora, { leadId: it.leadId, regraId: it.automacaoId }));
+          await deps.marcarResultado(it.id, 'cancelado', motivo, null);
+          continue;
+        }
+        const env = await deps.enviarTextoReal(it, ctx, r.text);
+        if (env.ok) {
+          resumo.auditoria.push(registroAuditoria('executou', env.resultado, agora, { leadId: it.leadId, regraId: it.automacaoId }));
+          await deps.registrarRegraExecutada?.(it.leadId, it.automacaoId, agora).catch(() => undefined);
+          await deps.marcarResultado(it.id, 'executado', env.resultado, r.text);
+        } else {
+          resumo.cancelados++;
+          resumo.auditoria.push(registroAuditoria('bloqueou', env.resultado, agora, { leadId: it.leadId, regraId: it.automacaoId }));
+          await deps.marcarResultado(it.id, 'cancelado', env.resultado, null);
+        }
         continue;
       }
       resumo.simulados++;
