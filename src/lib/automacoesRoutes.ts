@@ -233,7 +233,10 @@ export function iniciarWorkerAutomacoes(pool: pg.Pool): void {
           );
           const x = r.rows[0];
           if (!x) return null;
+          // Última mensagem do cliente (mesma fonte usada no histórico da conversa).
+          const u = await pool.query(`SELECT MAX(timestamp) AS ts FROM lead_messages WHERE lead_id = $1 AND sender = 'lead'`, [leadId]);
           return {
+            ultimaMensagemDoCliente: u.rows[0]?.ts ? new Date(u.rows[0].ts) : null,
             leadName: x.name,
             phoneNumber: x.phone_number,
             publicUrl: x.public_url,

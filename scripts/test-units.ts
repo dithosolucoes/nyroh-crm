@@ -32,7 +32,7 @@ import { processarVencidos, type DepsWorker } from '../src/lib/automacoesWorker'
 import { decidirEvento, estadoInicial, pausarLead, liberarLead } from '../src/lib/automacoesEstado';
 import { dentroDosLimites, pausaGeralAtiva, proximaVersao, registroAuditoria, aplicarVersao, LIMITES_PADRAO } from '../src/lib/automacoesLimites';
 import { avaliarCondicoes } from '../src/lib/automacoesEstado';
-import { dentroDoHorarioComercial } from '../src/lib/automacoesWorker';
+import { dentroDoHorarioComercial, dentroDaJanela24h } from '../src/lib/automacoesWorker';
 import { resolveLeadTokens, TOKEN_NAMES } from '../src/lib/leadTokens';
 import { validateTemplateCategory, buildMetaButtons, defaultExamples, countBodyVariables, validateTemplateVariables } from '../src/lib/templateRules';
 import {
@@ -1035,10 +1035,10 @@ test('processa só os vencidos: espera ok, texto simulado com dados reais, sem e
   const deps: DepsWorker = {
     buscarVencidos: async () => fila,
     reservar: async () => true,
-    contextoDoLead: async () => ({ leadName: 'Ana Souza', sellerName: 'Thomas' }),
+    contextoDoLead: async () => ({ leadName: 'Ana Souza', sellerName: 'Thomas', ultimaMensagemDoCliente: new Date('2026-11-10T12:00:00Z') }),
     marcarResultado: async (id, status, resultado, texto) => { marcados.push({ id, status, resultado, texto }); },
   };
-  const r = await processarVencidos(new Date(), deps);
+  const r = await processarVencidos(new Date('2026-11-10T13:00:00Z'), deps);
   assert.equal(r.processados, 2);
   assert.equal(marcados[0].resultado, 'Espera concluída');
   assert.equal(marcados[1].status, 'executado');
@@ -1217,7 +1217,7 @@ test('item bloqueado pelo limite vira cancelado com motivo e entra na auditoria'
   const deps: DepsWorker = {
     buscarVencidos: async () => [{ id: 'lim1', automacaoId: 'a', leadId: 'L9', passoOrdem: 1, acao: 'enviar_texto' as const, texto: 'Oi', executarEm: agora }],
     reservar: async () => true,
-    contextoDoLead: async () => ({ leadName: 'Eva' }),
+    contextoDoLead: async () => ({ leadName: 'Eva', ultimaMensagemDoCliente: agora }),
     marcarResultado: async (_id, status, resultado) => { marcados.push({ status, resultado }); },
     enviosRecentes: async () => [1, 2, 3].map((h) => new Date(agora.getTime() - h * 3600_000)),
   };
@@ -1309,6 +1309,39 @@ test('janela de 24h sem fonte de dado falha por segurança (não envia por engan
 test('horário comercial usa Brasília: 10h BRT dentro, 19h BRT fora', () => {
   assert.equal(dentroDoHorarioComercial(new Date('2026-11-10T13:00:00Z')), true);
   assert.equal(dentroDoHorarioComercial(new Date('2026-11-10T22:00:00Z')), false);
+});
+
+group('Janela de 24h (fonte e regra)');
+test('texto livre fora da janela de 24h não sai, com motivo claro', async () => {
+  const agora = new Date('2026-11-10T13:00:00Z');
+  const marcados: Array<{ status: string; resultado: string }> = [];
+  const deps: DepsWorker = {
+    buscarVencidos: async () => [{ id: 'j1', automacaoId: 'a', leadId: 'L10', passoOrdem: 1, acao: 'enviar_texto' as const, texto: 'Oi', executarEm: agora }],
+    reservar: async () => true,
+    contextoDoLead: async () => ({ leadName: 'Ivo', ultimaMensagemDoCliente: new Date('2026-11-08T13:00:00Z') }),
+    marcarResultado: async (_id, status, resultado) => { marcados.push({ status, resultado }); },
+  };
+  const r = await processarVencidos(agora, deps);
+  assert.equal(marcados[0].status, 'cancelado');
+  assert.match(marcados[0].resultado, /Fora da janela de 24h/);
+  assert.equal(r.auditoria[0].decisao, 'bloqueou');
+});
+test('sem nenhuma mensagem do cliente, texto livre também não sai', async () => {
+  const agora = new Date('2026-11-10T13:00:00Z');
+  const marcados: Array<{ status: string }> = [];
+  const deps: DepsWorker = {
+    buscarVencidos: async () => [{ id: 'j2', automacaoId: 'a', leadId: 'L11', passoOrdem: 1, acao: 'enviar_texto' as const, texto: 'Oi', executarEm: agora }],
+    reservar: async () => true,
+    contextoDoLead: async () => ({ leadName: 'Jo', ultimaMensagemDoCliente: null }),
+    marcarResultado: async (_id, status) => { marcados.push({ status }); },
+  };
+  await processarVencidos(agora, deps);
+  assert.equal(marcados[0].status, 'cancelado');
+});
+test('dentro da janela (mensagem há 2h) o texto é simulado', () => {
+  const agora = new Date('2026-11-10T13:00:00Z');
+  assert.equal(dentroDaJanela24h(new Date('2026-11-10T11:00:00Z'), agora), true);
+  assert.equal(dentroDaJanela24h(new Date('2026-11-09T12:00:00Z'), agora), false, 'mais de 24h');
 });
 
   await Promise.all(pending);
