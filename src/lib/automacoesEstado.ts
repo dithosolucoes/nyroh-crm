@@ -97,8 +97,42 @@ export interface ContextoCondicao {
   optout: boolean;
   pausado: boolean;
   janela24h: boolean;
-  horarioComercial: boolean;
+  /** Momento da execução. A faixa de horário vem do JSON da condição. */
+  agora: Date;
   ultimoComando: EventoLead | null;
+}
+
+export interface FaixaHoraria {
+  /** Início, formato "HH:MM". */
+  inicio: string;
+  /** Fim, formato "HH:MM". Não inclusivo. */
+  fim: string;
+  /** Fuso IANA, ex.: "America/Sao_Paulo". Obrigatório: o JSON define. */
+  fuso: string;
+  /** Dias da semana permitidos, 0 = domingo ... 6 = sábado. Opcional: sem ele, todos os dias. */
+  dias?: number[];
+}
+
+const HHMM = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+/** Verdadeiro se `agora` cai dentro da faixa, no fuso da faixa. Faixa inválida = falso. */
+export function dentroDaFaixaHoraria(agora: Date, faixa: FaixaHoraria | undefined): boolean {
+  if (!faixa || !HHMM.test(faixa.inicio) || !HHMM.test(faixa.fim) || !faixa.fuso) return false;
+  let partes: Intl.DateTimeFormatPart[];
+  try {
+    partes = new Intl.DateTimeFormat('en-US', {
+      timeZone: faixa.fuso, hour: '2-digit', minute: '2-digit', hour12: false, weekday: 'short',
+    }).formatToParts(agora);
+  } catch {
+    return false; // fuso desconhecido
+  }
+  const get = (t: string) => partes.find((p) => p.type === t)?.value ?? '';
+  const minutos = Number(get('hour')) * 60 + Number(get('minute'));
+  const ini = Number(faixa.inicio.slice(0, 2)) * 60 + Number(faixa.inicio.slice(3));
+  const fim = Number(faixa.fim.slice(0, 2)) * 60 + Number(faixa.fim.slice(3));
+  const diaSemana = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(get('weekday'));
+  if (faixa.dias && !faixa.dias.includes(diaSemana)) return false;
+  return minutos >= ini && minutos < fim;
 }
 
 export interface CondicaoDefinida {
@@ -121,7 +155,7 @@ export function avaliarCondicoes(
     if (c.var === 'lead.optout') ok = c.op === 'falso' ? !ctx.optout : c.op === 'verdadeiro' ? ctx.optout : false;
     else if (c.var === 'lead.pausado') ok = c.op === 'falso' ? !ctx.pausado : c.op === 'verdadeiro' ? ctx.pausado : false;
     else if (c.var === 'janela_24h') ok = c.op === 'verdadeiro' && ctx.janela24h;
-    else if (c.var === 'horario_comercial') ok = c.op === 'verdadeiro' && ctx.horarioComercial;
+    else if (c.var === 'horario_comercial') ok = c.op === 'verdadeiro' && dentroDaFaixaHoraria(ctx.agora, c.valor as FaixaHoraria);
     else if (c.var === 'ultimo_comando') ok = c.op === 'igual' && ctx.ultimoComando === c.valor;
     if (!ok) falhas.push(`${c.var} ${c.op}`);
   }

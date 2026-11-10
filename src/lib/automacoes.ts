@@ -25,7 +25,7 @@ export const CONDICOES = [
   { v: 'lead.optout', label: 'Lead está em opt-out', ops: ['falso', 'verdadeiro'] },
   { v: 'lead.pausado', label: 'Lead está pausado', ops: ['falso', 'verdadeiro'] },
   { v: 'janela_24h', label: 'Dentro da janela de 24h', ops: ['verdadeiro'] },
-  { v: 'horario_comercial', label: 'Dentro do horário comercial (Brasília)', ops: ['verdadeiro'] },
+  { v: 'horario_comercial', label: 'Dentro de uma faixa de horário (definida no JSON)', ops: ['verdadeiro'] },
   { v: 'ultimo_comando', label: 'Último comando do lead é', ops: ['igual'] },
 ] as const;
 
@@ -55,6 +55,8 @@ export interface Automacao {
   nome: string;
   gatilho: { evento: EventoV; filtro?: { texto_igual?: string; texto_contem?: string } };
   condicoes?: Array<{ var: string; op: string; valor?: unknown }>;
+  /** Limites de envio automático para cada lead. Sem eles, a automação não tem limite. */
+  limites?: { porDia?: number; porSemana?: number };
   passos: Passo[];
 }
 
@@ -135,6 +137,20 @@ export function validarAutomacao(
       erros.push(`Condição ${i + 1}: "${c.var}" não existe no catálogo.`);
     } else if (!(def.ops as readonly string[]).includes(c.op)) {
       erros.push(`Condição ${i + 1}: operador "${c.op}" não serve para "${def.label}".`);
+    } else if (c.var === 'horario_comercial') {
+      const f = (c.valor || {}) as Record<string, unknown>;
+      if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(String(f.inicio)) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(f.fim))) {
+        erros.push(`Condição ${i + 1}: a faixa de horário precisa de "inicio" e "fim" no formato HH:MM.`);
+      }
+      if (!f.fuso) erros.push(`Condição ${i + 1}: a faixa de horário precisa de "fuso" (ex.: America/Sao_Paulo).`);
+    }
+  }
+  if (d.limites !== undefined) {
+    for (const campo of ['porDia', 'porSemana'] as const) {
+      const v = (d.limites as Record<string, unknown>)[campo];
+      if (v !== undefined && (!Number.isInteger(v) || (v as number) < 1)) {
+        erros.push(`Limite ${campo}: precisa ser um número inteiro de pelo menos 1.`);
+      }
     }
   }
 

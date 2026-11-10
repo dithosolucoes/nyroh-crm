@@ -32,6 +32,8 @@ export interface PlanoAutomacao {
   passos: PassoPlanejado[];
   /** Condições da regra. Avaliadas de novo na execução, com o estado atual do lead. */
   condicoes: CondicaoDefinida[];
+  /** Limites da regra, do JSON. Sem eles, não há limite. */
+  limites?: { porDia?: number; porSemana?: number };
 }
 
 export interface RegistroAutomacao {
@@ -78,7 +80,7 @@ export function planejarEvento(
         horasDesdeEvento: horas,
       });
     });
-    planos.push({ id: r.id, nome: r.def.nome, passos, condicoes: r.def.condicoes || [] });
+    planos.push({ id: r.id, nome: r.def.nome, passos, condicoes: r.def.condicoes || [], limites: r.def.limites });
   }
   return planos;
 }
@@ -101,6 +103,8 @@ export interface ItemFila {
   executarEm: Date;
   /** Condições da regra, avaliadas na execução. Itens antigos, sem o campo, não têm condições. */
   condicoes?: CondicaoDefinida[];
+  /** Limites da regra, do JSON. Sem eles, não há limite. */
+  limites?: { porDia?: number; porSemana?: number };
 }
 
 export interface DepsRecebimento {
@@ -134,6 +138,7 @@ export async function registrarEventoCliente(
         texto: passo.texto,
         executarEm: quandoExecutar(agora, passo.horasDesdeEvento),
         condicoes: plano.condicoes,
+        limites: plano.limites,
       });
     }
   }

@@ -30,9 +30,10 @@ import { quandoExecutar, estaVencido, contemPalavra } from '../src/lib/automacoe
 import { registrarEventoCliente, eventoDaResposta, type DepsRecebimento } from '../src/lib/automacoesExecucao';
 import { processarVencidos, type DepsWorker } from '../src/lib/automacoesWorker';
 import { decidirEvento, estadoInicial, pausarLead, liberarLead } from '../src/lib/automacoesEstado';
-import { dentroDosLimites, pausaGeralAtiva, proximaVersao, registroAuditoria, aplicarVersao, LIMITES_PADRAO } from '../src/lib/automacoesLimites';
-import { avaliarCondicoes } from '../src/lib/automacoesEstado';
-import { dentroDoHorarioComercial, dentroDaJanela24h } from '../src/lib/automacoesWorker';
+import { dentroDosLimites, pausaGeralAtiva, proximaVersao, registroAuditoria, aplicarVersao } from '../src/lib/automacoesLimites';
+const LIMITES_TESTE = { porDia: 3, porSemana: 10 };
+import { avaliarCondicoes, dentroDaFaixaHoraria } from '../src/lib/automacoesEstado';
+import { dentroDaJanela24h } from '../src/lib/automacoesWorker';
 import { resolveLeadTokens, TOKEN_NAMES } from '../src/lib/leadTokens';
 import { validateTemplateCategory, buildMetaButtons, defaultExamples, countBodyVariables, validateTemplateVariables } from '../src/lib/templateRules';
 import {
@@ -1165,7 +1166,7 @@ group('Limites, pausa geral, versão e auditoria (fase D)');
 test('limite diário bloqueia o 4º envio em 24h, com motivo', () => {
   const agora = new Date('2026-11-10T13:00:00Z');
   const envios = [1, 2, 3].map((h) => new Date(agora.getTime() - h * 3600_000));
-  const r = dentroDosLimites(envios, agora, LIMITES_PADRAO);
+  const r = dentroDosLimites(envios, agora, LIMITES_TESTE);
   assert.equal(r.ok, false);
   assert.match(r.motivo, /diário/);
 });
@@ -1173,7 +1174,7 @@ test('limite semanal bloqueia mesmo fora das 24h', () => {
   const agora = new Date('2026-11-10T13:00:00Z');
   // 10 envios entre 25h e 133h atrás: fora das 24h, dentro dos 7 dias.
   const envios = Array.from({ length: 10 }, (_, k) => new Date(agora.getTime() - (25 + 12 * k) * 3600_000));
-  const r = dentroDosLimites(envios, agora, LIMITES_PADRAO);
+  const r = dentroDosLimites(envios, agora, LIMITES_TESTE);
   assert.equal(r.ok, false);
   assert.match(r.motivo, /semanal/);
 });
@@ -1215,7 +1216,7 @@ test('item bloqueado pelo limite vira cancelado com motivo e entra na auditoria'
   const agora = new Date('2026-11-10T13:00:00Z');
   const marcados: Array<{ status: string; resultado: string }> = [];
   const deps: DepsWorker = {
-    buscarVencidos: async () => [{ id: 'lim1', automacaoId: 'a', leadId: 'L9', passoOrdem: 1, acao: 'enviar_texto' as const, texto: 'Oi', executarEm: agora }],
+    buscarVencidos: async () => [{ id: 'lim1', automacaoId: 'a', leadId: 'L9', passoOrdem: 1, acao: 'enviar_texto' as const, texto: 'Oi', executarEm: agora, limites: { porDia: 3 } }],
     reservar: async () => true,
     contextoDoLead: async () => ({ leadName: 'Eva', ultimaMensagemDoCliente: agora }),
     marcarResultado: async (_id, status, resultado) => { marcados.push({ status, resultado }); },
@@ -1246,19 +1247,19 @@ test('histórico de versões fica limitado a 20 entradas', () => {
   assert.equal(((d as { historico: unknown[] }).historico).length, 20);
 });
 test('condições reais: lead em opt-out não passa em lead.optout falso', () => {
-  const ctx = { optout: true, pausado: false, janela24h: true, horarioComercial: true, ultimoComando: null };
+  const ctx = { optout: true, pausado: false, janela24h: true, agora: new Date('2026-11-10T13:00:00Z'), ultimoComando: null };
   const r = avaliarCondicoes([{ var: 'lead.optout', op: 'falso' }], ctx);
   assert.equal(r.ok, false);
   assert.deepEqual(r.falhas, ['lead.optout falso']);
 });
 test('condições reais: janela de 24h e comando do lead', () => {
-  const ctx = { optout: false, pausado: false, janela24h: false, horarioComercial: true, ultimoComando: 'cliente_clicou' as const };
+  const ctx = { optout: false, pausado: false, janela24h: false, agora: new Date('2026-11-10T13:00:00Z'), ultimoComando: 'cliente_clicou' as const };
   assert.equal(avaliarCondicoes([{ var: 'janela_24h', op: 'verdadeiro' }], ctx).ok, false);
   assert.equal(avaliarCondicoes([{ var: 'ultimo_comando', op: 'igual', valor: 'cliente_clicou' }], ctx).ok, true);
   assert.equal(avaliarCondicoes([{ var: 'ultimo_comando', op: 'igual', valor: 'sem_resposta' }], ctx).ok, false);
 });
 test('condição desconhecida é falsa, nunca dispara por engano', () => {
-  const ctx = { optout: false, pausado: false, janela24h: true, horarioComercial: true, ultimoComando: null };
+  const ctx = { optout: false, pausado: false, janela24h: true, agora: new Date('2026-11-10T13:00:00Z'), ultimoComando: null };
   assert.equal(avaliarCondicoes([{ var: 'inventada', op: 'verdadeiro' }], ctx).ok, false);
   assert.equal(avaliarCondicoes(undefined, ctx).ok, true, 'sem condições, passa');
 });
@@ -1306,10 +1307,24 @@ test('janela de 24h sem fonte de dado falha por segurança (não envia por engan
   await processarVencidos(agora, deps);
   assert.equal(marcados[0].status, 'cancelado');
 });
-test('horário comercial usa Brasília: 10h BRT dentro, 19h BRT fora', () => {
-  assert.equal(dentroDoHorarioComercial(new Date('2026-11-10T13:00:00Z')), true);
-  assert.equal(dentroDoHorarioComercial(new Date('2026-11-10T22:00:00Z')), false);
+test('faixa de horário vem do JSON: dentro e fora, no fuso informado', () => {
+  const faixa = { inicio: '08:00', fim: '18:00', fuso: 'America/Sao_Paulo' };
+  assert.equal(dentroDaFaixaHoraria(new Date('2026-11-10T13:00:00Z'), faixa), true, '10h em Brasília');
+  assert.equal(dentroDaFaixaHoraria(new Date('2026-11-10T22:00:00Z'), faixa), false, '19h em Brasília');
+  assert.equal(dentroDaFaixaHoraria(new Date('2026-11-10T13:00:00Z'), undefined), false, 'sem faixa no JSON, falso');
+  assert.equal(dentroDaFaixaHoraria(new Date('2026-11-10T13:00:00Z'), { inicio: '08:00', fim: '18:00', fuso: 'Nao/Existe' }), false, 'fuso inválido, falso');
 });
+test('faixa com dias: só os dias marcados no JSON', () => {
+  // 2026-11-10 é terça (2). Faixa só de sábado (6) não vale.
+  const faixa = { inicio: '08:00', fim: '18:00', fuso: 'America/Sao_Paulo', dias: [6] };
+  assert.equal(dentroDaFaixaHoraria(new Date('2026-11-10T13:00:00Z'), faixa), false);
+});
+test('sem limites no JSON, a automação não tem limite', () => {
+  const agora = new Date('2026-11-10T13:00:00Z');
+  const muitos = Array.from({ length: 50 }, (_, k) => new Date(agora.getTime() - k * 60_000));
+  assert.equal(dentroDosLimites(muitos, agora, undefined).ok, true);
+});
+
 
 group('Janela de 24h (fonte e regra)');
 test('texto livre fora da janela de 24h não sai, com motivo claro', async () => {
@@ -1342,6 +1357,22 @@ test('dentro da janela (mensagem há 2h) o texto é simulado', () => {
   const agora = new Date('2026-11-10T13:00:00Z');
   assert.equal(dentroDaJanela24h(new Date('2026-11-10T11:00:00Z'), agora), true);
   assert.equal(dentroDaJanela24h(new Date('2026-11-09T12:00:00Z'), agora), false, 'mais de 24h');
+});
+
+group('JSON manda: validação de faixa e limites');
+test('faixa de horário sem fuso ou com hora inválida é recusada com motivo', () => {
+  const base = { nome: 'h', gatilho: { evento: 'cliente_clicou' }, passos: [{ acao: 'enviar_texto', params: { texto: 'oi' } }] };
+  const sem = validarAutomacao({ ...base, condicoes: [{ var: 'horario_comercial', op: 'verdadeiro', valor: { inicio: '08:00', fim: '18:00' } }] }, [], 'self');
+  assert.ok(sem.erros.some((e) => /fuso/.test(e)));
+  const ruim = validarAutomacao({ ...base, condicoes: [{ var: 'horario_comercial', op: 'verdadeiro', valor: { inicio: '8h', fim: '18:00', fuso: 'America/Sao_Paulo' } }] }, [], 'self');
+  assert.ok(ruim.erros.some((e) => /HH:MM/.test(e)));
+});
+test('limites do JSON precisam ser inteiros de pelo menos 1', () => {
+  const base = { nome: 'l', gatilho: { evento: 'cliente_clicou' }, passos: [{ acao: 'enviar_texto', params: { texto: 'oi' } }] };
+  assert.equal(validarAutomacao({ ...base, limites: { porDia: 0 } }, [], 'self').erros.length, 1);
+  assert.equal(validarAutomacao({ ...base, limites: { porDia: 2.5 } }, [], 'self').erros.length, 1);
+  assert.equal(validarAutomacao({ ...base, limites: { porDia: 2, porSemana: 9 } }, [], 'self').erros.length, 0);
+  assert.equal(validarAutomacao({ ...base }, [], 'self').erros.length, 0, 'sem limites é válido');
 });
 
   await Promise.all(pending);

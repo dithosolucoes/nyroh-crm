@@ -2,17 +2,15 @@
  * Limites por lead, pausa geral, versão e auditoria das automações (blueprint, seção 8).
  * PURO: sem banco, sem rede.
  *
- * Os números de LIMITES_PADRAO são provisórios: a decisão de valor final é da fase F (Thomas).
+ * Os limites vêm SEMPRE do JSON da automação. Sem limite no JSON, o motor não aplica limite.
  */
 
 export interface LimitesLead {
-  /** Máximo de mensagens automáticas em 24 horas. */
-  porDia: number;
-  /** Máximo de mensagens automáticas em 7 dias corridos. */
-  porSemana: number;
+  /** Máximo de mensagens automáticas em 24 horas. Opcional: sem ele, não há limite diário. */
+  porDia?: number;
+  /** Máximo de mensagens automáticas em 7 dias corridos. Opcional: sem ele, não há limite semanal. */
+  porSemana?: number;
 }
-
-export const LIMITES_PADRAO: LimitesLead = { porDia: 3, porSemana: 10 };
 
 const HORA = 60 * 60 * 1000;
 
@@ -20,15 +18,15 @@ const HORA = 60 * 60 * 1000;
 export function dentroDosLimites(
   envios: Date[],
   agora: Date,
-  limites: LimitesLead = LIMITES_PADRAO
+  limites?: LimitesLead
 ): { ok: boolean; motivo: string } {
   const t = agora.getTime();
   const noDia = envios.filter((d) => t - d.getTime() < 24 * HORA && d.getTime() <= t).length;
   const naSemana = envios.filter((d) => t - d.getTime() < 7 * 24 * HORA && d.getTime() <= t).length;
-  if (noDia >= limites.porDia) {
+  if (limites?.porDia !== undefined && noDia >= limites.porDia) {
     return { ok: false, motivo: `Limite diário atingido (${noDia}/${limites.porDia} em 24h)` };
   }
-  if (naSemana >= limites.porSemana) {
+  if (limites?.porSemana !== undefined && naSemana >= limites.porSemana) {
     return { ok: false, motivo: `Limite semanal atingido (${naSemana}/${limites.porSemana} em 7 dias)` };
   }
   return { ok: true, motivo: 'Dentro dos limites' };

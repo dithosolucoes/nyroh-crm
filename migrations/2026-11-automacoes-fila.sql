@@ -23,3 +23,5 @@ CREATE INDEX IF NOT EXISTS automacoes_fila_pendentes ON automacoes_fila (executa
 
 -- Condições da regra, guardadas com o passo e avaliadas na execução (blueprint, seção 5).
 ALTER TABLE automacoes_fila ADD COLUMN IF NOT EXISTS condicoes JSONB;
+-- Limites da regra, do JSON da automação. Sem eles, não há limite.
+ALTER TABLE automacoes_fila ADD COLUMN IF NOT EXISTS limites JSONB;
