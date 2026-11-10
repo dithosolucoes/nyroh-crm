@@ -12,6 +12,7 @@ import type { Express, Request, Response } from 'express';
 import type pg from 'pg';
 import { validarAutomacao, type Automacao } from './automacoes';
 import { processarVencidos } from './automacoesWorker';
+import { criarExecutorAcoes, camposDoLead, tabelaExiste } from './automacoesExecutores';
 import { pausaGeralAtiva, aplicarVersao } from './automacoesLimites';
 
 interface AutomacoesDeps {
@@ -201,7 +202,7 @@ export function iniciarWorkerAutomacoes(pool: pg.Pool): void {
       const resumo = await processarVencidos(new Date(), {
         buscarVencidos: async (agora, limite) => {
           const r = await pool.query(
-            `SELECT id, automacao_id, lead_id, passo_ordem, acao, texto, executar_em, condicoes, limites
+            `SELECT id, automacao_id, lead_id, passo_ordem, acao, texto, executar_em, condicoes, limites, params, evento_em
              FROM automacoes_fila WHERE status = 'pendente' AND executar_em <= $1
              ORDER BY executar_em LIMIT $2`,
             [agora.toISOString(), limite]
@@ -214,8 +215,11 @@ export function iniciarWorkerAutomacoes(pool: pg.Pool): void {
             acao: x.acao,
             texto: x.texto,
             executarEm: new Date(x.executar_em),
-            condicoes: Array.isArray(x.condicoes) ? x.condicoes : [],
+            // Pode ser lista (antiga) ou grupo "e"/"ou"/"nao": guarda como veio.
+            condicoes: x.condicoes ?? [],
             limites: x.limites ?? undefined,
+            params: x.params ?? undefined,
+            eventoEm: x.evento_em ? new Date(x.evento_em).toISOString() : undefined,
           }));
         },
         reservar: async (id) => {
@@ -228,6 +232,7 @@ export function iniciarWorkerAutomacoes(pool: pg.Pool): void {
         contextoDoLead: async (leadId) => {
           const r = await pool.query(
             `SELECT l.name, l.phone_number, l.public_url, l.website, l.niche, l.salesperson_name, l.status,
+                    l.column_status, l.sub_status, l.loss_reason, l.variaveis_json,
                     e.status_geral, e.ultimo_comando
              FROM leads l LEFT JOIN leads_estado e ON e.lead_id = l.id
              WHERE l.id = $1`,
@@ -235,6 +240,10 @@ export function iniciarWorkerAutomacoes(pool: pg.Pool): void {
           );
           const x = r.rows[0];
           if (!x) return null;
+          // Etiquetas por lead: só existem depois da fase I. Sem tabela, o dado fica ausente (condição falsa).
+          const tags = (await tabelaExiste(pool as any, 'lead_tags'))
+            ? (await pool.query(`SELECT tag FROM lead_tags WHERE lead_id = $1`, [leadId])).rows.map((t: any) => String(t.tag))
+            : undefined;
           // Última mensagem do cliente (mesma fonte usada no histórico da conversa).
           const u = await pool.query(`SELECT MAX(timestamp) AS ts FROM lead_messages WHERE lead_id = $1 AND sender = 'lead'`, [leadId]);
           return {
@@ -249,8 +258,12 @@ export function iniciarWorkerAutomacoes(pool: pg.Pool): void {
             optout: x.status === 'DESCARTADO' || x.status_geral === 'optout',
             pausado: x.status_geral === 'pausado' || x.status_geral === 'revisao',
             ultimoComando: x.ultimo_comando ?? null,
+            status: x.status ?? undefined,
+            campos: camposDoLead(x),
+            tags,
           };
         },
+        aplicarAcao: criarExecutorAcoes(pool as any),
         marcarResultado: async (id, status, resultado, textoFinal) => {
           await pool.query(
             `UPDATE automacoes_fila SET status = $2, resultado = $3, texto_final = $4, processado_em = CURRENT_TIMESTAMP WHERE id = $1`,

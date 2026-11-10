@@ -25,6 +25,7 @@ import { detectOptOut, sanitizeTemplateVariable } from '../src/lib/leadIntent';
 import { isPubliclyFetchableUrl } from '../src/lib/auditEngine';
 import { validarAutomacao, logicaEmPalavras, conversaSimulada, renderPrevia, tokensDesconhecidos, EVENTOS, ACOES, CONDICOES, type Automacao } from '../src/lib/automacoes';
 import { planejarEvento, type RegistroAutomacao } from '../src/lib/automacoesExecucao';
+import { criarExecutorAcoes, camposDoLead } from '../src/lib/automacoesExecutores';
 import { colunaPermitida, TABELAS_BACKUP } from '../src/lib/backupRoutes';
 import { quandoExecutar, estaVencido, contemPalavra } from '../src/lib/automacoesFila';
 import { registrarEventoCliente, eventoDaResposta, type DepsRecebimento } from '../src/lib/automacoesExecucao';
@@ -1531,6 +1532,89 @@ test('com executor, a ação roda e o resultado é o do executor', async () => {
   await processarVencidos(new Date(), deps);
   assert.equal(marcados[0].status, 'executado');
   assert.equal(marcados[0].resultado, 'Variável gravada');
+});
+
+group('Executores das ações (banco com lista branca, falha com motivo)');
+function bancoFake(opts: { linhas?: number; tabelaTags?: boolean } = {}) {
+  const sqls: Array<{ sql: string; params: unknown[] }> = [];
+  return {
+    sqls,
+    db: {
+      query: async (sql: string, params: unknown[] = []) => {
+        sqls.push({ sql, params });
+        if (sql.includes('to_regclass')) return { rows: [{ ok: opts.tabelaTags === true }], rowCount: 1 };
+        return { rows: [], rowCount: opts.linhas ?? 1 };
+      },
+    },
+  };
+}
+const itemAcao = (acao: string, params: Record<string, unknown>) => ({ id: 'i', automacaoId: 'a1', leadId: 'L1', passoOrdem: 1, acao: acao as never, texto: null, executarEm: new Date(), params });
+test('mudar status: só valores permitidos; grava no leads', async () => {
+  const b = bancoFake();
+  const ex = criarExecutorAcoes(b.db);
+  assert.equal((await ex(itemAcao('mudar_status', { status: 'INTERESSADO' }), {} as never)).ok, true);
+  assert.match(b.sqls[0].sql, /UPDATE leads SET status/);
+  const ruim = await ex(itemAcao('mudar_status', { status: "x'; DROP TABLE leads;--" }), {} as never);
+  assert.equal(ruim.ok, false);
+  assert.equal(b.sqls.length, 1, 'valor inválido não chega ao banco');
+});
+test('mudar funil: coluna só da lista; etapa vai para sub_status', async () => {
+  const b = bancoFake();
+  const ex = criarExecutorAcoes(b.db);
+  assert.equal((await ex(itemAcao('mudar_funil', { funil: 'Fechado', etapa: 'Enviou proposta' }), {} as never)).ok, true);
+  assert.deepEqual(b.sqls[0].params, ['L1', 'Fechado', 'Enviou proposta']);
+  assert.equal((await ex(itemAcao('mudar_funil', { funil: 'Outra' }), {} as never)).ok, false);
+});
+test('definir campo: coluna própria para os campos da lista, o resto vai para variaveis_json', async () => {
+  const b = bancoFake();
+  const ex = criarExecutorAcoes(b.db);
+  await ex(itemAcao('definir_campo', { campo: 'niche', valor: 'padaria' }), {} as never);
+  assert.match(b.sqls[0].sql, /SET niche = \$2/);
+  await ex(itemAcao('definir_campo', { campo: 'cidade', valor: 'BH' }), {} as never);
+  assert.match(b.sqls[1].sql, /variaveis_json/);
+  assert.deepEqual(b.sqls[1].params, ['L1', 'cidade', 'BH']);
+  assert.equal((await ex(itemAcao('definir_campo', { campo: "a'b", valor: 'x' }), {} as never)).ok, false, 'nome inválido recusado');
+  assert.equal((await ex(itemAcao('definir_campo', { campo: 'cidade', valor: { x: 1 } }), {} as never)).ok, false, 'objeto recusado');
+});
+test('etiqueta sem tabela lead_tags: falha com motivo, nada gravado', async () => {
+  const b = bancoFake({ tabelaTags: false });
+  const r = await criarExecutorAcoes(b.db)(itemAcao('etiqueta', { nome: 'quente' }), {} as never);
+  assert.equal(r.ok, false);
+  assert.match(r.resultado, /fase I/);
+  assert.equal(b.sqls.some((x) => /INSERT INTO lead_tags/.test(x.sql)), false);
+});
+test('etiqueta com tabela: adiciona e remove', async () => {
+  const b = bancoFake({ tabelaTags: true });
+  const ex = criarExecutorAcoes(b.db);
+  assert.equal((await ex(itemAcao('etiqueta', { nome: 'quente' }), {} as never)).ok, true);
+  assert.equal((await ex(itemAcao('remover_etiqueta', { nome: 'quente' }), {} as never)).ok, true);
+  assert.ok(b.sqls.some((x) => /INSERT INTO lead_tags/.test(x.sql)));
+  assert.ok(b.sqls.some((x) => /DELETE FROM lead_tags/.test(x.sql)));
+});
+test('opt-out pela automação: status DESCARTADO e cancela os passos pendentes', async () => {
+  const b = bancoFake();
+  const r = await criarExecutorAcoes(b.db)(itemAcao('marcar_optout', {}), {} as never);
+  assert.equal(r.ok, true);
+  assert.match(b.sqls[0].sql, /status = 'DESCARTADO'/);
+  assert.match(b.sqls[1].sql, /automacoes_fila SET status = 'cancelado'/);
+});
+test('ações que dependem da fase I falham com motivo, sem gravar nada', async () => {
+  const b = bancoFake();
+  const r = await criarExecutorAcoes(b.db)(itemAcao('pausar_lead', {}), {} as never);
+  assert.equal(r.ok, false);
+  assert.equal(b.sqls.length, 0);
+});
+test('encerrar cancela só os passos desta automação para o lead', async () => {
+  const b = bancoFake({ linhas: 2 });
+  const r = await criarExecutorAcoes(b.db)(itemAcao('encerrar', {}), {} as never);
+  assert.equal(r.ok, true);
+  assert.deepEqual(b.sqls[0].params, ['L1', 'a1']);
+});
+test('campos do lead: variaveis_json mais as colunas úteis', () => {
+  const c = camposDoLead({ variaveis_json: { cidade: 'BH' }, niche: 'padaria', column_status: 'Leads' });
+  assert.equal(c.cidade, 'BH');
+  assert.equal(c.niche, 'padaria');
+  assert.equal(c.column_status, 'Leads');
 });
 
   await Promise.all(pending);
