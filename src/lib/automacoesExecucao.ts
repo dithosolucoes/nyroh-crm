@@ -6,7 +6,8 @@
  * e continua atrás de uma flag própria (desligada por padrão).
  */
 import { renderPrevia, type Automacao, type AcaoV, type EventoV } from './automacoes';
-import { contemPalavra } from './automacoesFila';
+import { contemPalavra, quandoExecutar } from './automacoesFila';
+import { randomUUID } from 'crypto';
 
 export interface ContextoEvento {
   /** Texto exato que o cliente mandou (ex.: "Acessar Link"), quando o gatilho exige. */
@@ -77,4 +78,59 @@ export function planejarEvento(
     planos.push({ id: r.id, nome: r.def.nome, passos });
   }
   return planos;
+}
+
+/** Evento do cliente a partir da resposta recebida. */
+export function eventoDaResposta(texto: string, optout: boolean): EventoV {
+  if (optout) return 'cliente_pediu_parar';
+  if (String(texto || '').trim() === 'Acessar Link') return 'cliente_clicou';
+  return 'cliente_respondeu';
+}
+
+export interface ItemFila {
+  id: string;
+  automacaoId: string;
+  leadId: string;
+  passoOrdem: number;
+  acao: AcaoV;
+  /** Texto AINDA COM {variáveis}. Quem preenche é a execução, com os dados reais do lead. */
+  texto: string | null;
+  executarEm: Date;
+}
+
+export interface DepsRecebimento {
+  carregarRegras: () => Promise<RegistroAutomacao[]>;
+  gravarFila: (itens: ItemFila[]) => Promise<void>;
+}
+
+/**
+ * Chamado quando chega resposta do cliente. Com NYROH_AUTOMACOES_EXECUCAO desligada (padrão),
+ * não faz nada. Ligada, só agenda os passos na fila. Nunca envia.
+ */
+export async function registrarEventoCliente(
+  contexto: { leadId: string; texto: string; optout: boolean },
+  agora: Date,
+  deps: DepsRecebimento
+): Promise<number> {
+  if (process.env.NYROH_AUTOMACOES_EXECUCAO !== 'true') return 0;
+  const evento = eventoDaResposta(contexto.texto, contexto.optout);
+  const regras = await deps.carregarRegras();
+  // Identidade: guarda o modelo. As variáveis são preenchidas só na execução, com o lead real.
+  const planos = planejarEvento(evento, regras, { texto: contexto.texto, optout: contexto.optout }, (t) => t);
+  const itens: ItemFila[] = [];
+  for (const plano of planos) {
+    for (const passo of plano.passos) {
+      itens.push({
+        id: randomUUID(),
+        automacaoId: plano.id,
+        leadId: contexto.leadId,
+        passoOrdem: passo.ordem,
+        acao: passo.acao,
+        texto: passo.texto,
+        executarEm: quandoExecutar(agora, passo.horasDesdeEvento),
+      });
+    }
+  }
+  if (itens.length > 0) await deps.gravarFila(itens);
+  return itens.length;
 }
