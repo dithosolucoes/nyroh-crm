@@ -28,6 +28,7 @@ import { planejarEvento, type RegistroAutomacao } from '../src/lib/automacoesExe
 import { colunaPermitida, TABELAS_BACKUP } from '../src/lib/backupRoutes';
 import { quandoExecutar, estaVencido, contemPalavra } from '../src/lib/automacoesFila';
 import { registrarEventoCliente, eventoDaResposta, type DepsRecebimento } from '../src/lib/automacoesExecucao';
+import { processarVencidos, type DepsWorker } from '../src/lib/automacoesWorker';
 import { resolveLeadTokens, TOKEN_NAMES } from '../src/lib/leadTokens';
 import { validateTemplateCategory, buildMetaButtons, defaultExamples, countBodyVariables, validateTemplateVariables } from '../src/lib/templateRules';
 import {
@@ -1018,6 +1019,37 @@ test('com a flag ligada, agenda os passos com o texto-modelo e não envia', asyn
   assert.equal(n, 2);
   assert.equal(fila[1].texto, 'Oi {nome}', 'guarda o modelo, sem preencher variáveis');
   assert.equal(fila[1].executarEm.toISOString(), '2026-11-10T14:30:00.000Z');
+});
+
+group('Processador da fila (sem envio)');
+test('processa só os vencidos: espera ok, texto simulado com dados reais, sem envio', async () => {
+  const fila = [
+    { id: 'e1', automacaoId: 'a', leadId: 'L1', passoOrdem: 1, acao: 'esperar' as const, texto: null, executarEm: new Date() },
+    { id: 'e2', automacaoId: 'a', leadId: 'L1', passoOrdem: 2, acao: 'enviar_texto' as const, texto: 'Oi {nome}, veja {empresa}', executarEm: new Date() },
+  ];
+  const marcados: Array<{ id: string; status: string; resultado: string; texto: string | null }> = [];
+  const deps: DepsWorker = {
+    buscarVencidos: async () => fila,
+    contextoDoLead: async () => ({ leadName: 'Ana Souza', sellerName: 'Thomas' }),
+    marcarResultado: async (id, status, resultado, texto) => { marcados.push({ id, status, resultado, texto }); },
+  };
+  const r = await processarVencidos(new Date(), deps);
+  assert.equal(r.processados, 2);
+  assert.equal(marcados[0].resultado, 'Espera concluída');
+  assert.equal(marcados[1].status, 'executado');
+  assert.match(marcados[1].resultado, /nada foi enviado/);
+  assert.equal(marcados[1].texto, 'Oi Ana, veja Ana Souza');
+});
+test('passo com variável sem dado do lead é cancelado com o motivo', async () => {
+  const marcados: Array<{ status: string; resultado: string }> = [];
+  const deps: DepsWorker = {
+    buscarVencidos: async () => [{ id: 'x', automacaoId: 'a', leadId: 'L2', passoOrdem: 1, acao: 'enviar_texto' as const, texto: 'Tel {telefone}', executarEm: new Date() }],
+    contextoDoLead: async () => ({ leadName: 'Bia' }),
+    marcarResultado: async (_id, status, resultado) => { marcados.push({ status, resultado }); },
+  };
+  await processarVencidos(new Date(), deps);
+  assert.equal(marcados[0].status, 'cancelado');
+  assert.match(marcados[0].resultado, /telefone/);
 });
   await Promise.all(pending);
 

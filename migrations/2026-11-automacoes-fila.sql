@@ -11,7 +11,10 @@ CREATE TABLE IF NOT EXISTS automacoes_fila (
   texto TEXT,
   executar_em TIMESTAMP WITH TIME ZONE NOT NULL,
   status VARCHAR(16) NOT NULL DEFAULT 'pendente' CHECK (status IN ('pendente', 'executado', 'cancelado')),
-  criado_em TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+  resultado TEXT,
+  texto_final TEXT,
+  criado_em TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  processado_em TIMESTAMP WITH TIME ZONE
 );
 
 CREATE INDEX IF NOT EXISTS automacoes_fila_pendentes ON automacoes_fila (executar_em) WHERE status = 'pendente';
