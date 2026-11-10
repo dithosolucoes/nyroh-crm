@@ -30,8 +30,8 @@ export interface ContextoLeadWorker extends LeadTokenContext {
   campos?: Record<string, unknown>;
   /** Status do lead. */
   status?: string;
-  /** Se a regra já executou para o lead nesta versão. Ausente = indisponível. */
-  regraExecutou?: boolean;
+  /** Regras que já executaram para o lead: id da regra -> quando. Ausente = indisponível. */
+  regrasExecutadas?: Record<string, string>;
 }
 
 /** Janela de 24h: texto livre só vale até 24h depois da última mensagem do cliente. */
@@ -55,6 +55,8 @@ export interface DepsWorker {
    * opt-out, pausa, aviso). Sem ele, a ação é CANCELADA com motivo: nada é aplicado em silêncio.
    */
   aplicarAcao?: (it: ItemFila, ctx: ContextoLeadWorker) => Promise<{ ok: boolean; resultado: string }>;
+  /** Marca que a regra executou para o lead (condição "regra já executou"). */
+  registrarRegraExecutada?: (leadId: string, regraId: string, quando: Date) => Promise<void>;
 }
 
 export interface OpcoesWorker {
@@ -111,7 +113,7 @@ export async function processarVencidos(
         campos: ctxCond?.campos,
         status: ctxCond?.status,
         envios,
-        regraExecutou: ctxCond?.regraExecutou,
+        regraExecutou: ctxCond?.regrasExecutadas !== undefined ? it.automacaoId in ctxCond.regrasExecutadas : undefined,
         eventoEm: it.eventoEm ? new Date(it.eventoEm) : null,
         ultimaMensagemDoCliente: ctxCond?.ultimaMensagemDoCliente ?? null,
       };
@@ -137,6 +139,12 @@ export async function processarVencidos(
         continue;
       }
       const ctx = ctxCond;
+      // Pausa: lead pausado não recebe texto automático (pausa vence automação).
+      if (ctx.pausado) {
+        resumo.cancelados++;
+        await deps.marcarResultado(it.id, 'cancelado', 'Lead pausado: passo não executado', null);
+        continue;
+      }
       // Opt-out: lido de novo neste passo. Se o lead saiu, o passo não executa.
       if (ctx.optout) {
         resumo.cancelados++;
@@ -170,6 +178,7 @@ export async function processarVencidos(
         continue;
       }
       resumo.simulados++;
+      await deps.registrarRegraExecutada?.(it.leadId, it.automacaoId, agora).catch(() => undefined);
       resumo.auditoria.push(registroAuditoria('executou', 'Simulado: nada foi enviado', agora, { leadId: it.leadId, regraId: it.automacaoId }));
       await deps.marcarResultado(it.id, 'executado', 'Simulado: envio desligado, nada foi enviado', r.text);
       continue;
@@ -200,6 +209,7 @@ export async function processarVencidos(
     const feito = await deps.aplicarAcao(it, ctxCond);
     if (feito.ok) {
       resumo.simulados++;
+      await deps.registrarRegraExecutada?.(it.leadId, it.automacaoId, agora).catch(() => undefined);
       await deps.marcarResultado(it.id, 'executado', feito.resultado, null);
     } else {
       resumo.cancelados++;

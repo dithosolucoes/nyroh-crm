@@ -1602,7 +1602,7 @@ test('ações que dependem da fase I falham com motivo, sem gravar nada', async 
   const b = bancoFake();
   const r = await criarExecutorAcoes(b.db)(itemAcao('pausar_lead', {}), {} as never);
   assert.equal(r.ok, false);
-  assert.equal(b.sqls.length, 0);
+  assert.equal(b.sqls.some((x) => /^\s*(INSERT|UPDATE|DELETE)/.test(x.sql)), false, 'nada gravado');
 });
 test('encerrar cancela só os passos desta automação para o lead', async () => {
   const b = bancoFake({ linhas: 2 });
@@ -1615,6 +1615,88 @@ test('campos do lead: variaveis_json mais as colunas úteis', () => {
   assert.equal(c.cidade, 'BH');
   assert.equal(c.niche, 'padaria');
   assert.equal(c.column_status, 'Leads');
+});
+
+group('Pausa, revisão e aviso (fase I para gravar, falha com motivo até lá)');
+test('pausar sem leads_estado: falha com motivo e não grava', async () => {
+  const b = bancoFake({ tabelaTags: false });
+  const r = await criarExecutorAcoes(b.db)(itemAcao('pausar_lead', {}), {} as never);
+  assert.equal(r.ok, false);
+  assert.match(r.resultado, /fase I/);
+  assert.equal(b.sqls.some((x) => /leads_estado/.test(x.sql)), false);
+});
+test('pausar com tabela: grava "pausado" sem tirar opt-out', async () => {
+  const b = bancoFake({ tabelaTags: true });
+  const r = await criarExecutorAcoes(b.db)(itemAcao('pausar_lead', {}), {} as never);
+  assert.equal(r.ok, true);
+  const sql = b.sqls.find((x) => /INSERT INTO leads_estado/.test(x.sql))!;
+  assert.deepEqual(sql.params.slice(0, 2), ['L1', 'pausado']);
+  assert.match(sql.sql, /status_geral <> 'optout'/, 'opt-out vence pausa');
+});
+test('revisão grava estado "revisao" e uma linha de auditoria com o motivo', async () => {
+  const b = bancoFake({ tabelaTags: true });
+  const r = await criarExecutorAcoes(b.db)(itemAcao('revisao', { motivo: 'cliente irritado' }), {} as never);
+  assert.equal(r.ok, true);
+  assert.equal(b.sqls.find((x) => /INSERT INTO leads_estado/.test(x.sql))!.params[1], 'revisao');
+  const aud = b.sqls.find((x) => /automacoes_auditoria/.test(x.sql))!;
+  assert.match(String(aud.params[1]), /cliente irritado/);
+});
+test('aviso fica na auditoria, não envia mensagem a ninguém', async () => {
+  const b = bancoFake({ tabelaTags: true });
+  const r = await criarExecutorAcoes(b.db)(itemAcao('notificar', { mensagem: 'lead quente' }), {} as never);
+  assert.equal(r.ok, true);
+  assert.ok(b.sqls.some((x) => /automacoes_auditoria/.test(x.sql)));
+  assert.equal(b.sqls.some((x) => /INSERT INTO leads_estado|UPDATE leads/.test(x.sql)), false);
+});
+test('aviso sem tabela de auditoria: falha com motivo', async () => {
+  const b = bancoFake({ tabelaTags: false });
+  const r = await criarExecutorAcoes(b.db)(itemAcao('notificar', { mensagem: 'x' }), {} as never);
+  assert.equal(r.ok, false);
+  assert.match(r.resultado, /fase I/);
+});
+test('worker: lead pausado não recebe texto automático', async () => {
+  const marcados: Array<{ status: string; resultado: string }> = [];
+  const deps: DepsWorker = {
+    reservar: async () => true,
+    buscarVencidos: async () => [{ id: 'p', automacaoId: 'a', leadId: 'L', passoOrdem: 1, acao: 'enviar_texto' as const, texto: 'oi', executarEm: new Date() }],
+    contextoDoLead: async () => ({ leadName: 'Bia', pausado: true, ultimaMensagemDoCliente: new Date() }),
+    marcarResultado: async (_id, status, resultado) => { marcados.push({ status, resultado }); },
+  };
+  await processarVencidos(new Date(), deps);
+  assert.equal(marcados[0].status, 'cancelado');
+  assert.match(marcados[0].resultado, /pausado/);
+});
+
+group('Regra já executou (condição lida do estado do lead)');
+test('regra executada no passado: "regra.ja_executou" verdadeiro; outra regra: falso', async () => {
+  const marcados: string[] = [];
+  const base = { id: 'x', automacaoId: 'regra-A', leadId: 'L', passoOrdem: 1, acao: 'notificar' as const, texto: null, executarEm: new Date(), condicoes: { e: [{ var: 'regra.ja_executou', op: 'verdadeiro' }] } as never };
+  const deps: DepsWorker = {
+    reservar: async () => true,
+    buscarVencidos: async () => [base],
+    contextoDoLead: async () => ({ leadName: 'Bia', regrasExecutadas: { 'regra-A': '2026-11-01T00:00:00Z' } }),
+    marcarResultado: async (_id, status) => { marcados.push(status); },
+    aplicarAcao: async () => ({ ok: true, resultado: 'ok' }),
+  };
+  await processarVencidos(new Date(), deps);
+  assert.equal(marcados[0], 'executado', 'já executou: segue');
+  marcados.length = 0;
+  deps.buscarVencidos = async () => [{ ...base, automacaoId: 'regra-B' }];
+  await processarVencidos(new Date(), deps);
+  assert.equal(marcados[0], 'cancelado', 'outra regra: não executou ainda, não segue');
+});
+test('execução registra que a regra executou para o lead', async () => {
+  const registros: string[] = [];
+  const deps: DepsWorker = {
+    reservar: async () => true,
+    buscarVencidos: async () => [{ id: 'r', automacaoId: 'regra-C', leadId: 'L9', passoOrdem: 1, acao: 'notificar' as const, texto: null, executarEm: new Date() }],
+    contextoDoLead: async () => ({ leadName: 'Bia' }),
+    marcarResultado: async () => undefined,
+    aplicarAcao: async () => ({ ok: true, resultado: 'ok' }),
+    registrarRegraExecutada: async (leadId, regraId) => { registros.push(`${leadId}:${regraId}`); },
+  };
+  await processarVencidos(new Date(), deps);
+  assert.deepEqual(registros, ['L9:regra-C']);
 });
 
   await Promise.all(pending);

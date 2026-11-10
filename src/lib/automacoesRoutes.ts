@@ -233,7 +233,7 @@ export function iniciarWorkerAutomacoes(pool: pg.Pool): void {
           const r = await pool.query(
             `SELECT l.name, l.phone_number, l.public_url, l.website, l.niche, l.salesperson_name, l.status,
                     l.column_status, l.sub_status, l.loss_reason, l.variaveis_json,
-                    e.status_geral, e.ultimo_comando
+                    e.status_geral, e.ultimo_comando, e.regras_executadas
              FROM leads l LEFT JOIN leads_estado e ON e.lead_id = l.id
              WHERE l.id = $1`,
             [leadId]
@@ -261,9 +261,19 @@ export function iniciarWorkerAutomacoes(pool: pg.Pool): void {
             status: x.status ?? undefined,
             campos: camposDoLead(x),
             tags,
+            regrasExecutadas: x.regras_executadas && typeof x.regras_executadas === 'object' ? x.regras_executadas : {},
           };
         },
         aplicarAcao: criarExecutorAcoes(pool as any),
+        registrarRegraExecutada: async (leadId, regraId, quando) => {
+          if (!(await tabelaExiste(pool as any, 'leads_estado'))) return;
+          await pool.query(
+            `INSERT INTO leads_estado (lead_id, regras_executadas, atualizado_em)
+             VALUES ($1, jsonb_build_object($2::text, $3::text), CURRENT_TIMESTAMP)
+             ON CONFLICT (lead_id) DO UPDATE SET regras_executadas = leads_estado.regras_executadas || jsonb_build_object($2::text, $3::text), atualizado_em = CURRENT_TIMESTAMP`,
+            [leadId, regraId, quando.toISOString()]
+          );
+        },
         marcarResultado: async (id, status, resultado, textoFinal) => {
           await pool.query(
             `UPDATE automacoes_fila SET status = $2, resultado = $3, texto_final = $4, processado_em = CURRENT_TIMESTAMP WHERE id = $1`,

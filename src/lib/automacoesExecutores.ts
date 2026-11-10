@@ -56,6 +56,15 @@ function textoDoValor(v: unknown): string | null {
   return null;
 }
 
+/** Grava uma linha de auditoria (decisão "avisou"). Usada por aviso e revisão. */
+async function gravarAuditoria(db: ConsultaSql, leadId: string, regraId: string, motivo: string): Promise<void> {
+  if (!(await tabelaExiste(db, 'automacoes_auditoria'))) return;
+  await db.query(
+    `INSERT INTO automacoes_auditoria (id, quando, decisao, motivo, lead_id, regra_id) VALUES ($1, CURRENT_TIMESTAMP, 'avisou', $2, $3, $4)`,
+    [`av-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`, motivo, leadId, regraId]
+  );
+}
+
 export function criarExecutorAcoes(db: ConsultaSql) {
   return async (it: ItemFila, _ctx: ContextoLeadWorker): Promise<ResultadoAcao> => {
     const pr = (it.params || {}) as Record<string, unknown>;
@@ -147,9 +156,42 @@ export function criarExecutorAcoes(db: ConsultaSql) {
         return { ok: true, resultado: `Automação encerrada para o lead (${r.rowCount ?? 0} passo(s) cancelado(s))` };
       }
 
+      case 'pausar_lead':
+      case 'revisao': {
+        // Estado do lead mora em leads_estado (migração da fase I). Sem ela, nada é gravado.
+        if (!(await tabelaExiste(db, 'leads_estado'))) {
+          return falha('Estado do lead ainda não tem tabela (migração pendente, fase I): nada foi aplicado');
+        }
+        const novo = it.acao === 'pausar_lead' ? 'pausado' : 'revisao';
+        // Opt-out vence tudo: quem já está em opt-out não sai dele por pausa ou revisão.
+        await db.query(
+          `INSERT INTO leads_estado (lead_id, status_geral, atualizado_em) VALUES ($1, $2, CURRENT_TIMESTAMP)
+           ON CONFLICT (lead_id) DO UPDATE SET status_geral = EXCLUDED.status_geral, atualizado_em = CURRENT_TIMESTAMP
+           WHERE leads_estado.status_geral <> 'optout'`,
+          [leadId, novo]
+        );
+        if (it.acao === 'revisao') {
+          const motivo = String(pr.motivo ?? '').trim() || 'Automação pediu revisão';
+          await gravarAuditoria(db, leadId, it.automacaoId, `Revisão: ${motivo}`);
+          return { ok: true, resultado: `Lead enviado para revisão: ${motivo}` };
+        }
+        return { ok: true, resultado: 'Lead pausado: passos seguintes não executam' };
+      }
+
+      case 'notificar': {
+        // Aviso fica registrado na auditoria, visível na tela de execuções. Não envia mensagem a ninguém.
+        const aviso = String(pr.mensagem ?? '').trim();
+        if (!aviso) return falha('Informe a mensagem do aviso');
+        if (aviso.length > TEXTO_MAX) return falha(`Aviso com mais de ${TEXTO_MAX} caracteres`);
+        if (!(await tabelaExiste(db, 'automacoes_auditoria'))) {
+          return falha('Auditoria ainda não tem tabela (migração pendente, fase I): aviso não registrado');
+        }
+        await gravarAuditoria(db, leadId, it.automacaoId, `Aviso: ${aviso}`);
+        return { ok: true, resultado: 'Aviso registrado na auditoria' };
+      }
+
       default:
-        // Pausar, revisão e aviso dependem da tabela de estado do lead (fase I) ou de um canal de aviso.
-        return falha(`"${it.acao}" ainda não tem executor: depende da fase I ou de canal de aviso`);
+        return falha(`"${it.acao}" ainda não tem executor`);
     }
   };
 }
