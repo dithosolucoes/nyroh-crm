@@ -5,10 +5,10 @@
  * Ainda não está ligado a nenhum disparo real. Quando for ligado, a execução usa este plano
  * e continua atrás de uma flag própria (desligada por padrão).
  */
-import { renderPrevia, type Automacao, type AcaoV, type EventoV } from './automacoes';
+import { renderPrevia, substituirVariaveis, type Automacao, type AcaoV, type EventoV } from './automacoes';
 import { contemPalavra, quandoExecutar } from './automacoesFila';
 import { randomUUID } from 'crypto';
-import type { CondicaoDefinida } from './automacoesEstado';
+import { normalizarCondicoes, proximaOcorrencia, type Condicoes, type Grupo, type AgendaHorario } from './automacoesEstado';
 import { detectOptOut } from './leadIntent';
 
 export interface ContextoEvento {
@@ -16,6 +16,12 @@ export interface ContextoEvento {
   texto?: string;
   /** Se o lead já está em opt-out. */
   optout?: boolean;
+  /** Momento do gatilho. Base para "esperar até" e para "cliente respondeu depois". */
+  em?: Date;
+  /** Filtros extras do gatilho (tag, status, funil) quando o evento os usa. */
+  tag?: string;
+  status?: string;
+  funil?: string;
 }
 
 export interface PassoPlanejado {
@@ -25,6 +31,8 @@ export interface PassoPlanejado {
   texto: string | null;
   /** Horas acumuladas desde o evento até este passo. */
   horasDesdeEvento: number;
+  /** Condição deste passo: a da regra E a do próprio passo (se houver, com "negar" invertido). */
+  condicoes: Grupo;
 }
 
 export interface PlanoAutomacao {
@@ -32,7 +40,7 @@ export interface PlanoAutomacao {
   nome: string;
   passos: PassoPlanejado[];
   /** Condições da regra. Avaliadas de novo na execução, com o estado atual do lead. */
-  condicoes: CondicaoDefinida[];
+  condicoes: Condicoes;
   /** Limites da regra, do JSON. Sem eles, não há limite. */
   limites?: { porDia?: number; porSemana?: number };
 }
@@ -50,9 +58,23 @@ const emHoras = (valor: unknown, unidade: unknown): number => {
   return v / 60;
 };
 
+const ms = (h: number) => h * 60 * 60 * 1000;
+
+/** Filtros do gatilho que não são texto: etiqueta, status e funil. Sem o dado, não dispara. */
+function filtrosEventoOk(def: Automacao, ctx: ContextoEvento): boolean {
+  const f = def.gatilho.filtro || {};
+  if (def.gatilho.evento === 'tag_mudou' && norm(ctx.tag) !== norm(f.tag)) return false;
+  if (def.gatilho.evento === 'status_mudou' && norm(ctx.status) !== norm(f.status)) return false;
+  if (def.gatilho.evento === 'funil_entrou' && norm(ctx.funil) !== norm(f.funil)) return false;
+  return true;
+}
+
+const norm = (v: unknown) => String(v ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+
 /**
  * Quais automações ATIVAS disparam para este evento e o que fariam.
  * `resolver` troca {campo} pelos dados do lead real; por padrão usa os valores de exemplo.
+ * Variáveis do próprio JSON são trocadas antes do resolver.
  */
 export function planejarEvento(
   evento: EventoV,
@@ -61,12 +83,17 @@ export function planejarEvento(
   resolver: (texto: string) => string = renderPrevia
 ): PlanoAutomacao[] {
   const planos: PlanoAutomacao[] = [];
+  const em = contexto.em ?? new Date(0);
   for (const r of regras) {
     if (r.status !== 'ativa' || !r.def?.gatilho || r.def.gatilho.evento !== evento) continue;
     const filtro = r.def.gatilho.filtro;
     if (filtro?.texto_igual !== undefined && contexto.texto !== filtro.texto_igual) continue;
     if (filtro?.texto_contem !== undefined && !contemPalavra(contexto.texto || '', filtro.texto_contem)) continue;
-    const pulaSeOptout = (r.def.condicoes || []).some((c) => c.var === 'lead.optout' && c.op === 'falso');
+    if (filtro?.texto_comeca !== undefined && !norm(contexto.texto).startsWith(norm(filtro.texto_comeca))) continue;
+    if (filtro?.texto_lista !== undefined && !filtro.texto_lista.some((p) => contemPalavra(contexto.texto || '', p))) continue;
+    if (!filtrosEventoOk(r.def, contexto)) continue;
+    const regraCond: Grupo = normalizarCondicoes(r.def.condicoes) as Grupo;
+    const pulaSeOptout = Array.isArray(r.def.condicoes) && r.def.condicoes.some((c) => c.var === 'lead.optout' && c.op === 'falso');
     if (pulaSeOptout && contexto.optout) continue;
 
     let horas = 0;
@@ -74,14 +101,25 @@ export function planejarEvento(
     (r.def.passos || []).forEach((p, i) => {
       const pr = (p.params || {}) as Record<string, unknown>;
       if (p.acao === 'esperar') horas += emHoras(pr.valor, pr.unidade);
+      if (p.acao === 'esperar_ate') {
+        const agenda: AgendaHorario = { hora: String(pr.hora), fuso: String(pr.fuso), dias: Array.isArray(pr.dias) ? (pr.dias as number[]) : undefined };
+        const prox = proximaOcorrencia(new Date(em.getTime() + ms(horas)), agenda);
+        if (prox) horas = (prox.getTime() - em.getTime()) / ms(1);
+      }
+      const passoCond: Grupo = p.se === undefined
+        ? { e: [] }
+        : p.negar
+          ? { nao: p.se as Grupo }
+          : (p.se as Grupo);
       passos.push({
         ordem: i + 1,
         acao: p.acao,
-        texto: p.acao === 'enviar_texto' ? resolver(String(pr.texto || '')) : null,
+        texto: p.acao === 'enviar_texto' ? resolver(substituirVariaveis(String(pr.texto || ''), r.def.variaveis)) : null,
         horasDesdeEvento: horas,
+        condicoes: { e: [regraCond, passoCond] } as Grupo,
       });
     });
-    planos.push({ id: r.id, nome: r.def.nome, passos, condicoes: r.def.condicoes || [], limites: r.def.limites });
+    planos.push({ id: r.id, nome: r.def.nome, passos, condicoes: r.def.condicoes, limites: r.def.limites });
   }
   return planos;
 }
@@ -130,8 +168,10 @@ export interface ItemFila {
   /** Texto AINDA COM {variáveis}. Quem preenche é a execução, com os dados reais do lead. */
   texto: string | null;
   executarEm: Date;
-  /** Condições da regra, avaliadas na execução. Itens antigos, sem o campo, não têm condições. */
-  condicoes?: CondicaoDefinida[];
+  /** Condições do item (regra + passo), avaliadas na execução. Itens antigos, sem o campo, não têm condições. */
+  condicoes?: Condicoes;
+  /** Quando o gatilho aconteceu (ISO). Base para "cliente respondeu depois do gatilho". */
+  eventoEm?: string;
   /** Limites da regra, do JSON. Sem eles, não há limite. */
   limites?: { porDia?: number; porSemana?: number };
 }
@@ -154,7 +194,7 @@ export async function registrarEventoCliente(
   const evento = eventoDaResposta(contexto.texto, contexto.optout, contexto.alerta === true);
   const regras = await deps.carregarRegras();
   // Identidade: guarda o modelo. As variáveis são preenchidas só na execução, com o lead real.
-  const planos = planejarEvento(evento, regras, { texto: contexto.texto, optout: contexto.optout }, (t) => t);
+  const planos = planejarEvento(evento, regras, { texto: contexto.texto, optout: contexto.optout, em: agora }, (t) => t);
   const itens: ItemFila[] = [];
   for (const plano of planos) {
     for (const passo of plano.passos) {
@@ -166,7 +206,8 @@ export async function registrarEventoCliente(
         acao: passo.acao,
         texto: passo.texto,
         executarEm: quandoExecutar(agora, passo.horasDesdeEvento),
-        condicoes: plano.condicoes,
+        condicoes: passo.condicoes,
+        eventoEm: agora.toISOString(),
         limites: plano.limites,
       });
     }
