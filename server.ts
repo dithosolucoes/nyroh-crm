@@ -1026,6 +1026,8 @@ async function initDatabase(retries = 5, delayMs = 3000) {
           ALTER TABLE campaign_batches ADD COLUMN IF NOT EXISTS quarantine_ends_at TIMESTAMP WITH TIME ZONE;
           ALTER TABLE campaign_batches ADD COLUMN IF NOT EXISTS allowed_closers JSONB DEFAULT '["seller-thomas"]'::jsonb;
           ALTER TABLE campaign_batches ADD COLUMN IF NOT EXISTS hot_retained_by_admin BOOLEAN DEFAULT TRUE;
+          ALTER TABLE campaign_batches ADD COLUMN IF NOT EXISTS quarantine_on_reply TEXT DEFAULT 'lock_closer';
+          ALTER TABLE campaign_batches ADD COLUMN IF NOT EXISTS quarantine_on_expire TEXT DEFAULT 'manual_pool';
           ALTER TABLE campaign_batches ADD COLUMN IF NOT EXISTS dispatched_count INT DEFAULT 0;
           ALTER TABLE campaign_batches ADD COLUMN IF NOT EXISTS hot_count INT DEFAULT 0;
           ALTER TABLE campaign_batches ADD COLUMN IF NOT EXISTS cold_count INT DEFAULT 0;
@@ -9413,6 +9415,8 @@ app.get('/api/campaign/batches', async (req, res) => {
           b.quarantine_ends_at AS "quarantineEndsAt",
           b.allowed_closers AS "allowedClosers",
           b.hot_retained_by_admin AS "hotLeadsRetainedByAdmin",
+          b.quarantine_on_reply AS "onReplyAction",
+          b.quarantine_on_expire AS "onExpireAction",
           b.dispatched_count AS "dispatchedCount",
           (SELECT COUNT(*) FROM campaign_leads cl
              WHERE cl.batch_id = b.id AND cl.whatsapp_message_id IS NOT NULL)::int AS "acceptedCount",
@@ -11360,6 +11364,14 @@ app.post('/api/campaign/batches/:batchId/quarantine-config', async (req: any, re
   const { batchId } = req.params;
   const { quarantineHours, allowedClosers, hotRetainedByAdmin, onReplyAction, onExpireAction } = req.body;
   const hours = Number(quarantineHours) > 0 ? Number(quarantineHours) : 4;
+  const REGRA_RESPOSTA = ['lock_closer', 'notify_admin', 'move_hot_column'];
+  const REGRA_EXPIRA = ['roulette_closers', 'manual_pool', 'cold_call_list'];
+  if (onReplyAction !== undefined && !REGRA_RESPOSTA.includes(onReplyAction)) {
+    return res.status(400).json({ success: false, error: 'Regra de resposta inválida.' });
+  }
+  if (onExpireAction !== undefined && !REGRA_EXPIRA.includes(onExpireAction)) {
+    return res.status(400).json({ success: false, error: 'Regra de expiração inválida.' });
+  }
 
   try {
     if (usePostgres && pgPool) {
@@ -11367,9 +11379,11 @@ app.post('/api/campaign/batches/:batchId/quarantine-config', async (req: any, re
         `UPDATE campaign_batches
          SET quarantine_hours = $1,
              allowed_closers = COALESCE($2, allowed_closers),
-             hot_retained_by_admin = COALESCE($3, hot_retained_by_admin)
+             hot_retained_by_admin = COALESCE($3, hot_retained_by_admin),
+             quarantine_on_reply = COALESCE($5, quarantine_on_reply),
+             quarantine_on_expire = COALESCE($6, quarantine_on_expire)
          WHERE id = $4`,
-        [hours, allowedClosers ? JSON.stringify(allowedClosers) : null, typeof hotRetainedByAdmin === 'boolean' ? hotRetainedByAdmin : null, batchId]
+        [hours, allowedClosers ? JSON.stringify(allowedClosers) : null, typeof hotRetainedByAdmin === 'boolean' ? hotRetainedByAdmin : null, batchId, onReplyAction ?? null, onExpireAction ?? null]
       );
     } else {
       const batch = memoryCampaignBatchesMap.get(batchId);

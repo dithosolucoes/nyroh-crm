@@ -254,7 +254,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   // Configurações Avançadas da Quarentena Anti-Vazamento
   const [quarantineUnit, setQuarantineUnit] = useState<'hours' | 'days'>('hours');
   const [quarantineOnReplyAction, setQuarantineOnReplyAction] = useState<'lock_closer' | 'notify_admin' | 'move_hot_column'>('lock_closer');
-  const [quarantineOnExpireAction, setQuarantineOnExpireAction] = useState<'roulette_closers' | 'manual_pool' | 'cold_call_list'>('roulette_closers');
+  const [quarantineOnExpireAction, setQuarantineOnExpireAction] = useState<'roulette_closers' | 'manual_pool' | 'cold_call_list'>('manual_pool');
   const [quarantineCustomHours, setQuarantineCustomHours] = useState<number>(4);
 
   // Montador State - Templates & 2 Níveis de Variáveis
@@ -834,6 +834,14 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   const currentBatch = useMemo(() => {
     return batches.find(b => b.id === selectedBatchId) || batches[0] || null;
   }, [batches, selectedBatchId]);
+
+  // Carrega as duas regras de saída salvas na safra selecionada (para a tela refletir o que está no banco)
+  useEffect(() => {
+    const r: any = (currentBatch as any)?.onReplyAction;
+    const e: any = (currentBatch as any)?.onExpireAction;
+    if (r === 'lock_closer' || r === 'notify_admin' || r === 'move_hot_column') setQuarantineOnReplyAction(r);
+    if (e === 'roulette_closers' || e === 'manual_pool' || e === 'cold_call_list') setQuarantineOnExpireAction(e);
+  }, [currentBatch?.id, (currentBatch as any)?.onReplyAction, (currentBatch as any)?.onExpireAction]);
 
   // Initialize quotas for distribution
   useEffect(() => {
