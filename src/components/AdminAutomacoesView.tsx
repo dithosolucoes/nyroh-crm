@@ -148,6 +148,22 @@ export default function AdminAutomacoesView() {
   const revisao = useLista<RevisaoLinha>('/api/admin/automacoes/revisao', REVISAO_EXEMPLO);
   const config = useLista<ConfigReal | null>('/api/admin/automacoes/configuracoes', [null]);
   const cfg = config.dados[0] ?? null;
+  const [pausaMudada, setPausaMudada] = useState<boolean | null>(null);
+  const [pausaMsg, setPausaMsg] = useState('');
+  const pausaAtual = pausaMudada ?? (cfg ? cfg.pausaGeral : false);
+
+  async function alternarPausa() {
+    setPausaMsg('');
+    const r = await fetch('/api/admin/automacoes/configuracoes', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pausaGeral: !pausaAtual }),
+    });
+    const j = await r.json().catch(() => ({}) as { error?: string; pausaGeral?: boolean });
+    if (!r.ok) return setPausaMsg(j.error || 'Não consegui mudar a pausa geral.');
+    setPausaMudada(Boolean(j.pausaGeral));
+    setPausaMsg(j.pausaGeral ? 'Pausa geral ligada: a fila está parada.' : 'Pausa geral desligada.');
+  }
 
   // Com a persistência ligada no servidor, carrega as regras salvas. Sem ela, mantém os exemplos.
   useEffect(() => {
@@ -608,11 +624,19 @@ export default function AdminAutomacoesView() {
       {tab === 'config' && (
         <section className="rounded-[14px] border border-[#E3E1DA] bg-white p-4">
           <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6A64]">Configurações{cfg ? '' : ' (exemplo)'}</p>
-          <Item nome="Pausa geral" texto={cfg ? (cfg.pausaGeral ? 'LIGADA: a fila está parada' : 'desligada') : 'desligada'} />
+          <Item nome="Pausa geral" texto={pausaAtual ? 'LIGADA: a fila está parada' : 'desligada'} />
+          <button
+            type="button"
+            onClick={alternarPausa}
+            className="mb-1 w-full rounded-md border border-[#E3E1DA] bg-white px-2 py-1.5 text-xs font-semibold text-[#1A1A17] hover:bg-[#F5F4F0]"
+          >
+            {pausaAtual ? 'Desligar pausa geral' : 'Ligar pausa geral'}
+          </button>
+          {pausaMsg && <p className="mb-1 text-xs text-[#6B6A64]">{pausaMsg}</p>}
           <Item nome="Execução da fila" texto={cfg ? (cfg.execucaoLigada ? 'ligada' : 'desligada, nada roda') : 'desligada, nada roda'} />
           <Item nome="Limites de mensagens por lead" texto="definidos em cada automação (JSON)" />
           <Item nome="Janela de texto livre" texto="24 horas após a última mensagem do cliente" />
-          <Item nome="Horário comercial" texto="08:00 às 18:00 (Brasília)" />
+          <Item nome="Horário comercial" texto="definido em cada automação (JSON)" />
         </section>
       )}
     </div>

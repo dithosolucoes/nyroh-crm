@@ -195,18 +195,32 @@ export async function registrarEventoCliente(
   agora: Date,
   deps: DepsRecebimento
 ): Promise<number> {
-  if (process.env.NYROH_AUTOMACOES_EXECUCAO !== 'true') return 0;
   const evento = eventoDaResposta(contexto.texto, contexto.optout, contexto.alerta === true);
+  return registrarEventoGeral(evento, contexto.leadId, { texto: contexto.texto, optout: contexto.optout }, agora, deps);
+}
+
+/**
+ * Registra QUALQUER evento de um lead (etiqueta, status, funil, agenda) e enfileira os passos
+ * das automações ativas que casam. Sem a flag de execução, não faz nada.
+ */
+export async function registrarEventoGeral(
+  evento: EventoV,
+  leadId: string,
+  contexto: ContextoEvento,
+  agora: Date,
+  deps: DepsRecebimento
+): Promise<number> {
+  if (process.env.NYROH_AUTOMACOES_EXECUCAO !== 'true') return 0;
   const regras = await deps.carregarRegras();
   // Identidade: guarda o modelo. As variáveis são preenchidas só na execução, com o lead real.
-  const planos = planejarEvento(evento, regras, { texto: contexto.texto, optout: contexto.optout, em: agora }, (t) => t);
+  const planos = planejarEvento(evento, regras, { ...contexto, em: agora }, (t) => t);
   const itens: ItemFila[] = [];
   for (const plano of planos) {
     for (const passo of plano.passos) {
       itens.push({
         id: randomUUID(),
         automacaoId: plano.id,
-        leadId: contexto.leadId,
+        leadId,
         passoOrdem: passo.ordem,
         acao: passo.acao,
         texto: passo.texto,
