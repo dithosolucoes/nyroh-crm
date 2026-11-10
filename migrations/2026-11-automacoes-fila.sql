@@ -25,3 +25,7 @@ CREATE INDEX IF NOT EXISTS automacoes_fila_pendentes ON automacoes_fila (executa
 ALTER TABLE automacoes_fila ADD COLUMN IF NOT EXISTS condicoes JSONB;
 -- Limites da regra, do JSON da automação. Sem eles, não há limite.
 ALTER TABLE automacoes_fila ADD COLUMN IF NOT EXISTS limites JSONB;
+
+-- Parâmetros do passo (nome e valor da etiqueta, status, funil...) e quando o gatilho aconteceu.
+ALTER TABLE automacoes_fila ADD COLUMN IF NOT EXISTS params JSONB;
+ALTER TABLE automacoes_fila ADD COLUMN IF NOT EXISTS evento_em TIMESTAMP WITH TIME ZONE;

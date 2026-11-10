@@ -33,6 +33,8 @@ export interface PassoPlanejado {
   horasDesdeEvento: number;
   /** Condição deste passo: a da regra E a do próprio passo (se houver, com "negar" invertido). */
   condicoes: Grupo;
+  /** Parâmetros do passo, como estão no JSON (ex.: nome e valor de uma etiqueta). */
+  params?: Record<string, unknown>;
 }
 
 export interface PlanoAutomacao {
@@ -117,6 +119,7 @@ export function planejarEvento(
         texto: p.acao === 'enviar_texto' ? resolver(substituirVariaveis(String(pr.texto || ''), r.def.variaveis)) : null,
         horasDesdeEvento: horas,
         condicoes: { e: [regraCond, passoCond] } as Grupo,
+        params: pr,
       });
     });
     planos.push({ id: r.id, nome: r.def.nome, passos, condicoes: r.def.condicoes, limites: r.def.limites });
@@ -172,6 +175,8 @@ export interface ItemFila {
   condicoes?: Condicoes;
   /** Quando o gatilho aconteceu (ISO). Base para "cliente respondeu depois do gatilho". */
   eventoEm?: string;
+  /** Parâmetros do passo, do JSON (nome, valor, status, funil...). */
+  params?: Record<string, unknown>;
   /** Limites da regra, do JSON. Sem eles, não há limite. */
   limites?: { porDia?: number; porSemana?: number };
 }
@@ -208,6 +213,7 @@ export async function registrarEventoCliente(
         executarEm: quandoExecutar(agora, passo.horasDesdeEvento),
         condicoes: passo.condicoes,
         eventoEm: agora.toISOString(),
+        params: passo.params,
         limites: plano.limites,
       });
     }
