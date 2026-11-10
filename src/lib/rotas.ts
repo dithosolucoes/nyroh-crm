@@ -19,6 +19,7 @@ export type SecaoAdmin =
   | 'auditoria'
   | 'blindagem'
   | 'logs'
+  | 'automacoes'
   | 'whatsapp';
 
 export interface Destino {
@@ -41,6 +42,7 @@ const CAMINHOS: Array<{ path: string; tab: AbaPrincipal; section?: SecaoAdmin; s
   { path: '/admin/vendedores', tab: 'admin', section: 'vendedores', soAdmin: true },
   { path: '/admin/auditoria', tab: 'admin', section: 'auditoria', soAdmin: true },
   { path: '/admin/blindagem', tab: 'admin', section: 'blindagem', soAdmin: true },
+  { path: '/admin/automacoes', tab: 'admin', section: 'automacoes', soAdmin: true },
 ];
 
 /** Caminho da URL para um destino. Destino de admin sem seção cai no cockpit. */
