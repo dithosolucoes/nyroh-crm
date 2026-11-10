@@ -47,6 +47,24 @@ export function proximaVersao(atual?: number): number {
   return Number.isInteger(atual) && (atual as number) >= 1 ? (atual as number) + 1 : 1;
 }
 
+/**
+ * Aplica a versão a uma definição ao salvar. A versão e o histórico vêm do servidor, nunca do cliente:
+ * a definição anterior entra no histórico (máximo de 20 entradas) e a nova recebe a próxima versão.
+ */
+export function aplicarVersao(
+  anteriorDb: Record<string, unknown> | null | undefined,
+  nova: Record<string, unknown>,
+  agora: Date
+): Record<string, unknown> {
+  const versaoAnterior = typeof anteriorDb?.versao === 'number' ? (anteriorDb.versao as number) : undefined;
+  const historico: unknown[] = Array.isArray(anteriorDb?.historico) ? [...(anteriorDb!.historico as unknown[])] : [];
+  if (anteriorDb && versaoAnterior !== undefined) {
+    const { historico: _h, ...definicaoAnterior } = anteriorDb;
+    historico.push({ versao: versaoAnterior, salvoEm: agora.toISOString(), definicao: definicaoAnterior });
+  }
+  return { ...nova, versao: proximaVersao(versaoAnterior), historico: historico.slice(-20) };
+}
+
 export type DecisaoMotor = 'executou' | 'bloqueou' | 'pulou' | 'agendou' | 'cancelou';
 
 export interface RegistroAuditoria {

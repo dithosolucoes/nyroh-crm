@@ -93,16 +93,36 @@ const SUBTABS: Array<{ id: Aba; label: string }> = [
   { id: 'config', label: 'Configurações' },
 ];
 
-const EXECUCOES = [
-  { lead: 'Roberto · Padaria Estrela', regra: 'Clicou em Acessar Link', resultado: 'Link enviado' },
-  { lead: 'Ana · Clínica Vida', regra: 'Pediu para parar', resultado: 'Opt-out aplicado' },
-  { lead: 'Carlos · Oficina Norte', regra: 'Ameaça', resultado: 'Pausado · revisão' },
+interface ExecucaoLinha { quando: string; decisao: string; motivo: string; leadId: string | null; regraId: string | null }
+interface FilaLinha { leadId: string; acao: string; executarEm: string; status: string }
+interface RevisaoLinha { leadId: string; ultimoComando: string | null; em: string | null }
+interface ConfigReal { persistenciaLigada: boolean; execucaoLigada: boolean; pausaGeral: boolean; limites: { porDia: number; porSemana: number } }
+
+// Exemplos mostrados só quando a persistência está desligada (o servidor responde 503).
+const EXECUCOES_EXEMPLO: ExecucaoLinha[] = [
+  { quando: '', decisao: 'executou', motivo: 'Link enviado', leadId: 'Roberto · Padaria Estrela', regraId: 'Clicou em Acessar Link' },
+  { quando: '', decisao: 'bloqueou', motivo: 'Opt-out aplicado', leadId: 'Ana · Clínica Vida', regraId: 'Pediu para parar' },
 ];
-const FILA = [{ lead: 'Lúcia · Loja Sol', passo: 'Passo 2 · etiqueta', quando: 'hoje, 22:20' }];
-const REVISOES = [
-  { lead: 'Carlos · Oficina Norte', motivo: 'Ameaça', acao: 'Aguardando você' },
-  { lead: 'Paulo · Imobiliária Centro', motivo: 'Resposta para classificar', acao: 'Aguardando você' },
-];
+const FILA_EXEMPLO: FilaLinha[] = [{ leadId: 'Lúcia · Loja Sol', acao: 'etiqueta', executarEm: 'hoje, 22:20', status: 'pendente' }];
+const REVISAO_EXEMPLO: RevisaoLinha[] = [{ leadId: 'Carlos · Oficina Norte', ultimoComando: 'Ameaça', em: 'aguardando você' }];
+
+/** Lê uma lista do servidor. Se a rota responder erro (ex.: 503, persistência desligada), mantém o exemplo. */
+function useLista<T>(url: string, exemplo: T[]): { dados: T[]; real: boolean } {
+  const [dados, setDados] = useState<T[]>(exemplo);
+  const [real, setReal] = useState(false);
+  useEffect(() => {
+    let vivo = true;
+    fetch(url)
+      .then(async (r) => {
+        if (!r.ok) return;
+        const j = (await r.json()) as T[];
+        if (vivo) { setDados(j); setReal(true); }
+      })
+      .catch(() => {});
+    return () => { vivo = false; };
+  }, [url]);
+  return { dados, real };
+}
 
 const ACCENT = 'text-[#0F766E]';
 const BTN = 'inline-flex items-center rounded-lg border border-[#E3E1DA] bg-white px-3 py-2 text-sm font-semibold whitespace-nowrap hover:border-[#cfcdc4] disabled:cursor-not-allowed disabled:opacity-45';
@@ -123,6 +143,11 @@ export default function AdminAutomacoesView() {
   const [step, setStep] = useState(0);
   const [persistido, setPersistido] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
+  const exec = useLista<ExecucaoLinha>('/api/admin/automacoes/execucoes', EXECUCOES_EXEMPLO);
+  const fila = useLista<FilaLinha>('/api/admin/automacoes/fila', FILA_EXEMPLO);
+  const revisao = useLista<RevisaoLinha>('/api/admin/automacoes/revisao', REVISAO_EXEMPLO);
+  const config = useLista<ConfigReal | null>('/api/admin/automacoes/configuracoes', [null]);
+  const cfg = config.dados[0] ?? null;
 
   // Com a persistência ligada no servidor, carrega as regras salvas. Sem ela, mantém os exemplos.
   useEffect(() => {
@@ -561,31 +586,32 @@ export default function AdminAutomacoesView() {
 
       {tab === 'exec' && (
         <section className="rounded-[14px] border border-[#E3E1DA] bg-white p-4">
-          <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6A64]">Execuções (exemplo)</p>
-          {EXECUCOES.map((e) => <Item key={e.lead} nome={`${e.lead} · ${e.regra}`} texto={e.resultado} />)}
+          <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6A64]">Execuções{exec.real ? '' : ' (exemplo)'}</p>
+          {exec.dados.map((e, i) => <Item key={`${e.leadId}-${i}`} nome={`${e.leadId ?? '—'} · ${e.regraId ?? ''}`} texto={`${e.decisao}: ${e.motivo}`} />)}
         </section>
       )}
 
       {tab === 'fila' && (
         <section className="rounded-[14px] border border-[#E3E1DA] bg-white p-4">
-          <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6A64]">Fila agendada (exemplo)</p>
-          {FILA.map((f) => <Item key={f.lead} nome={`${f.lead} · ${f.passo}`} texto={f.quando} />)}
+          <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6A64]">Fila agendada{fila.real ? '' : ' (exemplo)'}</p>
+          {fila.dados.map((f, i) => <Item key={`${f.leadId}-${i}`} nome={`${f.leadId} · ${f.acao}`} texto={`${f.executarEm} · ${f.status}`} />)}
         </section>
       )}
 
       {tab === 'revisao' && (
         <section className="rounded-[14px] border border-[#E3E1DA] bg-white p-4">
-          <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6A64]">Revisão manual (exemplo)</p>
-          {REVISOES.map((v) => <Item key={v.lead} nome={`${v.lead} · ${v.motivo}`} texto={v.acao} />)}
+          <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6A64]">Revisão manual{revisao.real ? '' : ' (exemplo)'}</p>
+          {revisao.dados.map((v, i) => <Item key={`${v.leadId}-${i}`} nome={`${v.leadId} · ${v.ultimoComando ?? '—'}`} texto={v.em ?? ''} />)}
         </section>
       )}
 
       {tab === 'config' && (
         <section className="rounded-[14px] border border-[#E3E1DA] bg-white p-4">
-          <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6A64]">Configurações (exemplo)</p>
+          <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6A64]">Configurações{cfg ? '' : ' (exemplo)'}</p>
+          <Item nome="Pausa geral" texto={cfg ? (cfg.pausaGeral ? 'LIGADA: a fila está parada' : 'desligada') : 'desligada'} />
+          <Item nome="Execução da fila" texto={cfg ? (cfg.execucaoLigada ? 'ligada' : 'desligada, nada roda') : 'desligada, nada roda'} />
+          <Item nome="Máximo de mensagens automáticas por lead" texto={cfg ? `${cfg.limites.porDia} por dia · ${cfg.limites.porSemana} por semana` : '3 por dia · 10 por semana'} />
           <Item nome="Janela de texto livre" texto="24 horas após a última mensagem do cliente" />
-          <Item nome="Espera padrão de uma resposta automática" texto="2 horas" />
-          <Item nome="Máximo de mensagens automáticas por lead" texto="2 por dia · 5 por semana" />
           <Item nome="Horário comercial" texto="08:00 às 18:00 (Brasília)" />
         </section>
       )}

@@ -93,6 +93,41 @@ export function decidirEvento(
   return { pode: true, motivo: regra ? `Regra ${regra.id} pode executar` : 'Evento aceito', estado };
 }
 
+export interface ContextoCondicao {
+  optout: boolean;
+  pausado: boolean;
+  janela24h: boolean;
+  horarioComercial: boolean;
+  ultimoComando: EventoLead | null;
+}
+
+export interface CondicaoDefinida {
+  var: string;
+  op: string;
+  valor?: unknown;
+}
+
+/**
+ * Avalia as condições de uma regra contra o contexto do lead. Todas precisam ser verdadeiras.
+ * Condição desconhecida é falsa: nunca dispara por engano.
+ */
+export function avaliarCondicoes(
+  condicoes: CondicaoDefinida[] | undefined,
+  ctx: ContextoCondicao
+): { ok: boolean; falhas: string[] } {
+  const falhas: string[] = [];
+  for (const c of condicoes || []) {
+    let ok = false;
+    if (c.var === 'lead.optout') ok = c.op === 'falso' ? !ctx.optout : c.op === 'verdadeiro' ? ctx.optout : false;
+    else if (c.var === 'lead.pausado') ok = c.op === 'falso' ? !ctx.pausado : c.op === 'verdadeiro' ? ctx.pausado : false;
+    else if (c.var === 'janela_24h') ok = c.op === 'verdadeiro' && ctx.janela24h;
+    else if (c.var === 'horario_comercial') ok = c.op === 'verdadeiro' && ctx.horarioComercial;
+    else if (c.var === 'ultimo_comando') ok = c.op === 'igual' && ctx.ultimoComando === c.valor;
+    if (!ok) falhas.push(`${c.var} ${c.op}`);
+  }
+  return { ok: falhas.length === 0, falhas };
+}
+
 /** Pausa manual de um lead (botão de revisão). Não reverte opt-out. */
 export function pausarLead(estadoAtual: EstadoLead, motivo: 'pausado' | 'revisao'): EstadoLead {
   if (estadoAtual.statusGeral === 'optout') return estadoAtual;
