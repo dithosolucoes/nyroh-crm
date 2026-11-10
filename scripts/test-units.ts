@@ -24,6 +24,7 @@ import { effectiveSpeedPerSecond, dispatchRpm, planRpm, delayForIndex, maxDispat
 import { detectOptOut, sanitizeTemplateVariable } from '../src/lib/leadIntent';
 import { isPubliclyFetchableUrl } from '../src/lib/auditEngine';
 import { validarAutomacao, logicaEmPalavras, conversaSimulada, renderPrevia, tokensDesconhecidos, type Automacao } from '../src/lib/automacoes';
+import { planejarEvento, type RegistroAutomacao } from '../src/lib/automacoesExecucao';
 import { resolveLeadTokens, TOKEN_NAMES } from '../src/lib/leadTokens';
 import { validateTemplateCategory, buildMetaButtons, defaultExamples, countBodyVariables, validateTemplateVariables } from '../src/lib/templateRules';
 import {
@@ -919,6 +920,31 @@ async function main() {
     assert.deepEqual(tokensDesconhecidos('{nome} {xpto}'), ['xpto']);
   });
 
+
+group('Planejador de automações (sem envio)');
+test('planeja só regras ativas do mesmo evento, com tempo acumulado', () => {
+  const regras: RegistroAutomacao[] = [
+    { id: 'a', status: 'ativa', def: { nome: 'A', gatilho: { evento: 'cliente_respondeu' }, passos: [
+      { acao: 'esperar', params: { valor: 2, unidade: 'horas' } },
+      { acao: 'enviar_texto', params: { texto: 'Oi {nome}' } },
+    ] } },
+    { id: 'b', status: 'rascunho', def: { nome: 'B', gatilho: { evento: 'cliente_respondeu' }, passos: [{ acao: 'revisao', params: { motivo: 'x' } }] } },
+    { id: 'c', status: 'ativa', def: { nome: 'C', gatilho: { evento: 'cliente_ameacou' }, passos: [{ acao: 'pausar_lead' }] } },
+  ];
+  const planos = planejarEvento('cliente_respondeu', regras, {}, (t) => t.replace('{nome}', 'Ana'));
+  assert.equal(planos.length, 1, 'só a ativa do evento');
+  assert.equal(planos[0].passos[0].horasDesdeEvento, 2, 'espera acumulada');
+  assert.equal(planos[0].passos[1].texto, 'Oi Ana', 'variável resolvida pelo lead');
+});
+test('filtro de texto e condição de opt-out são respeitados', () => {
+  const regras: RegistroAutomacao[] = [
+    { id: 'l', status: 'ativa', def: { nome: 'Link', gatilho: { evento: 'cliente_clicou', filtro: { texto_igual: 'Acessar Link' } },
+      condicoes: [{ var: 'lead.optout', op: 'falso' }], passos: [{ acao: 'enviar_texto', params: { texto: 'link' } }] } },
+  ];
+  assert.equal(planejarEvento('cliente_clicou', regras, { texto: 'Outro' }).length, 0, 'texto diferente não dispara');
+  assert.equal(planejarEvento('cliente_clicou', regras, { texto: 'Acessar Link', optout: true }).length, 0, 'opt-out bloqueia');
+  assert.equal(planejarEvento('cliente_clicou', regras, { texto: 'Acessar Link', optout: false }).length, 1, 'caso normal dispara');
+});
   await Promise.all(pending);
 
   console.log(`\n=====================================================`);

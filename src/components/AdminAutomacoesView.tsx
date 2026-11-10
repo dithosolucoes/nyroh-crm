@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ACOES,
   EVENTOS,
@@ -121,6 +121,52 @@ export default function AdminAutomacoesView() {
   const [view, setView] = useState<Visao>('lado');
   const [draft, setDraft] = useState<string | null>(null);
   const [step, setStep] = useState(0);
+  const [persistido, setPersistido] = useState(false);
+  const [aviso, setAviso] = useState<string | null>(null);
+
+  // Com a persistência ligada no servidor, carrega as regras salvas. Sem ela, mantém os exemplos.
+  useEffect(() => {
+    let vivo = true;
+    fetch('/api/admin/automacoes')
+      .then(async (r) => {
+        if (!vivo) return;
+        if (r.status === 503) {
+          setAviso('Dados de exemplo: a persistência das automações está desligada neste ambiente. Nada é salvo de verdade.');
+          return;
+        }
+        if (!r.ok) {
+          setAviso('Não consegui carregar as automações salvas.');
+          return;
+        }
+        const lista = (await r.json()) as Regra[];
+        setPersistido(true);
+        setRegras(lista);
+        setSelId(lista[0]?.id ?? null);
+      })
+      .catch(() => {
+        if (vivo) setAviso('Não consegui carregar as automações salvas.');
+      });
+    return () => {
+      vivo = false;
+    };
+  }, []);
+
+  /** Grava no servidor quando a persistência está ligada. Devolve false se o servidor recusar. */
+  const gravar = async (id: string, status: Status, def: Automacao): Promise<boolean> => {
+    if (!persistido) return true;
+    const r = await fetch(`/api/admin/automacoes/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status, def }),
+    });
+    if (!r.ok) {
+      const j = await r.json().catch(() => ({}) as { error?: string; erros?: string[]; conflitos?: string[] });
+      setAviso([j.error || 'Não foi possível salvar.', ...(j.erros || []), ...(j.conflitos || [])].join(' '));
+      return false;
+    }
+    setAviso(null);
+    return true;
+  };
 
   const sel = regras.find((r) => r.id === selId) ?? regras[0];
 
@@ -168,23 +214,34 @@ export default function AdminAutomacoesView() {
     setStep(0);
   };
 
-  const salvar = () => {
+  const salvar = async () => {
     if (noSave || !ok) return;
-    setRegras((rs) => rs.map((r) => (r.id === sel.id ? { ...r, def: ok, status: r.status === 'ativa' ? 'ativa' : 'rascunho' } : r)));
+    const novo: Status = sel.status === 'ativa' ? 'ativa' : 'rascunho';
+    if (!(await gravar(sel.id, novo, ok))) return;
+    setRegras((rs) => rs.map((r) => (r.id === sel.id ? { ...r, def: ok, status: novo } : r)));
     setDraft(null);
   };
 
-  const ativar = () => {
+  const ativar = async () => {
     if (sel.status === 'ativa') {
+      if (!(await gravar(sel.id, 'inativa', sel.def))) return;
       setRegras((rs) => rs.map((r) => (r.id === sel.id ? { ...r, status: 'inativa' } : r)));
       return;
     }
     if (noActivate || !ok) return;
+    if (!(await gravar(sel.id, 'ativa', ok))) return;
     setRegras((rs) => rs.map((r) => (r.id === sel.id ? { ...r, def: ok, status: 'ativa' } : r)));
     setDraft(null);
   };
 
-  const excluir = () => {
+  const excluir = async () => {
+    if (persistido) {
+      const r = await fetch(`/api/admin/automacoes/${encodeURIComponent(sel.id)}`, { method: 'DELETE' });
+      if (!r.ok) {
+        setAviso('Não foi possível excluir a automação.');
+        return;
+      }
+    }
     const next = regras.filter((r) => r.id !== sel.id);
     setRegras(next);
     setSelId(next[0]?.id ?? null);
@@ -218,6 +275,7 @@ export default function AdminAutomacoesView() {
 
   return (
     <div className="min-h-full bg-[#F5F4F0] p-4 text-[14px] leading-[1.45] text-[#191917] sm:p-6">
+      {aviso && <div className="mb-3 rounded-[10px] bg-[#FBF1E0] px-3 py-2 text-[13px] text-[#9A5B00]">{aviso}</div>}
       <header className="mb-3.5 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="m-0 text-2xl font-bold tracking-tight">Automações</h1>
@@ -289,9 +347,9 @@ export default function AdminAutomacoesView() {
                   <div className="text-xs text-[#6B6A64]">Situação salva: {sel.status === 'ativa' ? 'ativa' : sel.status === 'rascunho' ? 'rascunho' : 'inativa'}</div>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <button type="button" onClick={salvar} disabled={noSave} className={BTN}>Salvar</button>
-                  <button type="button" onClick={ativar} disabled={sel.status !== 'ativa' && noActivate} className={BTN_PRIMARY}>{ativarLabel}</button>
-                  <button type="button" onClick={excluir} className={`${BTN} text-[#B42318]`}>Excluir</button>
+                  <button type="button" onClick={() => void salvar()} disabled={noSave} className={BTN}>Salvar</button>
+                  <button type="button" onClick={() => void ativar()} disabled={sel.status !== 'ativa' && noActivate} className={BTN_PRIMARY}>{ativarLabel}</button>
+                  <button type="button" onClick={() => void excluir()} className={`${BTN} text-[#B42318]`}>Excluir</button>
                 </div>
               </div>
 

@@ -14,6 +14,7 @@ import pg from 'pg';
 import { Lead, CallLog, ColumnStatus, PIPELINE_COLUMNS, CustomTag, Salesperson, DistributeLeadsParams, User, AuditLog, QuickReply } from './src/types.js';
 import { getLeadNiche } from './src/lib/niche.js';
 import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regrasDeContatoSql, instanciaDaSafra } from './src/lib/uxRoutes.js';
+import { registerAutomacoesRoutes, applyAutomacoesMigration, automacoesPersistenciaOn } from './src/lib/automacoesRoutes.js';
 import { hashPassword, verifyPassword, generateSessionToken, DEFAULT_USERS, StoredUser, isUserAdmin } from './src/lib/serverAuth.js';
 import { performWebsiteAudit } from './src/lib/auditEngine.js';
 import { missingFluxoVars, summarizeFluxoInstance } from './src/lib/fluxoInstanceStatus.js';
@@ -1488,6 +1489,7 @@ async function initDatabase(retries = 5, delayMs = 3000) {
         pgPool = pool;
         usePostgres = true;
         if (uxSchemaOn()) { await applyUxMigration(pool).catch((e: any) => console.error('[UX] migração falhou:', e?.message)); }
+        if (automacoesPersistenciaOn()) { await applyAutomacoesMigration(pool).catch((e: any) => console.error('[AUTOMACOES] migração falhou:', e?.message)); }
         await loadMetaRegistryFromDb().catch((e: any) => console.error('[Meta] falha ao carregar contas:', e?.message));
         dbBootDone = true;
         if (dbReconnectTimer) {
@@ -12857,6 +12859,13 @@ registerUxRoutes(app, {
   currentUser: (req: any) => req.user,
   isAdmin: (user: any) => isUserAdmin(user),
   getLeadOwnerId,
+});
+
+// Automações de resposta: só persistem regras (admin). Nenhum envio.
+registerAutomacoesRoutes(app, {
+  getPool: () => (usePostgres ? pgPool : null),
+  currentUser: (req: any) => req.user,
+  isAdmin: (user: any) => isUserAdmin(user),
 });
 
 // 404 Handler for unhandled API routes
