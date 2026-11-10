@@ -6,6 +6,7 @@
  * e continua atrás de uma flag própria (desligada por padrão).
  */
 import { renderPrevia, type Automacao, type AcaoV, type EventoV } from './automacoes';
+import { contemPalavra } from './automacoesFila';
 
 export interface ContextoEvento {
   /** Texto exato que o cliente mandou (ex.: "Acessar Link"), quando o gatilho exige. */
@@ -55,8 +56,9 @@ export function planejarEvento(
   const planos: PlanoAutomacao[] = [];
   for (const r of regras) {
     if (r.status !== 'ativa' || !r.def?.gatilho || r.def.gatilho.evento !== evento) continue;
-    const exigeTexto = r.def.gatilho.filtro?.texto_igual;
-    if (exigeTexto !== undefined && contexto.texto !== exigeTexto) continue;
+    const filtro = r.def.gatilho.filtro;
+    if (filtro?.texto_igual !== undefined && contexto.texto !== filtro.texto_igual) continue;
+    if (filtro?.texto_contem !== undefined && !contemPalavra(contexto.texto || '', filtro.texto_contem)) continue;
     const pulaSeOptout = (r.def.condicoes || []).some((c) => c.var === 'lead.optout' && c.op === 'falso');
     if (pulaSeOptout && contexto.optout) continue;
 
