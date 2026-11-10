@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { isUiFlagOn } from '../lib/uiFlags';
+const AUTOMACOES_ON = isUiFlagOn(import.meta.env.VITE_MOSTRAR_AUTOMACOES);
 const INFRA_ON = isUiFlagOn(import.meta.env.VITE_MOSTRAR_INFRA);
 import { User, Salesperson, Lead, AuditLog, PIPELINE_COLUMNS, PIPELINE_STAGE_META } from '../types';
 import { BulkCreateSalespeopleModal } from './BulkCreateSalespeopleModal';
@@ -44,6 +45,7 @@ import {
   Send
 } from 'lucide-react';
 import { AdminLogsView } from './AdminLogsView';
+import AdminAutomacoesView from './AdminAutomacoesView';
 import { AdminCampaignDisparosView } from './AdminCampaignDisparosView';
 import { ownerOf } from '../lib/sellerCounts';
 
@@ -56,7 +58,7 @@ interface AdminDashboardViewProps {
   onNavigateToKanban: (salespersonId?: string) => void;
   onRefreshData: () => void;
   onShowToast: (msg: string) => void;
-  activeSection?: 'cockpit' | 'usuarios' | 'carteiras' | 'auditoria' | 'blindagem' | 'logs' | 'whatsapp' | 'disparos';
+  activeSection?: 'cockpit' | 'usuarios' | 'carteiras' | 'auditoria' | 'blindagem' | 'logs' | 'automacoes' | 'whatsapp' | 'disparos';
   onChangeSection?: (section: string) => void;
   onSelectSalesperson?: (id: string) => void;
 }
@@ -74,7 +76,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
   onChangeSection,
   onSelectSalesperson
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'cockpit' | 'usuarios' | 'carteiras' | 'auditoria' | 'blindagem' | 'logs' | 'whatsapp' | 'disparos'>(
+  const [activeSubTab, setActiveSubTab] = useState<'cockpit' | 'usuarios' | 'carteiras' | 'auditoria' | 'blindagem' | 'logs' | 'automacoes' | 'whatsapp' | 'disparos'>(
     (activeSection as any) || 'cockpit'
   );
 
@@ -87,6 +89,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
         activeSection === 'auditoria' ||
         activeSection === 'blindagem' ||
         activeSection === 'logs' ||
+        activeSection === 'automacoes' ||
         activeSection === 'whatsapp' ||
         activeSection === 'disparos'
       ) {
@@ -603,6 +606,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
               : activeSubTab === 'auditoria' ? 'Auditoria'
               : activeSubTab === 'blindagem' ? 'Blindagem de dados'
               : activeSubTab === 'logs' ? 'Logs do sistema'
+              : activeSubTab === 'automacoes' ? 'Automações de resposta'
               : 'Painel'}
           </h1>
           <p className="text-sm text-neutral-500 mt-1">
@@ -1440,6 +1444,8 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
         )}
 
         {activeSubTab === 'logs' && <AdminLogsView />}
+
+        {activeSubTab === 'automacoes' && AUTOMACOES_ON && <AdminAutomacoesView />}
 
         {/* TAB 3: CAIXA-PRETA DE AUDITORIA */}
         {activeSubTab === 'auditoria' && (

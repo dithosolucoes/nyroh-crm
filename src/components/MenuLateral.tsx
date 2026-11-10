@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 
 const INFRA_ON = isUiFlagOn(import.meta.env.VITE_MOSTRAR_INFRA);
+const AUTOMACOES_ON = isUiFlagOn(import.meta.env.VITE_MOSTRAR_AUTOMACOES);
 
 interface MenuLateralProps {
   currentUser: User;
@@ -135,6 +136,9 @@ export const MenuLateral: React.FC<MenuLateralProps> = ({
         { label: 'Mensagem do WhatsApp', icon: <MessageSquare className={`${iconeCls} text-neutral-500`} />, acao: onOpenWhatsAppSettings },
         { label: 'Histórico', icon: <Clock className={`${iconeCls} text-neutral-500`} />, destino: { tab: 'admin', section: 'auditoria' } },
         { label: 'Logs do sistema', icon: <Database className={`${iconeCls} text-neutral-500`} />, destino: { tab: 'admin', section: 'logs' } },
+        ...(AUTOMACOES_ON
+          ? [{ label: 'Automações de resposta', icon: <Layers className={`${iconeCls} text-neutral-500`} />, destino: { tab: 'admin' as const, section: 'automacoes' as const } }]
+          : []),
         ...(INFRA_ON
           ? [{ label: 'Infraestrutura', icon: <Database className={`${iconeCls} text-neutral-500`} />, destino: { tab: 'admin' as const, section: 'blindagem' as const } }]
           : [])

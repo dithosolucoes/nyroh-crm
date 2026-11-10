@@ -23,6 +23,7 @@ import { extensionFor, saveMediaBuffer } from '../src/lib/mediaStorage';
 import { effectiveSpeedPerSecond, dispatchRpm, planRpm, delayForIndex, maxDispatchPerSecond, FluxoRateLimitedError } from '../src/lib/dispatchRate';
 import { detectOptOut, sanitizeTemplateVariable } from '../src/lib/leadIntent';
 import { isPubliclyFetchableUrl } from '../src/lib/auditEngine';
+import { validarAutomacao, logicaEmPalavras, conversaSimulada, renderPrevia, tokensDesconhecidos, type Automacao } from '../src/lib/automacoes';
 import { resolveLeadTokens, TOKEN_NAMES } from '../src/lib/leadTokens';
 import { validateTemplateCategory, buildMetaButtons, defaultExamples, countBodyVariables, validateTemplateVariables } from '../src/lib/templateRules';
 import {
@@ -866,6 +867,57 @@ async function main() {
   for (const k of Object.keys(process.env)) if (!(k in envBackup)) delete process.env[k];
   Object.assign(process.env, envBackup);
   void realFetch;
+
+
+  group('Automações de resposta (motor puro, sem rede)');
+  const base: Automacao = { nome: 'Clicou', gatilho: { evento: 'cliente_clicou', filtro: { texto_igual: 'Acessar Link' } }, passos: [{ acao: 'enviar_texto', params: { texto: 'Link: {site_novo}' } }] };
+  test('automação válida passa sem erros nem conflitos', () => {
+    const r = validarAutomacao(base, [], 'x');
+    assert.deepEqual(r.erros, []);
+    assert.deepEqual(r.conflitos, []);
+  });
+  test('variável que não existe no projeto bloqueia o salvamento', () => {
+    const r = validarAutomacao({ ...base, passos: [{ acao: 'enviar_texto', params: { texto: 'Oi {link}' } }] }, [], 'x');
+    assert.ok(r.erros.some((e) => e.includes('{link} não existe')));
+  });
+  test('texto final acima de 1024 caracteres bloqueia (conta o valor de exemplo, não o modelo)', () => {
+    const r = validarAutomacao({ ...base, passos: [{ acao: 'enviar_texto', params: { texto: 'a'.repeat(1030) } }] }, [], 'x');
+    assert.ok(r.erros.some((e) => e.includes('1024')));
+  });
+  test('espera zero ou acima de 30 dias bloqueia', () => {
+    const zero = validarAutomacao({ ...base, passos: [{ acao: 'esperar', params: { valor: 0, unidade: 'horas' } }] }, [], 'x');
+    const longa = validarAutomacao({ ...base, passos: [{ acao: 'esperar', params: { valor: 31, unidade: 'dias' } }] }, [], 'x');
+    assert.ok(zero.erros.length > 0);
+    assert.ok(longa.erros.some((e) => e.includes('30 dias')));
+  });
+  test('variável com fallback vazio vira aviso (não bloqueia salvar)', () => {
+    const r = validarAutomacao({ ...base, passos: [{ acao: 'enviar_texto', params: { texto: 'Cnpj {telefone}' } }] }, [], 'x');
+    assert.deepEqual(r.erros, []);
+    assert.ok(r.avisos.some((a) => a.includes('{telefone}')));
+  });
+  test('conflito: envia texto x opt-out no mesmo gatilho, com automação ativa, bloqueia ativação', () => {
+    const outra = { id: 'o', status: 'ativa', def: { nome: 'Pede parar', gatilho: { evento: 'cliente_clicou' as const }, passos: [{ acao: 'marcar_optout' as const }] } };
+    const r = validarAutomacao(base, [outra], 'x');
+    assert.ok(r.conflitos.some((c) => c.includes('Pede parar')));
+  });
+  test('conflito só vale para automação ATIVA (rascunho não bloqueia)', () => {
+    const outra = { id: 'o', status: 'rascunho', def: { nome: 'Pede parar', gatilho: { evento: 'cliente_clicou' as const }, passos: [{ acao: 'marcar_optout' as const }] } };
+    assert.deepEqual(validarAutomacao(base, [outra], 'x').conflitos, []);
+  });
+  test('texto de confirmação depois do opt-out é permitido (ordem define o efeito)', () => {
+    const r = validarAutomacao({ ...base, gatilho: { evento: 'cliente_pediu_parar' }, passos: [{ acao: 'marcar_optout' }, { acao: 'enviar_texto', params: { texto: 'Tudo certo, {nome}.' } }] }, [], 'x');
+    assert.deepEqual(r.erros, []);
+  });
+  test('lógica em palavras e conversa simulada usam os valores de exemplo do projeto', () => {
+    const linhas = logicaEmPalavras(base);
+    assert.ok(linhas[0].includes('clicou no botão'));
+    assert.ok(linhas.some((l) => l.includes('https://site-do-cliente.com.br')));
+    const conv = conversaSimulada(base);
+    assert.equal(conv[0].quem, 'cliente');
+    assert.equal(conv[1].quem, 'automacao');
+    assert.equal(renderPrevia('Oi {nome} de {empresa}'), 'Oi Roberto de Padaria Estrela');
+    assert.deepEqual(tokensDesconhecidos('{nome} {xpto}'), ['xpto']);
+  });
 
   await Promise.all(pending);
 
