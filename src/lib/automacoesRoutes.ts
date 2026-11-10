@@ -147,9 +147,16 @@ export function iniciarWorkerAutomacoes(pool: pg.Pool): void {
             executarEm: new Date(x.executar_em),
           }));
         },
+        reservar: async (id) => {
+          const r = await pool.query(
+            `UPDATE automacoes_fila SET status = 'executando' WHERE id = $1 AND status = 'pendente'`,
+            [id]
+          );
+          return (r.rowCount ?? 0) > 0;
+        },
         contextoDoLead: async (leadId) => {
           const r = await pool.query(
-            `SELECT name, phone_number, public_url, website, niche, salesperson_name FROM leads WHERE id = $1`,
+            `SELECT name, phone_number, public_url, website, niche, salesperson_name, status FROM leads WHERE id = $1`,
             [leadId]
           );
           const x = r.rows[0];
@@ -161,6 +168,8 @@ export function iniciarWorkerAutomacoes(pool: pg.Pool): void {
             website: x.website,
             niche: x.niche,
             sellerName: x.salesperson_name,
+            // Opt-out hoje é marcado com status DESCARTADO (ver detecção de opt-out no recebimento).
+            optout: x.status === 'DESCARTADO',
           };
         },
         marcarResultado: async (id, status, resultado, textoFinal) => {
@@ -170,7 +179,7 @@ export function iniciarWorkerAutomacoes(pool: pg.Pool): void {
           );
         },
       });
-      if (resumo.processados > 0) console.log('[AUTOMACOES] fila processada (sem envio):', resumo);
+      if (resumo.processados > 0 || resumo.ignorados > 0) console.log('[AUTOMACOES] fila processada (sem envio):', resumo);
     } catch (e: any) {
       console.warn('[AUTOMACOES] falha ao processar a fila:', e?.message);
     } finally {

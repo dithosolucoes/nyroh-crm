@@ -1030,6 +1030,7 @@ test('processa só os vencidos: espera ok, texto simulado com dados reais, sem e
   const marcados: Array<{ id: string; status: string; resultado: string; texto: string | null }> = [];
   const deps: DepsWorker = {
     buscarVencidos: async () => fila,
+    reservar: async () => true,
     contextoDoLead: async () => ({ leadName: 'Ana Souza', sellerName: 'Thomas' }),
     marcarResultado: async (id, status, resultado, texto) => { marcados.push({ id, status, resultado, texto }); },
   };
@@ -1043,6 +1044,7 @@ test('processa só os vencidos: espera ok, texto simulado com dados reais, sem e
 test('passo com variável sem dado do lead é cancelado com o motivo', async () => {
   const marcados: Array<{ status: string; resultado: string }> = [];
   const deps: DepsWorker = {
+    reservar: async () => true,
     buscarVencidos: async () => [{ id: 'x', automacaoId: 'a', leadId: 'L2', passoOrdem: 1, acao: 'enviar_texto' as const, texto: 'Tel {telefone}', executarEm: new Date() }],
     contextoDoLead: async () => ({ leadName: 'Bia' }),
     marcarResultado: async (_id, status, resultado) => { marcados.push({ status, resultado }); },
@@ -1051,6 +1053,35 @@ test('passo com variável sem dado do lead é cancelado com o motivo', async () 
   assert.equal(marcados[0].status, 'cancelado');
   assert.match(marcados[0].resultado, /telefone/);
 });
+test('item que outro ciclo já reservou não é executado nem marcado', async () => {
+  const marcados: string[] = [];
+  let contexto = 0;
+  const deps: DepsWorker = {
+    buscarVencidos: async () => [{ id: 'r1', automacaoId: 'a', leadId: 'L3', passoOrdem: 1, acao: 'enviar_texto' as const, texto: 'Oi {nome}', executarEm: new Date() }],
+    reservar: async () => false,
+    contextoDoLead: async () => { contexto++; return { leadName: 'Caio' }; },
+    marcarResultado: async (id) => { marcados.push(id); },
+  };
+  const r = await processarVencidos(new Date(), deps);
+  assert.equal(r.ignorados, 1);
+  assert.equal(r.processados, 0);
+  assert.equal(marcados.length, 0);
+  assert.equal(contexto, 0, 'nem lê o lead quando não reservou');
+});
+test('lead com opt-out não recebe o passo, mesmo já na fila', async () => {
+  const marcados: Array<{ status: string; resultado: string }> = [];
+  const deps: DepsWorker = {
+    buscarVencidos: async () => [{ id: 'o1', automacaoId: 'a', leadId: 'L4', passoOrdem: 1, acao: 'enviar_texto' as const, texto: 'Oi {nome}', executarEm: new Date() }],
+    reservar: async () => true,
+    contextoDoLead: async () => ({ leadName: 'Dani', optout: true }),
+    marcarResultado: async (_id, status, resultado) => { marcados.push({ status, resultado }); },
+  };
+  const r = await processarVencidos(new Date(), deps);
+  assert.equal(marcados[0].status, 'cancelado');
+  assert.match(marcados[0].resultado, /opt-out/);
+  assert.equal(r.simulados, 0);
+});
+
   await Promise.all(pending);
 
   console.log(`\n=====================================================`);
