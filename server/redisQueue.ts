@@ -201,6 +201,8 @@ export interface ZipImportJobData {
 export interface CampaignDispatchJobData {
   campaignId: string;
   batchId?: string;
+  /** Número escolhido na tela (instância da FluxoAPI). Vazio = marca da safra ou número geral. */
+  instanceId?: string;
   leadId: string;
   phone: string;
   leadName?: string;

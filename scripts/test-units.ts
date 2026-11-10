@@ -32,6 +32,7 @@ import { dispararAgendas, lerPausaGeral } from '../src/lib/automacoesRoutes';
 import { registrarEventoGeral } from '../src/lib/automacoesExecucao';
 import { colunaPermitida, TABELAS_BACKUP } from '../src/lib/backupRoutes';
 import { normalizarEnvio, decidirEnvio, ENVIO_PADRAO, type ConfigEnvio } from '../src/lib/automacoesEnvio';
+import { validarInstanciaEscolhida, escolherInstanciaDisparo } from '../src/lib/dispatchInstancia';
 import { quandoExecutar, estaVencido, contemPalavra } from '../src/lib/automacoesFila';
 import { registrarEventoCliente, eventoDaResposta, type DepsRecebimento } from '../src/lib/automacoesExecucao';
 import { processarVencidos, type DepsWorker } from '../src/lib/automacoesWorker';
@@ -1872,6 +1873,21 @@ test('se ler a configuração falhar, vale o padrão (desligado): nada sai', asy
   await processarVencidos(new Date('2026-11-10T13:00:00Z'), deps);
   assert.equal(chamou, 0);
   assert.match(marcados[0].resultado, /nada foi enviado/);
+});
+
+group('Escolha do número no disparo (vale primeiro; sem marca também dispara)');
+test('validação: vazio = sem escolha; formato válido passa; lixo é recusado', () => {
+  assert.equal(validarInstanciaEscolhida(undefined), '');
+  assert.equal(validarInstanciaEscolhida('  '), '');
+  assert.equal(validarInstanciaEscolhida('minha-instancia_01'), 'minha-instancia_01');
+  assert.equal(validarInstanciaEscolhida('x; DROP TABLE'), null);
+  assert.equal(validarInstanciaEscolhida('a'.repeat(121)), null);
+});
+test('escolha vale primeiro; sem escolha, marca da safra; sem marca, instância global', () => {
+  assert.equal(escolherInstanciaDisparo({ escolhida: 'manual', daSafra: 'marca', global: 'geral' }), 'manual');
+  assert.equal(escolherInstanciaDisparo({ escolhida: '', daSafra: 'marca', global: 'geral' }), 'marca');
+  assert.equal(escolherInstanciaDisparo({ escolhida: undefined, daSafra: '', global: 'geral' }), 'geral');
+  assert.equal(escolherInstanciaDisparo({ escolhida: null, daSafra: '', global: '' }), '');
 });
 
   await Promise.all(pending);

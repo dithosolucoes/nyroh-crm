@@ -14,6 +14,7 @@ import pg from 'pg';
 import { Lead, CallLog, ColumnStatus, PIPELINE_COLUMNS, CustomTag, Salesperson, DistributeLeadsParams, User, AuditLog, QuickReply } from './src/types.js';
 import { getLeadNiche } from './src/lib/niche.js';
 import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regrasDeContatoSql, instanciaDaSafra } from './src/lib/uxRoutes.js';
+import { validarInstanciaEscolhida, escolherInstanciaDisparo } from './src/lib/dispatchInstancia.js';
 import { registerAutomacoesRoutes, applyAutomacoesMigration, applyAutomacoesEstadoMigration, applyAutomacoesFilaMigration, automacoesPersistenciaOn, iniciarWorkerAutomacoes } from './src/lib/automacoesRoutes.js';
 import { registrarEventoCliente, registrarEventoGeral, pedidoDePararPelasRegras, pedidoDeAlertaPelasRegras, type ItemFila } from './src/lib/automacoesExecucao.js';
 import type { EventoV } from './src/lib/automacoes.js';
@@ -10440,11 +10441,18 @@ app.post('/api/campaign/dispatch', async (req: any, res) => {
     leadIds,
     salespersonId,
     salespersonIds,
-    dryRun = false
+    dryRun = false,
+    phoneNumberId
   } = req.body;
 
   if (!batchId) {
     return res.status(400).json({ error: 'ID da safra é obrigatório para disparo.' });
+  }
+
+  // Número escolhido na tela (instância da FluxoAPI). Vazio = padrão (marca da safra ou número geral).
+  const instanciaEscolhida = validarInstanciaEscolhida(phoneNumberId);
+  if (instanciaEscolhida === null) {
+    return res.status(400).json({ error: 'Número de envio inválido. Escolha um número da lista.' });
   }
 
   // Flag CAMPAIGN_GENERIC_TOKENS (desligada por padrão): copy com campo desconhecido não sai para o cliente.
@@ -10706,7 +10714,8 @@ app.post('/api/campaign/dispatch', async (req: any, res) => {
           // Modelos com botão de URL variável / cupom / mídia de cabeçalho exigem esses valores (§A4)
           buttonValues: req.body.buttonValues && typeof req.body.buttonValues === 'object' ? req.body.buttonValues : undefined,
           headerMediaUrl: typeof req.body.headerMediaUrl === 'string' ? req.body.headerMediaUrl : undefined,
-          dispatchedAt: Date.now()
+          dispatchedAt: Date.now(),
+          instanceId: instanciaEscolhida || undefined
         });
 
         // Sincronizar lead com o CRM para aparecer no Kanban e no WhatsApp do vendedor atribuído
@@ -10876,7 +10885,8 @@ app.post('/api/campaign/dispatch', async (req: any, res) => {
           // Modelos com botão de URL variável / cupom / mídia de cabeçalho exigem esses valores (§A4)
           buttonValues: req.body.buttonValues && typeof req.body.buttonValues === 'object' ? req.body.buttonValues : undefined,
           headerMediaUrl: typeof req.body.headerMediaUrl === 'string' ? req.body.headerMediaUrl : undefined,
-          dispatchedAt: Date.now()
+          dispatchedAt: Date.now(),
+          instanceId: instanciaEscolhida || undefined
         });
 
         // Sync into memory CRM leads
@@ -13020,7 +13030,11 @@ async function main() {
       const apiSecret = (memoryFluxoConfig.apiSecret || '').trim();
       // Safra ligada a marca: envia pelo número vinculado à marca. Sem marca, usa a instância global.
       const safraInst = await instanciaDaSafra(pgPool, String(jobData.batchId || jobData.campaignId || ''));
-      const instanceId = safraInst.temMarca ? safraInst.instanceId : (memoryFluxoConfig.instanceId || '').trim();
+      const instanceId = escolherInstanciaDisparo({
+        escolhida: jobData.instanceId,
+        daSafra: safraInst.temMarca ? safraInst.instanceId : '',
+        global: memoryFluxoConfig.instanceId || '',
+      });
       const attempt = ctx?.attempt ?? 1;
       const maxAttempts = ctx?.maxAttempts ?? 1;
       const isLastAttempt = attempt >= maxAttempts;

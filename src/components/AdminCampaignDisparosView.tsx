@@ -192,7 +192,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   // A vazão é limitada pelo plano da FluxoAPI, que mede por MINUTO (Starter 60/min, Pro 300, Escala 1.200...).
   // Os valores reais vêm do servidor (FLUXO_PLAN_RPM); aqui só guardamos o que ele devolve. Unidade interna: msgs/segundo.
   const [dispatchSpeed, setDispatchSpeed] = useState<number>(0.8);
-  // Número de envio do disparo (vazio = padrão do ambiente). Sem isso o servidor escolhe o primeiro número cadastrado.
+  // Número de envio do disparo (vazio = marca da safra ou número geral). O servidor usa esta escolha primeiro.
   const [dispatchPhoneNumberId, setDispatchPhoneNumberId] = useState<string>('');
   const [dispatchNumbers, setDispatchNumbers] = useState<Array<{ id: string; name: string; phone: string }>>([]);
   useEffect(() => {
@@ -3870,7 +3870,11 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
                     </div>
                     <div className="bg-white px-4 py-3">
                       <p className="text-[11px] text-neutral-500">Número(s) de envio</p>
-                      <p className="text-sm font-bold text-neutral-900 truncate">{dispatchInfo ? (dispatchInfo.numeros.length ? dispatchInfo.numeros.join(', ') : 'Nenhum vinculado') : '…'}</p>
+                      <p className="text-sm font-bold text-neutral-900 truncate">
+                        {dispatchPhoneNumberId
+                          ? (dispatchNumbers.find(n => n.id === dispatchPhoneNumberId)?.name ?? dispatchPhoneNumberId)
+                          : dispatchInfo ? (dispatchInfo.numeros.length ? dispatchInfo.numeros.join(', ') : 'Padrão do ambiente') : '…'}
+                      </p>
                     </div>
                     <div className="bg-white px-4 py-3">
                       <p className="text-[11px] text-neutral-500">Passam nas regras</p>
