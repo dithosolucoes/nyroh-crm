@@ -22,8 +22,15 @@ export interface ContextoLeadWorker extends LeadTokenContext {
   pausado?: boolean;
   /** Último comando do cliente, para a condição ultimo_comando. */
   ultimoComando?: EventoLead | null;
-  /** Dentro da janela de 24h. Sem a fonte desse dado, fica indefinido (condição falha, por segurança). */
-  janela24h?: boolean;
+  /** Data da última mensagem enviada pelo cliente. Base da janela de 24h. */
+  ultimaMensagemDoCliente?: Date | null;
+}
+
+/** Janela de 24h: texto livre só vale até 24h depois da última mensagem do cliente. */
+export function dentroDaJanela24h(ultima: Date | null | undefined, agora: Date): boolean {
+  if (!ultima) return false;
+  const diff = agora.getTime() - ultima.getTime();
+  return diff >= 0 && diff < 24 * 60 * 60 * 1000;
 }
 
 /** Horário comercial em Brasília: 08:00 às 18:00. Faixa provisória, decisão na fase F. */
@@ -88,7 +95,7 @@ export async function processarVencidos(
       const av = avaliarCondicoes(it.condicoes, {
         optout: Boolean(ctxCond?.optout),
         pausado: Boolean(ctxCond?.pausado),
-        janela24h: Boolean(ctxCond?.janela24h),
+        janela24h: dentroDaJanela24h(ctxCond?.ultimaMensagemDoCliente, agora),
         horarioComercial: dentroDoHorarioComercial(agora),
         ultimoComando: ctxCond?.ultimoComando ?? null,
       });
@@ -136,6 +143,14 @@ export async function processarVencidos(
           await deps.marcarResultado(it.id, 'cancelado', lim.motivo, null);
           continue;
         }
+      }
+      // Janela de 24h: texto livre fora dela não sai (blueprint, seção 8). Vai para o motivo claro.
+      if (!dentroDaJanela24h(ctx.ultimaMensagemDoCliente, agora)) {
+        resumo.cancelados++;
+        const motivo = 'Fora da janela de 24h: texto livre não enviado (use um modelo aprovado)';
+        resumo.auditoria.push(registroAuditoria('bloqueou', motivo, agora, { leadId: it.leadId, regraId: it.automacaoId }));
+        await deps.marcarResultado(it.id, 'cancelado', motivo, null);
+        continue;
       }
       resumo.simulados++;
       resumo.auditoria.push(registroAuditoria('executou', 'Simulado: nada foi enviado', agora, { leadId: it.leadId, regraId: it.automacaoId }));
