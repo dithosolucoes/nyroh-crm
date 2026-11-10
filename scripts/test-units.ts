@@ -33,6 +33,7 @@ import { registrarEventoGeral } from '../src/lib/automacoesExecucao';
 import { colunaPermitida, TABELAS_BACKUP } from '../src/lib/backupRoutes';
 import { normalizarEnvio, decidirEnvio, ENVIO_PADRAO, type ConfigEnvio } from '../src/lib/automacoesEnvio';
 import { validarInstanciaEscolhida, escolherInstanciaDisparo } from '../src/lib/dispatchInstancia';
+import { distribuirQuantidade } from '../src/lib/dispatchDistribuicao';
 import { quandoExecutar, estaVencido, contemPalavra } from '../src/lib/automacoesFila';
 import { registrarEventoCliente, eventoDaResposta, type DepsRecebimento } from '../src/lib/automacoesExecucao';
 import { processarVencidos, type DepsWorker } from '../src/lib/automacoesWorker';
@@ -1888,6 +1889,31 @@ test('escolha vale primeiro; sem escolha, marca da safra; sem marca, instância 
   assert.equal(escolherInstanciaDisparo({ escolhida: '', daSafra: 'marca', global: 'geral' }), 'marca');
   assert.equal(escolherInstanciaDisparo({ escolhida: undefined, daSafra: '', global: 'geral' }), 'geral');
   assert.equal(escolherInstanciaDisparo({ escolhida: null, daSafra: '', global: '' }), '');
+});
+
+group('Distribuição do disparo por safra (total pedido, proporcional, nunca passa do disponível)');
+const quatro = [{ id: 'a', disponivel: 50 }, { id: 'b', disponivel: 50 }, { id: 'c', disponivel: 50 }, { id: 'd', disponivel: 50 }];
+test('4 safras de 50 e total 200: sai 50 de cada', () => {
+  assert.deepEqual(distribuirQuantidade(200, quatro), { a: 50, b: 50, c: 50, d: 50 });
+});
+test('total 120 com 4 safras de 50: sai 30 de cada, soma exata', () => {
+  assert.deepEqual(distribuirQuantidade(120, quatro), { a: 30, b: 30, c: 30, d: 30 });
+});
+test('total acima do disponível é limitado ao disponível (nunca passa)', () => {
+  const r = distribuirQuantidade(250, quatro);
+  assert.equal(Object.values(r).reduce((s, n) => s + n, 0), 200);
+  assert.ok(Object.values(r).every((n) => n <= 50));
+});
+test('proporcional e soma exata com safras de tamanhos diferentes (49, 11, 49, 50 e total 100)', () => {
+  const r = distribuirQuantidade(100, [{ id: 'a', disponivel: 49 }, { id: 'b', disponivel: 11 }, { id: 'c', disponivel: 49 }, { id: 'd', disponivel: 50 }]);
+  assert.equal(r.a + r.b + r.c + r.d, 100);
+  assert.ok(r.a <= 49 && r.b <= 11 && r.c <= 49 && r.d <= 50);
+  assert.ok(r.b >= 6 && r.b <= 8, 'safra pequena recebe perto da sua parte proporcional');
+});
+test('sem disponível ou total zero: tudo zero, sem erro', () => {
+  assert.deepEqual(distribuirQuantidade(10, [{ id: 'a', disponivel: 0 }]), { a: 0 });
+  assert.deepEqual(distribuirQuantidade(0, quatro), { a: 0, b: 0, c: 0, d: 0 });
+  assert.deepEqual(distribuirQuantidade(NaN, []), {});
 });
 
   await Promise.all(pending);

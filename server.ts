@@ -9436,6 +9436,8 @@ app.get('/api/campaign/batches', async (req, res) => {
           b.hot_count AS "hotCount",
           b.cold_count AS "coldCount",
           b.opt_out_count AS "optOutCount",
+          (SELECT COUNT(*) FROM campaign_leads cl
+             WHERE cl.batch_id = b.id AND cl.status = 'STAGING')::int AS "stagingCount",
           b.created_at AS "createdAt"
         FROM campaign_batches b
         ORDER BY b.created_at DESC
@@ -10068,7 +10070,11 @@ app.get('/api/campaign/uploads', async (_req, res) => {
 
 // 4. Get campaign leads with filters
 app.get('/api/campaign/leads', async (req, res) => {
-  const { batchId, status, search, limit } = req.query as any;
+  const { batchId, batchIds, status, search, limit } = req.query as any;
+  // Várias safras de uma vez (quadro com as safras marcadas). Lista separada por vírgula.
+  const listaSafras: string[] = typeof batchIds === 'string'
+    ? batchIds.split(',').map((x) => x.trim()).filter(Boolean).slice(0, 200)
+    : [];
 
   try {
     // Recupera automaticamente quaisquer leads fixos que tenham sido marcados incorretamente como descartados
@@ -10119,7 +10125,10 @@ app.get('/api/campaign/leads', async (req, res) => {
       `;
       const params: any[] = [];
 
-      if (batchId) {
+      if (listaSafras.length > 0) {
+        params.push(listaSafras);
+        query += ` AND batch_id = ANY($${params.length}::text[])`;
+      } else if (batchId) {
         params.push(batchId);
         query += ` AND batch_id = $${params.length}`;
       }
@@ -10137,7 +10146,7 @@ app.get('/api/campaign/leads', async (req, res) => {
       } else if (limit && Number(limit) > 0) {
         params.push(Number(limit));
         query += ` ORDER BY created_at DESC LIMIT $${params.length}`;
-      } else if (batchId) {
+      } else if (batchId || listaSafras.length > 0) {
         // Quando uma safra é selecionada, carrega todos os seus leads para contagem e disparo sem travar em 500
         query += ` ORDER BY created_at DESC LIMIT 50000`;
       } else {

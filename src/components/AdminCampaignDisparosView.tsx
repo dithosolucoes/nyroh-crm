@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { parseTemplateBody, templateVarIndexes, renderTemplateBody } from '../lib/templateSegments';
 import { fillLeadTokens } from '../lib/templateCopy';
+import { distribuirQuantidade } from '../lib/dispatchDistribuicao';
+
+/** Acima deste total, o disparo pede confirmação extra. */
+const CONFIRMA_ACIMA_DE = 200;
 import { sanitizeTemplateVariable } from '../lib/leadIntent';
 import { resolveLeadTokens } from '../lib/leadTokens';
 import { useRuntimeConfig, formatInstancePhone } from '../lib/useRuntimeConfig';
@@ -181,6 +185,19 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   const [isBatchDispatchModalOpen, setIsBatchDispatchModalOpen] = useState<boolean>(false);
   const [dispatchQuantityOption, setDispatchQuantityOption] = useState<number | 'ALL'>(100);
   const [customDispatchQuantity, setCustomDispatchQuantity] = useState<string>('100');
+  // Distribuição por safra: automática (proporcional) ou ajustada à mão na tabela.
+  const [distribuicaoManual, setDistribuicaoManual] = useState<Record<string, number> | null>(null);
+  const linhasDisparo = checkedBatchIds.map((id) => ({
+    id,
+    nome: batches.find((b) => b.id === id)?.name || id,
+    disponivel: (batches.find((b) => b.id === id) as any)?.stagingCount ?? 0,
+  }));
+  const desejadoDisparo = dispatchQuantityOption === 'ALL'
+    ? linhasDisparo.reduce((s, l) => s + l.disponivel, 0)
+    : (Number(customDispatchQuantity) > 0 ? Number(customDispatchQuantity) : 100);
+  const planoDisparo: Record<string, number> = distribuicaoManual ?? distribuirQuantidade(desejadoDisparo, linhasDisparo);
+  const totalPlanoDisparo = linhasDisparo.reduce((s, l) => s + (planoDisparo[l.id] ?? 0), 0);
+  useEffect(() => { setDistribuicaoManual(null); }, [desejadoDisparo, checkedBatchIds.join(',')]);
   const [dispatchSelectedTemplate, setDispatchSelectedTemplate] = useState<string>('dns_escassez_np4');
   const [dispatchSelectedCloser, setDispatchSelectedCloser] = useState<string>('seller-thomas');
   const [dispatchSelectedClosers, setDispatchSelectedClosers] = useState<string[]>([]);
@@ -768,13 +785,14 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
 
   // Fetch leads for the active batch
   const fetchLeads = async () => {
-    if (!selectedBatchId) {
+    const idsQuadro = checkedBatchIds.length > 0 ? checkedBatchIds : (selectedBatchId ? [selectedBatchId] : []);
+    if (idsQuadro.length === 0) {
       setLeads([]);
       return;
     }
     try {
       const url = new URL('/api/campaign/leads', window.location.origin);
-      url.searchParams.set('batchId', selectedBatchId);
+      url.searchParams.set('batchIds', idsQuadro.join(','));
       url.searchParams.set('limit', 'ALL');
       if (statusFilter !== 'ALL') {
         url.searchParams.set('status', statusFilter);
@@ -796,7 +814,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
     setVisibleStagingCount(100);
     setVisibleColdCount(100);
     fetchLeads();
-  }, [selectedBatchId, statusFilter, searchQuery]);
+  }, [selectedBatchId, checkedBatchIds.join(','), statusFilter, searchQuery]);
 
   // Selected batch reference
   const currentBatch = useMemo(() => {
@@ -1345,10 +1363,19 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
     const effectiveClosers = dispatchSelectedClosers.length > 0
       ? dispatchSelectedClosers
       : [dispatchSelectedCloser || 'seller-thomas'];
-    let limitParam: number | 'ALL' = 'ALL';
-    if (dispatchQuantityOption !== 'ALL') {
-      const parsedQty = Number(customDispatchQuantity);
-      limitParam = parsedQty > 0 ? parsedQty : 100;
+    const plano = planoDisparo;
+    const totalPlano = totalPlanoDisparo;
+    if (totalPlano <= 0) {
+      showNotification('error', 'Nenhuma mensagem para disparar nas safras marcadas.');
+      return;
+    }
+    const estourou = linhasDisparo.find((l) => (plano[l.id] ?? 0) > l.disponivel);
+    if (estourou) {
+      showNotification('error', `A safra "${estourou.nome}" recebeu mais leads do que tem disponível. Ajuste a distribuição.`);
+      return;
+    }
+    if (totalPlano > CONFIRMA_ACIMA_DE && !window.confirm(`Confirma disparar ${totalPlano.toLocaleString('pt-BR')} mensagens nas ${targets.length} safra(s) marcadas?`)) {
+      return;
     }
     setDispatchModalStep('processing');
     setIsDispatching(true);
@@ -1356,6 +1383,8 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
     let totalEnviados = 0;
     const falhas: string[] = [];
     for (const batchId of targets) {
+      const qtd = plano[batchId] ?? 0;
+      if (qtd <= 0) continue;
       try {
         const res = await fetch('/api/campaign/dispatch', {
           method: 'POST',
@@ -1366,8 +1395,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
             quarantineHours: dispatchQuarantineHours,
             phoneNumberId: dispatchPhoneNumberId || undefined,
             speedPerSecond: dispatchSpeed,
-            limit: limitParam === 'ALL' ? undefined : limitParam,
-            allowAll: limitParam === 'ALL',
+            limit: qtd,
             salespersonId: effectiveClosers[0],
             salespersonIds: effectiveClosers,
             variableValues: {
@@ -1397,10 +1425,11 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
       showNotification('error', `Algumas safras não dispararam: ${falhas.join(' | ')}`);
     }
     await fetchBatches();
+    await fetchLeads();
   };
 
   const handleExecuteBatchDispatch = async () => {
-    if (checkedBatchIds.length > 1) {
+    if (stagingSelectedLeadIds.length === 0 && checkedBatchIds.length > 0) {
       return handleDispatchCheckedBatches();
     }
     if (!selectedBatchId) {
@@ -3542,6 +3571,9 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
                             }`}>
                               {lead.isMobile ? 'Celular' : 'Fixo'}
                             </span>
+                            {checkedBatchIds.length > 0 && (
+                              <span className="block text-[9px] text-neutral-500 truncate">{batches.find(b => b.id === lead.batchId)?.name || ''}</span>
+                            )}
                           </div>
 
                           <div className="text-[11px] text-neutral-600 font-mono flex items-center gap-1.5">
@@ -3571,6 +3603,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
                             <span className="text-[10px] text-neutral-400">Pronto p/ disparo</span>
                             <button
                               onClick={() => {
+                                setSelectedBatchId(lead.batchId);
                                 setStagingSelectedLeadIds([lead.id]);
                                 handleOpenDispatchModal(1);
                               }}
@@ -3966,11 +3999,47 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
                       <div className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 flex items-center gap-1.5">
                         <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                         <span>
-                          Garantia de Limite: Serão disparados <strong>{dispatchQuantityOption === 'ALL' ? leads.filter(l => l.status === 'STAGING').length.toLocaleString('pt-BR') : (Number(customDispatchQuantity) || 100).toLocaleString('pt-BR')} leads</strong> (o sistema respeita rigorosamente o limite).
+                          Garantia de Limite: Serão disparados <strong>{(checkedBatchIds.length > 0 ? totalPlanoDisparo : (dispatchQuantityOption === 'ALL' ? leads.filter(l => l.status === 'STAGING').length : (Number(customDispatchQuantity) || 100))).toLocaleString('pt-BR')} leads</strong> (o sistema respeita rigorosamente o limite).
                         </span>
                       </div>
                     </div>
                   </div>
+
+                  {checkedBatchIds.length > 0 && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-bold text-neutral-900">Distribuição por safra</p>
+                        {distribuicaoManual && (
+                          <button type="button" onClick={() => setDistribuicaoManual(null)} className="text-xs text-emerald-700 font-bold hover:underline cursor-pointer">
+                            Voltar à distribuição automática
+                          </button>
+                        )}
+                      </div>
+                      <div className="rounded-xl border border-neutral-200 divide-y divide-neutral-200">
+                        {linhasDisparo.map(l => (
+                          <div key={l.id} className="flex items-center justify-between gap-3 px-3 py-2 text-xs">
+                            <span className="truncate font-semibold text-neutral-800">{l.nome}</span>
+                            <span className="text-neutral-500 shrink-0">disponíveis: {l.disponivel.toLocaleString('pt-BR')}</span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={l.disponivel}
+                              value={planoDisparo[l.id] ?? 0}
+                              onChange={e => {
+                                const v = Math.max(0, Math.min(l.disponivel, Math.floor(Number(e.target.value) || 0)));
+                                setDistribuicaoManual({ ...planoDisparo, [l.id]: v });
+                              }}
+                              className="w-24 px-2 py-1 rounded-lg border border-neutral-300 text-right text-xs"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-xs text-neutral-600">
+                        Total: <strong>{totalPlanoDisparo.toLocaleString('pt-BR')}</strong> mensagens
+                        {totalPlanoDisparo > CONFIRMA_ACIMA_DE && <span className="text-amber-700"> · acima de {CONFIRMA_ACIMA_DE}: vai pedir confirmação</span>}
+                      </p>
+                    </div>
+                  )}
 
                   {/* Copy & Template Selection */}
                   <div className="space-y-3 pt-4 border-t border-neutral-200">
