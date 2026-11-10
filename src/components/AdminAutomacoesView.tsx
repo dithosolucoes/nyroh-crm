@@ -15,64 +15,14 @@ import {
 import { TOKEN_NAMES } from '../lib/leadTokens';
 
 /**
- * Tela de Automações de resposta (admin). Porta fiel do protótipo aprovado.
- * Só dados de exemplo: nada é salvo no servidor e nada é enviado.
+ * Tela de Automações de resposta (admin). Mostra só o que existe de verdade no servidor.
+ * Sem dados reais, mostra vazio. Nenhuma automação ou registro fictício é exibido.
  */
 
 type Status = 'ativa' | 'inativa' | 'rascunho';
 type Regra = { id: string; status: Status; def: Automacao };
 type Visao = 'json' | 'conversa' | 'lado' | 'editar';
 type Aba = 'regras' | 'exec' | 'fila' | 'revisao' | 'config';
-
-const SEED: Regra[] = [
-  {
-    id: 'r1',
-    status: 'ativa',
-    def: {
-      nome: 'Clicou em Acessar Link',
-      gatilho: { evento: 'cliente_clicou', filtro: { texto_igual: 'Acessar Link' } },
-      condicoes: [{ var: 'lead.optout', op: 'falso' }],
-      passos: [{ acao: 'enviar_texto', params: { texto: 'Aqui está o link do site: {site_novo}' } }],
-    },
-  },
-  {
-    id: 'r2',
-    status: 'ativa',
-    def: {
-      nome: 'Pediu para parar',
-      gatilho: { evento: 'cliente_pediu_parar' },
-      condicoes: [],
-      passos: [
-        { acao: 'marcar_optout' },
-        { acao: 'enviar_texto', params: { texto: 'Obrigado pelo retorno, {nome}. Vou tirar seu número da lista. Bom sucesso!' } },
-      ],
-    },
-  },
-  {
-    id: 'r3',
-    status: 'ativa',
-    def: {
-      nome: 'Ameaça: pausar e revisar',
-      gatilho: { evento: 'cliente_ameacou' },
-      condicoes: [],
-      passos: [
-        { acao: 'pausar_lead' },
-        { acao: 'revisao', params: { motivo: 'Palavra de alerta' } },
-        { acao: 'notificar', params: { mensagem: 'Lead com ameaça pausado' } },
-      ],
-    },
-  },
-  {
-    id: 'r4',
-    status: 'rascunho',
-    def: {
-      nome: 'Outra resposta: mandar para revisão',
-      gatilho: { evento: 'cliente_respondeu' },
-      condicoes: [],
-      passos: [{ acao: 'revisao', params: { motivo: 'Resposta para classificar' } }],
-    },
-  },
-];
 
 const BASE: Partial<Record<AcaoV, Record<string, unknown>>> = {
   enviar_texto: { texto: '' },
@@ -98,17 +48,9 @@ interface FilaLinha { leadId: string; acao: string; executarEm: string; status: 
 interface RevisaoLinha { leadId: string; ultimoComando: string | null; em: string | null }
 interface ConfigReal { persistenciaLigada: boolean; execucaoLigada: boolean; pausaGeral: boolean; limites: null }
 
-// Exemplos mostrados só quando a persistência está desligada (o servidor responde 503).
-const EXECUCOES_EXEMPLO: ExecucaoLinha[] = [
-  { quando: '', decisao: 'executou', motivo: 'Link enviado', leadId: 'Roberto · Padaria Estrela', regraId: 'Clicou em Acessar Link' },
-  { quando: '', decisao: 'bloqueou', motivo: 'Opt-out aplicado', leadId: 'Ana · Clínica Vida', regraId: 'Pediu para parar' },
-];
-const FILA_EXEMPLO: FilaLinha[] = [{ leadId: 'Lúcia · Loja Sol', acao: 'etiqueta', executarEm: 'hoje, 22:20', status: 'pendente' }];
-const REVISAO_EXEMPLO: RevisaoLinha[] = [{ leadId: 'Carlos · Oficina Norte', ultimoComando: 'Ameaça', em: 'aguardando você' }];
-
-/** Lê uma lista do servidor. Se a rota responder erro (ex.: 503, persistência desligada), mantém o exemplo. */
-function useLista<T>(url: string, exemplo: T[]): { dados: T[]; real: boolean } {
-  const [dados, setDados] = useState<T[]>(exemplo);
+/** Lê uma lista do servidor. Sem resposta válida (ex.: 503, persistência desligada), fica vazia. */
+function useLista<T>(url: string, inicial: T[] = []): { dados: T[]; real: boolean } {
+  const [dados, setDados] = useState<T[]>(inicial);
   const [real, setReal] = useState(false);
   useEffect(() => {
     let vivo = true;
@@ -135,17 +77,17 @@ const LABEL = 'mt-2 mb-1 block text-xs font-semibold text-[#6B6A64]';
 
 export default function AdminAutomacoesView() {
   const [tab, setTab] = useState<Aba>('regras');
-  const [regras, setRegras] = useState<Regra[]>(SEED);
-  const [selId, setSelId] = useState<string | null>('r1');
+  const [regras, setRegras] = useState<Regra[]>([]);
+  const [selId, setSelId] = useState<string | null>(null);
   const [filtro, setFiltro] = useState<'todas' | Status>('todas');
   const [view, setView] = useState<Visao>('lado');
   const [draft, setDraft] = useState<string | null>(null);
   const [step, setStep] = useState(0);
   const [persistido, setPersistido] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
-  const exec = useLista<ExecucaoLinha>('/api/admin/automacoes/execucoes', EXECUCOES_EXEMPLO);
-  const fila = useLista<FilaLinha>('/api/admin/automacoes/fila', FILA_EXEMPLO);
-  const revisao = useLista<RevisaoLinha>('/api/admin/automacoes/revisao', REVISAO_EXEMPLO);
+  const exec = useLista<ExecucaoLinha>('/api/admin/automacoes/execucoes');
+  const fila = useLista<FilaLinha>('/api/admin/automacoes/fila');
+  const revisao = useLista<RevisaoLinha>('/api/admin/automacoes/revisao');
   const config = useLista<ConfigReal | null>('/api/admin/automacoes/configuracoes', [null]);
   const cfg = config.dados[0] ?? null;
   const [pausaMudada, setPausaMudada] = useState<boolean | null>(null);
@@ -165,14 +107,14 @@ export default function AdminAutomacoesView() {
     setPausaMsg(j.pausaGeral ? 'Pausa geral ligada: a fila está parada.' : 'Pausa geral desligada.');
   }
 
-  // Com a persistência ligada no servidor, carrega as regras salvas. Sem ela, mantém os exemplos.
+  // Carrega as regras salvas no servidor. Sem persistência, a tela fica vazia.
   useEffect(() => {
     let vivo = true;
     fetch('/api/admin/automacoes')
       .then(async (r) => {
         if (!vivo) return;
         if (r.status === 503) {
-          setAviso('Dados de exemplo: a persistência das automações está desligada neste ambiente. Nada é salvo de verdade.');
+          setAviso('Persistência das automações desligada neste ambiente: nada é carregado nem salvo.');
           return;
         }
         if (!r.ok) {
@@ -209,12 +151,101 @@ export default function AdminAutomacoesView() {
     return true;
   };
 
+  const novaAutomacao = () => {
+    const id = `n${Date.now().toString(36)}`;
+    const def: Automacao = {
+      nome: 'Nova automação',
+      gatilho: { evento: 'cliente_clicou', filtro: { texto_igual: 'Acessar Link' } },
+      condicoes: [],
+      passos: [{ acao: 'enviar_texto', params: { texto: 'Oi {nome}, aqui está o link: {site_novo}' } }],
+    };
+    setRegras((rs) => [...rs, { id, status: 'rascunho', def }]);
+    setSelId(id);
+    setDraft(null);
+    setStep(0);
+    setFiltro('todas');
+    setTab('regras');
+  };
+
   const sel = regras.find((r) => r.id === selId) ?? regras[0];
+
+  const cabecalho = (
+    <>
+      <header className="mb-3.5 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="m-0 text-2xl font-bold tracking-tight">Automações</h1>
+          <p className="mt-1 text-[#6B6A64]">Cada automação é uma regra: quando o cliente faz algo, o sistema executa os passos.</p>
+        </div>
+        <button type="button" onClick={novaAutomacao} className={BTN_PRIMARY}>Nova automação</button>
+      </header>
+
+      <nav className="mb-4 flex gap-1 overflow-x-auto border-b border-[#E3E1DA]">
+        {SUBTABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setTab(t.id)}
+            className={`-mb-px whitespace-nowrap border-b-2 px-3 py-2.5 ${tab === t.id ? 'border-[#0F766E] font-semibold text-[#191917]' : 'border-transparent font-medium text-[#6B6A64]'}`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </nav>
+    </>
+  );
+  const outrasAbas = (
+    <>
+      {tab === 'exec' && (
+        <section className="rounded-[14px] border border-[#E3E1DA] bg-white p-4">
+          <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6A64]">Execuções</p>
+          {exec.dados.map((e, i) => <Item key={`${e.leadId}-${i}`} nome={`${e.leadId ?? '—'} · ${e.regraId ?? ''}`} texto={`${e.decisao}: ${e.motivo}`} />)}
+        </section>
+      )}
+
+      {tab === 'fila' && (
+        <section className="rounded-[14px] border border-[#E3E1DA] bg-white p-4">
+          <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6A64]">Fila agendada</p>
+          {fila.dados.map((f, i) => <Item key={`${f.leadId}-${i}`} nome={`${f.leadId} · ${f.acao}`} texto={`${f.executarEm} · ${f.status}`} />)}
+        </section>
+      )}
+
+      {tab === 'revisao' && (
+        <section className="rounded-[14px] border border-[#E3E1DA] bg-white p-4">
+          <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6A64]">Revisão manual</p>
+          {revisao.dados.map((v, i) => <Item key={`${v.leadId}-${i}`} nome={`${v.leadId} · ${v.ultimoComando ?? '—'}`} texto={v.em ?? ''} />)}
+        </section>
+      )}
+
+      {tab === 'config' && (
+        <section className="rounded-[14px] border border-[#E3E1DA] bg-white p-4">
+          <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6A64]">Configurações</p>
+          <Item nome="Pausa geral" texto={pausaAtual ? 'LIGADA: a fila está parada' : 'desligada'} />
+          <button
+            type="button"
+            onClick={alternarPausa}
+            className="mb-1 w-full rounded-md border border-[#E3E1DA] bg-white px-2 py-1.5 text-xs font-semibold text-[#1A1A17] hover:bg-[#F5F4F0]"
+          >
+            {pausaAtual ? 'Desligar pausa geral' : 'Ligar pausa geral'}
+          </button>
+          {pausaMsg && <p className="mb-1 text-xs text-[#6B6A64]">{pausaMsg}</p>}
+          <Item nome="Execução da fila" texto={cfg ? (cfg.execucaoLigada ? 'ligada' : 'desligada, nada roda') : 'desligada, nada roda'} />
+          <Item nome="Limites de mensagens por lead" texto="definidos em cada automação (JSON)" />
+          <Item nome="Janela de texto livre" texto="24 horas após a última mensagem do cliente" />
+          <Item nome="Horário comercial" texto="definido em cada automação (JSON)" />
+        </section>
+      )}
+    </>
+  );
 
   if (!sel) {
     return (
-      <div className="p-6">
-        <p className="text-sm text-[#6B6A64]">Nenhuma automação. Crie uma com "Nova automação".</p>
+      <div className="min-h-full bg-[#F5F4F0] p-4 text-[14px] leading-[1.45] text-[#191917] sm:p-6">
+        {cabecalho}
+        {tab === 'regras' ? (
+          <p className="text-sm text-[#6B6A64]">Nenhuma automação salva ainda. Crie uma com "Nova automação".</p>
+        ) : (
+          outrasAbas
+        )}
       </div>
     );
   }
@@ -290,21 +321,6 @@ export default function AdminAutomacoesView() {
     setStep(0);
   };
 
-  const novaAutomacao = () => {
-    const id = `n${Date.now().toString(36)}`;
-    const def: Automacao = {
-      nome: 'Nova automação',
-      gatilho: { evento: 'cliente_clicou', filtro: { texto_igual: 'Acessar Link' } },
-      condicoes: [],
-      passos: [{ acao: 'enviar_texto', params: { texto: 'Oi {nome}, aqui está o link: {site_novo}' } }],
-    };
-    setRegras((rs) => [...rs, { id, status: 'rascunho', def }]);
-    setSelId(id);
-    setDraft(null);
-    setStep(0);
-    setFiltro('todas');
-    setTab('regras');
-  };
 
   const visiveis = filtro === 'todas' ? regras : regras.filter((r) => r.status === filtro);
   const nAt = (s: Status) => regras.filter((r) => r.status === s).length;
@@ -316,28 +332,7 @@ export default function AdminAutomacoesView() {
 
   return (
     <div className="min-h-full bg-[#F5F4F0] p-4 text-[14px] leading-[1.45] text-[#191917] sm:p-6">
-      {aviso && <div className="mb-3 rounded-[10px] bg-[#FBF1E0] px-3 py-2 text-[13px] text-[#9A5B00]">{aviso}</div>}
-      <header className="mb-3.5 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="m-0 text-2xl font-bold tracking-tight">Automações</h1>
-          <p className="mt-1 text-[#6B6A64]">Cada automação é uma regra: quando o cliente faz algo, o sistema executa os passos.</p>
-        </div>
-        <button type="button" onClick={novaAutomacao} className={BTN_PRIMARY}>Nova automação</button>
-      </header>
-
-      <nav className="mb-4 flex gap-1 overflow-x-auto border-b border-[#E3E1DA]">
-        {SUBTABS.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setTab(t.id)}
-            className={`-mb-px whitespace-nowrap border-b-2 px-3 py-2.5 ${tab === t.id ? 'border-[#0F766E] font-semibold text-[#191917]' : 'border-transparent font-medium text-[#6B6A64]'}`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </nav>
-
+      {cabecalho}
       {tab === 'regras' && (
         <>
           <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -600,45 +595,7 @@ export default function AdminAutomacoesView() {
         </>
       )}
 
-      {tab === 'exec' && (
-        <section className="rounded-[14px] border border-[#E3E1DA] bg-white p-4">
-          <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6A64]">Execuções{exec.real ? '' : ' (exemplo)'}</p>
-          {exec.dados.map((e, i) => <Item key={`${e.leadId}-${i}`} nome={`${e.leadId ?? '—'} · ${e.regraId ?? ''}`} texto={`${e.decisao}: ${e.motivo}`} />)}
-        </section>
-      )}
-
-      {tab === 'fila' && (
-        <section className="rounded-[14px] border border-[#E3E1DA] bg-white p-4">
-          <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6A64]">Fila agendada{fila.real ? '' : ' (exemplo)'}</p>
-          {fila.dados.map((f, i) => <Item key={`${f.leadId}-${i}`} nome={`${f.leadId} · ${f.acao}`} texto={`${f.executarEm} · ${f.status}`} />)}
-        </section>
-      )}
-
-      {tab === 'revisao' && (
-        <section className="rounded-[14px] border border-[#E3E1DA] bg-white p-4">
-          <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6A64]">Revisão manual{revisao.real ? '' : ' (exemplo)'}</p>
-          {revisao.dados.map((v, i) => <Item key={`${v.leadId}-${i}`} nome={`${v.leadId} · ${v.ultimoComando ?? '—'}`} texto={v.em ?? ''} />)}
-        </section>
-      )}
-
-      {tab === 'config' && (
-        <section className="rounded-[14px] border border-[#E3E1DA] bg-white p-4">
-          <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6A64]">Configurações{cfg ? '' : ' (exemplo)'}</p>
-          <Item nome="Pausa geral" texto={pausaAtual ? 'LIGADA: a fila está parada' : 'desligada'} />
-          <button
-            type="button"
-            onClick={alternarPausa}
-            className="mb-1 w-full rounded-md border border-[#E3E1DA] bg-white px-2 py-1.5 text-xs font-semibold text-[#1A1A17] hover:bg-[#F5F4F0]"
-          >
-            {pausaAtual ? 'Desligar pausa geral' : 'Ligar pausa geral'}
-          </button>
-          {pausaMsg && <p className="mb-1 text-xs text-[#6B6A64]">{pausaMsg}</p>}
-          <Item nome="Execução da fila" texto={cfg ? (cfg.execucaoLigada ? 'ligada' : 'desligada, nada roda') : 'desligada, nada roda'} />
-          <Item nome="Limites de mensagens por lead" texto="definidos em cada automação (JSON)" />
-          <Item nome="Janela de texto livre" texto="24 horas após a última mensagem do cliente" />
-          <Item nome="Horário comercial" texto="definido em cada automação (JSON)" />
-        </section>
-      )}
+      {outrasAbas}
     </div>
   );
 }
