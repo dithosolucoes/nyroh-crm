@@ -245,6 +245,20 @@ export function registerAutomacoesRoutes(app: Express, deps: AutomacoesDeps): vo
 }
 
 /** Cria a fila das esperas (idempotente). Só roda com NYROH_AUTOMACOES_EXECUCAO=true. */
+/**
+ * Estado do lead, auditoria, etiquetas e configuração. Roda no boot com a flag de persistência ligada.
+ * Os arquivos só criam tabelas e colunas que não existem (IF NOT EXISTS). Não apagam nada.
+ */
+export async function applyAutomacoesEstadoMigration(pool: pg.Pool): Promise<void> {
+  const { default: fs } = await import('fs');
+  const path = await import('path');
+  for (const arquivo of ['2026-11-leads-estado-auditoria.sql', '2026-11-lead-tags.sql', '2026-11-automacoes-config.sql']) {
+    const sql = fs.readFileSync(path.resolve(process.cwd(), 'migrations', arquivo), 'utf8');
+    await pool.query(sql);
+  }
+  console.log('[AUTOMACOES] tabelas de estado, auditoria, etiquetas e configuração conferidas (flag NYROH_AUTOMACOES_PERSISTENCIA=true).');
+}
+
 export async function applyAutomacoesFilaMigration(pool: pg.Pool): Promise<void> {
   const { default: fs } = await import('fs');
   const path = await import('path');

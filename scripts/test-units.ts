@@ -1,3 +1,5 @@
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 /**
  * Testes UNITÁRIOS das regras de negócio do WhatsApp (sem rede, sem servidor, sem banco).
  * Rodar:  npm test        (ou)   npx tsx scripts/test-units.ts
@@ -1752,6 +1754,15 @@ test('pausa geral: sem tabela, vale a variável de ambiente; com a linha no banc
     assert.equal(await lerPausaGeral(semTabela as never), true, 'sem tabela: env');
   } finally {
     if (prev === undefined) delete process.env.NYROH_AUTOMACOES_PAUSA_GERAL; else process.env.NYROH_AUTOMACOES_PAUSA_GERAL = prev;
+  }
+});
+
+group('Migrações das automações: aditivas, sem apagar nada');
+test('arquivos de migração só criam ou acrescentam (sem DROP, TRUNCATE ou DELETE)', () => {
+  for (const arq of ['2026-11-leads-estado-auditoria.sql', '2026-11-automacoes-fila.sql', '2026-11-lead-tags.sql', '2026-11-automacoes-config.sql']) {
+    const sql = readFileSync(resolve(process.cwd(), 'migrations', arq), 'utf8');
+    assert.doesNotMatch(sql, /\b(DROP|TRUNCATE|DELETE\s+FROM)\b/i, arq);
+    assert.match(sql, /IF NOT EXISTS/i, `${arq} é idempotente`);
   }
 });
 

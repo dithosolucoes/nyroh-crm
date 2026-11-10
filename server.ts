@@ -14,7 +14,7 @@ import pg from 'pg';
 import { Lead, CallLog, ColumnStatus, PIPELINE_COLUMNS, CustomTag, Salesperson, DistributeLeadsParams, User, AuditLog, QuickReply } from './src/types.js';
 import { getLeadNiche } from './src/lib/niche.js';
 import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regrasDeContatoSql, instanciaDaSafra } from './src/lib/uxRoutes.js';
-import { registerAutomacoesRoutes, applyAutomacoesMigration, applyAutomacoesFilaMigration, automacoesPersistenciaOn, iniciarWorkerAutomacoes } from './src/lib/automacoesRoutes.js';
+import { registerAutomacoesRoutes, applyAutomacoesMigration, applyAutomacoesEstadoMigration, applyAutomacoesFilaMigration, automacoesPersistenciaOn, iniciarWorkerAutomacoes } from './src/lib/automacoesRoutes.js';
 import { registrarEventoCliente, registrarEventoGeral, pedidoDePararPelasRegras, pedidoDeAlertaPelasRegras, type ItemFila } from './src/lib/automacoesExecucao.js';
 import type { EventoV } from './src/lib/automacoes.js';
 import type { ContextoEvento } from './src/lib/automacoesExecucao.js';
@@ -1494,6 +1494,7 @@ async function initDatabase(retries = 5, delayMs = 3000) {
         usePostgres = true;
         if (uxSchemaOn()) { await applyUxMigration(pool).catch((e: any) => console.error('[UX] migração falhou:', e?.message)); }
         if (automacoesPersistenciaOn()) { await applyAutomacoesMigration(pool).catch((e: any) => console.error('[AUTOMACOES] migração falhou:', e?.message)); }
+        if (automacoesPersistenciaOn()) { await applyAutomacoesEstadoMigration(pool).catch((e: any) => console.error('[AUTOMACOES] estado/etiquetas/configuração falhou:', e?.message)); }
         if (process.env.NYROH_AUTOMACOES_EXECUCAO === 'true') { await applyAutomacoesFilaMigration(pool).catch((e: any) => console.error('[AUTOMACOES] fila falhou:', e?.message)); }
         if (process.env.NYROH_AUTOMACOES_EXECUCAO === 'true') iniciarWorkerAutomacoes(pool, { carregarRegras: carregarRegrasAutomacoes, gravarFila: gravarFilaAutomacoes });
         await loadMetaRegistryFromDb().catch((e: any) => console.error('[Meta] falha ao carregar contas:', e?.message));
