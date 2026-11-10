@@ -13,7 +13,7 @@ export const EVENTOS = [
   { v: 'cliente_clicou', label: 'Clicou no botão Acessar Link', desc: 'clicou em Acessar Link' },
   { v: 'cliente_pediu_parar', label: 'Pediu para parar', desc: 'pediu para parar (Parar Mensagens ou palavra de parar)' },
   { v: 'cliente_ameacou', label: 'Escreveu palavra de alerta', desc: 'escreveu uma palavra de alerta' },
-  { v: 'cliente_respondeu', label: 'Respondeu outro texto', desc: 'respondeu com texto livre (vai para a revisão manual)' },
+  { v: 'cliente_respondeu', label: 'Respondeu outro texto', desc: 'respondeu com texto livre (vai para sua revisão)' },
   { v: 'sem_resposta', label: 'Não respondeu no prazo', desc: 'não respondeu no prazo' },
   { v: 'falha_envio', label: 'Envio falhou', desc: 'o envio falhou' },
 ] as const;
