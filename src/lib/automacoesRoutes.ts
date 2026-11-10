@@ -11,6 +11,7 @@ import type { Express, Request, Response } from 'express';
 import type pg from 'pg';
 import { validarAutomacao, type Automacao } from './automacoes';
 import { processarVencidos } from './automacoesWorker';
+import { pausaGeralAtiva } from './automacoesLimites';
 
 interface AutomacoesDeps {
   getPool: () => pg.Pool | null;
@@ -178,7 +179,17 @@ export function iniciarWorkerAutomacoes(pool: pg.Pool): void {
             [id, status, resultado, textoFinal]
           );
         },
-      });
+        enviosRecentes: async (leadId, agora) => {
+          // Envios automáticos (simulados hoje) nos últimos 7 dias, para os limites por lead.
+          const r = await pool.query(
+            `SELECT processado_em FROM automacoes_fila
+             WHERE lead_id = $1 AND status = 'executado' AND texto_final IS NOT NULL
+               AND processado_em >= $2::timestamptz - INTERVAL '7 days'`,
+            [leadId, agora.toISOString()]
+          );
+          return r.rows.map((x: any) => new Date(x.processado_em));
+        },
+      }, 50, { pausaGeral: pausaGeralAtiva() });
       if (resumo.processados > 0 || resumo.ignorados > 0) console.log('[AUTOMACOES] fila processada (sem envio):', resumo);
     } catch (e: any) {
       console.warn('[AUTOMACOES] falha ao processar a fila:', e?.message);
