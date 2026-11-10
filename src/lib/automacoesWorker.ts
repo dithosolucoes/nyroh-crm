@@ -13,9 +13,16 @@
 import { resolveLeadTokens, type LeadTokenContext } from './leadTokens';
 import type { ItemFila } from './automacoesExecucao';
 
+export interface ContextoLeadWorker extends LeadTokenContext {
+  /** Lead que pediu para não receber mensagens. Lido de novo antes de cada passo. */
+  optout?: boolean;
+}
+
 export interface DepsWorker {
   buscarVencidos: (agora: Date, limite: number) => Promise<ItemFila[]>;
-  contextoDoLead: (leadId: string) => Promise<LeadTokenContext | null>;
+  /** Reserva o item para este ciclo (pendente -> executando). Falso se outro ciclo já pegou. */
+  reservar: (id: string) => Promise<boolean>;
+  contextoDoLead: (leadId: string) => Promise<ContextoLeadWorker | null>;
   marcarResultado: (id: string, status: 'executado' | 'cancelado', resultado: string, textoFinal: string | null) => Promise<void>;
 }
 
@@ -23,13 +30,21 @@ export interface ResumoWorker {
   processados: number;
   simulados: number;
   cancelados: number;
+  /** Itens que outro ciclo já reservou: não são executados aqui. */
+  ignorados: number;
 }
 
 export async function processarVencidos(agora: Date, deps: DepsWorker, limite = 50): Promise<ResumoWorker> {
   const itens = await deps.buscarVencidos(agora, limite);
-  const resumo: ResumoWorker = { processados: 0, simulados: 0, cancelados: 0 };
+  const resumo: ResumoWorker = { processados: 0, simulados: 0, cancelados: 0, ignorados: 0 };
 
   for (const it of itens) {
+    // Idempotência: só executa quem conseguir reservar o item. Dois ciclos não pegam o mesmo passo.
+    const reservado = await deps.reservar(it.id);
+    if (!reservado) {
+      resumo.ignorados++;
+      continue;
+    }
     resumo.processados++;
 
     if (it.acao === 'esperar') {
@@ -42,6 +57,12 @@ export async function processarVencidos(agora: Date, deps: DepsWorker, limite = 
       if (!ctx) {
         resumo.cancelados++;
         await deps.marcarResultado(it.id, 'cancelado', 'Lead não encontrado', null);
+        continue;
+      }
+      // Opt-out: lido de novo neste passo. Se o lead saiu, o passo não executa.
+      if (ctx.optout) {
+        resumo.cancelados++;
+        await deps.marcarResultado(it.id, 'cancelado', 'Lead com opt-out: passo não executado', null);
         continue;
       }
       const r = resolveLeadTokens(it.texto || '', ctx);
