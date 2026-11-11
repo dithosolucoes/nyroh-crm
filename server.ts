@@ -9874,12 +9874,13 @@ app.post('/api/campaign/upload-zip', diskUpload.single('zipFile') as any, async 
     if (pgPool) {
       const alreadyContacted = new Set<string>();
       try {
+        // Qualquer lead que já exista com esse telefone (qualquer safra, qualquer status, ou no CRM) não sobe de novo.
         const prev = await pgPool.query(
           `SELECT regexp_replace(phone_number, '[^0-9]', '', 'g') AS d
-             FROM campaign_leads WHERE status NOT IN ('STAGING', 'DESCARTADO')
+             FROM campaign_leads
            UNION
            SELECT regexp_replace(phone_number, '[^0-9]', '', 'g') AS d
-             FROM leads WHERE sub_status ILIKE '%Disparo%' OR last_call_tag = 'WhatsApp Enviado'`
+             FROM leads`
         );
         for (const r of prev.rows) if (r.d) alreadyContacted.add(String(r.d));
       } catch (dedupErr: any) {
