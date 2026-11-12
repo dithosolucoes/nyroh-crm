@@ -1413,6 +1413,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
     setIsDispatching(true);
     setDispatchProgress(5);
     let totalEnviados = 0;
+    const batchesEnfileiradas: string[] = [];
     const falhas: string[] = [];
     for (const batchId of targets) {
       const qtd = plano[batchId] ?? 0;
@@ -1440,7 +1441,9 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
         });
         const data = await res.json();
         if (res.ok && data.success) {
-          totalEnviados += data.enqueuedCount || data.dispatchedCount || 0;
+          const enfileirados = data.enqueuedCount || data.dispatchedCount || 0;
+          totalEnviados += enfileirados;
+          if (enfileirados > 0) batchesEnfileiradas.push(batchId);
         } else {
           falhas.push(`${batches.find(b => b.id === batchId)?.name || batchId}: ${data.error || 'erro'}`);
         }
@@ -1448,11 +1451,38 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
         falhas.push(`${batches.find(b => b.id === batchId)?.name || batchId}: ${err.message}`);
       }
     }
+    // Espera a fila de cada safra terminar (mesmo critério do disparo de uma safra só), para o resultado ser real.
+    let enviadosReais = 0;
+    let falhasReais = 0;
+    for (const batchId of batchesEnfileiradas) {
+      let concluido = false;
+      let tentativas = 0;
+      while (!concluido && tentativas < 5400) {
+        tentativas++;
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        try {
+          const progRes = await fetch(`/api/campaign/batches/${batchId}/progress`);
+          if (!progRes.ok) { concluido = true; break; }
+          const prog = await progRes.json();
+          if (prog && prog.total > 0) {
+            setDispatchProgress(Math.min(99, Math.round(((prog.sent + prog.failed) / prog.total) * 100)));
+            if (prog.status === 'completed' || prog.status === 'cancelled' || prog.sent + prog.failed >= prog.total) {
+              concluido = true;
+              enviadosReais += prog.sent || 0;
+              falhasReais += prog.failed || 0;
+            }
+          }
+        } catch {
+          // tenta de novo na próxima volta
+        }
+      }
+    }
+    setBatchDispatchStats({ total: totalEnviados, dispatched: enviadosReais, failed: falhasReais, sellersUsed: effectiveClosers });
     setDispatchProgress(100);
     setDispatchModalStep('success');
     setIsDispatching(false);
     if (falhas.length === 0) {
-      showNotification('success', `Disparo enfileirado em ${targets.length} safra(s): ${totalEnviados} leads.`);
+      showNotification('success', `Disparo concluído em ${targets.length} safra(s): ${enviadosReais} enviados, ${falhasReais} falhas.`);
     } else {
       showNotification('error', `Algumas safras não dispararam: ${falhas.join(' | ')}`);
     }
