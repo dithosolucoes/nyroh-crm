@@ -24,7 +24,7 @@ import { hashPassword, verifyPassword, generateSessionToken, DEFAULT_USERS, Stor
 import { performWebsiteAudit } from './src/lib/auditEngine.js';
 import { missingFluxoVars, summarizeFluxoInstance } from './src/lib/fluxoInstanceStatus.js';
 import { buildLeadVariables } from './src/lib/templateCopy.js';
-import { buildFluxoAudioMedia, isFluxoAudioVoiceEnabled } from './src/lib/fluxoAudio.js';
+import { buildFluxoAudioMedia, isFluxoAudioVoiceEnabled, uploadFluxoAudioMedia } from './src/lib/fluxoAudio.js';
 import { installLogBuffer, readLogs, logCategories } from './src/lib/logBuffer.js';
 installLogBuffer();
 import { executeFluxoRequest, downloadFluxoMediaBinary, prepareOutboundMedia, fluxoInstancePath, hasFfmpeg } from './src/lib/fluxoClient.js';
@@ -12556,8 +12556,16 @@ app.post('/api/leads/:leadId/messages', requireDatabaseReady, async (req: any, r
       bodyPayload = { to: e164, template: built.template, idempotency_key: idempotencyKey };
     } else if (effectiveKind === 'audio') {
       targetPath = fluxoInstancePath('/messages', instanceId);
+      // Nota de voz: sobe o áudio em /media e envia pelo id com voice:true (por link vira arquivo de áudio).
+      let audioMedia: { url: string } | { id: string; voice: boolean } = buildFluxoAudioMedia(preparedMediaUrl, isFluxoAudioVoiceEnabled());
+      const audioDataUri = String(audioUrl || mediaUrl || '');
+      if (getMetaProvider() !== 'meta' && isFluxoAudioVoiceEnabled() && audioDataUri.startsWith('data:')) {
+        const mediaId = await uploadFluxoAudioMedia(audioDataUri, instanceId, fluxoKey, fluxoSecret);
+        if (mediaId) audioMedia = { id: mediaId, voice: true };
+        else console.warn('[Envio] upload do áudio em /media falhou; enviando por link (chega como arquivo).');
+      }
       // Em áudio a Meta NÃO aceita legenda (a FluxoAPI ignora)
-      bodyPayload = { to: e164, type: 'audio', media: buildFluxoAudioMedia(preparedMediaUrl, isFluxoAudioVoiceEnabled()), idempotency_key: idempotencyKey };
+      bodyPayload = { to: e164, type: 'audio', media: audioMedia, idempotency_key: idempotencyKey };
     } else if (effectiveKind === 'document') {
       targetPath = fluxoInstancePath('/messages', instanceId);
       const caption = realCaption(text);
