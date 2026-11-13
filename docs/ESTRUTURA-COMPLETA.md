@@ -207,7 +207,7 @@ Ordem prática, quando um item não pode andar em paralelo:
 - [ ] **D0. Decisão do descadastro**
   - Depende de: sua decisão
   - Pronto quando: você escolhe entre palavras fixas no código ou automação obrigatória. Hoje, sem automação cadastrada, "PARAR" não descadastra na produção.
-- [ ] **P1. Teste de comportamento do envio atual**
+- [x] **P1. Teste de comportamento do envio atual** (concluída: grupo "📤 Envio pelo Nyroh" do E2E, 154/154 sem alteração no servidor)
   - Depende de: G1
   - Pronto quando: o envio manual (`POST /api/leads/:leadId/messages`) tem teste que registra o comportamento atual, incluindo a janela de 24 horas, e o teste passa sem alteração.
 - [ ] **O1. Descadastro pelo clique do botão**
