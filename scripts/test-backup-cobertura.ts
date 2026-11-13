@@ -10,7 +10,19 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { TABELAS_BACKUP, TABELAS_EXCLUIDAS, colunaPermitida } from '../src/lib/backupRoutes';
+import os from 'node:os';
+import JSZip from 'jszip';
+import {
+  TABELAS_BACKUP,
+  TABELAS_EXCLUIDAS,
+  colunaPermitida,
+  redigirSystemSettings,
+  MARCA_OMITIDO,
+  listarMidias,
+  montarZip,
+  montarManifesto,
+  type ColetaBanco,
+} from '../src/lib/backupRoutes';
 
 const raiz = process.cwd();
 
@@ -87,6 +99,86 @@ test('permite colunas comuns de negócio', () => {
     assert.equal(colunaPermitida(nome), true, `deveria permitir: ${nome}`);
   }
 });
+
+console.log('\nSegredos em system_settings');
+
+test('valores de chaves secretas saem como OMITIDO', () => {
+  const linhas = redigirSystemSettings([
+    { key: 'fluxo_api_key', value: 'abc' },
+    { key: 'fluxo_api_secret', value: 'xyz' },
+    { key: 'meta_access_token', value: 'tok' },
+    { key: 'meta_verify_token', value: 'ver' },
+  ]);
+  for (const l of linhas) assert.equal(l.value, MARCA_OMITIDO, `vazou o valor de ${l.key}`);
+});
+
+test('identificadores que não são segredo continuam aparecendo', () => {
+  const linhas = redigirSystemSettings([
+    { key: 'fluxo_instance_id', value: 'inst_123' },
+    { key: 'meta_phone_number_id', value: '999' },
+    { key: 'meta_waba_id', value: '777' },
+  ]);
+  assert.equal(linhas[0].value, 'inst_123');
+  assert.equal(linhas[1].value, '999');
+  assert.equal(linhas[2].value, '777');
+});
+
+console.log('\nMídias e pacote .zip');
+
+const pastaTemp = fs.mkdtempSync(path.join(os.tmpdir(), 'nyroh-backup-teste-'));
+fs.mkdirSync(path.join(pastaTemp, 'inbox'), { recursive: true });
+fs.writeFileSync(path.join(pastaTemp, 'foto.jpg'), 'foto');
+fs.writeFileSync(path.join(pastaTemp, 'inbox', 'audio.ogg'), 'som-de-teste');
+
+test('lista arquivos de mídia com caminho relativo e tamanho', () => {
+  const midias = listarMidias(pastaTemp);
+  assert.deepEqual(midias.map((m) => m.rel), ['foto.jpg', 'inbox/audio.ogg']);
+  assert.equal(midias[1].bytes, 'som-de-teste'.length);
+});
+
+test('pasta de mídia inexistente não quebra (lista vazia)', () => {
+  assert.deepEqual(listarMidias(path.join(pastaTemp, 'nao-existe')), []);
+});
+
+const coletaFake: ColetaBanco = {
+  tabelas: { leads: [{ id: 'L1', name: 'Ana' }] },
+  contagem: { leads: 1 },
+  ausentes: ['remessas'],
+  segredosOmitidos: ['fluxo_api_key'],
+};
+
+async function testeAsync(nome: string, fn: () => void | Promise<void>) {
+  try {
+    await fn();
+    console.log(`  ok  ${nome}`);
+  } catch (e) {
+    falhas++;
+    console.log(`  FALHA ${nome}\n       ${(e as Error).message}`);
+  }
+}
+
+await testeAsync('o .zip tem dados.json, LEIA-ME.txt e a mídia em midia/', async () => {
+  const zip = montarZip({ geradoEm: '2026-11-13T00:00:00.000Z', coleta: coletaFake, midias: listarMidias(pastaTemp) });
+  const buffer = await zip.generateAsync({ type: 'nodebuffer' });
+  const lido = await JSZip.loadAsync(buffer);
+  // JSZip cria entradas de pasta (ex.: "midia/"). Só os arquivos importam.
+  const nomes = Object.values(lido.files).filter((f) => !f.dir).map((f) => f.name).sort();
+  assert.deepEqual(nomes, ['LEIA-ME.txt', 'dados.json', 'midia/foto.jpg', 'midia/inbox/audio.ogg']);
+  const dados = JSON.parse(await lido.file('dados.json')!.async('string'));
+  assert.equal(dados.tabelas.leads[0].name, 'Ana');
+  assert.equal(dados.contagem.leads, 1);
+  assert.equal(await lido.file('midia/foto.jpg')!.async('string'), 'foto');
+});
+
+await testeAsync('o LEIA-ME diz o que ficou de fora e que não restaura', () => {
+  const texto = montarManifesto({ geradoEm: 'agora', coleta: coletaFake, midias: [] });
+  assert.ok(texto.includes('remessas'), 'deveria listar a tabela ausente');
+  assert.ok(texto.includes('fluxo_api_key'), 'deveria listar o segredo omitido');
+  assert.ok(texto.includes('NÃO restaura'), 'deveria avisar que não restaura');
+  assert.ok(texto.includes('nenhuma mídia encontrada'), 'deveria alertar quando não há mídia');
+});
+
+fs.rmSync(pastaTemp, { recursive: true, force: true });
 
 console.log('');
 if (falhas > 0) {

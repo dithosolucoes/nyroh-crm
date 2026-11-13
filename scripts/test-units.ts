@@ -1006,9 +1006,9 @@ test('colunas de senha, hash, token e chave nunca entram no backup', () => {
     assert.equal(colunaPermitida(c), true, c);
   }
 });
-test('tabelas de tokens e chaves ficam fora da exportação', () => {
+test('sessões de login ficam fora da exportação; configurações entram com segredos redigidos', () => {
   assert.equal((TABELAS_BACKUP as readonly string[]).includes('auth_sessions'), false);
-  assert.equal((TABELAS_BACKUP as readonly string[]).includes('system_settings'), false);
+  assert.equal((TABELAS_BACKUP as readonly string[]).includes('system_settings'), true);
 });
 
 group('Agenda e palavra-chave das automações');
