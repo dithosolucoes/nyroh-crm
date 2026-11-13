@@ -96,6 +96,14 @@ ONDA 4
 
 ONDA 5
   Z1   revisão final                     ← tudo
+
+TRILHA DESCADASTRO (nova; regra de negócio, com teste antes e aprovação em cada passo)
+  D0   decisão sua: palavras fixas no código ou automação obrigatória   [ação sua]
+  P1   teste de comportamento do envio atual (caminho de envio)         ← G1
+  O1   descadastro pelo clique do botão (reply.id), sem balão no chat   ← T1, P1, D0
+  O2   automação "Parar mensagens" visível na tela de Automações        ← O1
+  O3   confirmação automática, atrás de flag desligada                  ← O2, P1
+  O4   testes E2E da trilha                                             ← O3
 ```
 
 Ordem prática, quando um item não pode andar em paralelo:
@@ -113,7 +121,7 @@ Ordem prática, quando um item não pode andar em paralelo:
 - [x] **G1. Portão de qualidade** (concluída: `npm run qualidade`)
   - Depende de: nada
   - Pronto quando: lint, testes unitários, teste do cliente e build rodam num único comando, e esse comando precisa passar para aprovar um PR.
-- [ ] **T1. Testes de rotas críticas (HTTP)**
+- [ ] **T1. Testes de rotas críticas (HTTP)** (em andamento: dedupe por telefone na importação feito, commit `a2d59c0`; opt-out pendente de D0)
   - Depende de: nada
   - Cobre: importar leads (dedupe por telefone), disparo (cota e fila), webhook de status (assinatura e ordem), opt-out, janela de 24h.
   - Pronto quando: cada rota crítica tem um teste de caminho feliz e um de erro, e todos passam no código atual.
@@ -193,6 +201,27 @@ Ordem prática, quando um item não pode andar em paralelo:
 - [ ] **Z1. Revisão final**
   - Depende de: todos os itens acima
   - Pronto quando: a documentação de arquitetura está atualizada, o checklist está todo marcado e a regressão completa passa.
+
+### Trilha descadastro (nova)
+
+- [ ] **D0. Decisão do descadastro**
+  - Depende de: sua decisão
+  - Pronto quando: você escolhe entre palavras fixas no código ou automação obrigatória. Hoje, sem automação cadastrada, "PARAR" não descadastra na produção.
+- [ ] **P1. Teste de comportamento do envio atual**
+  - Depende de: G1
+  - Pronto quando: o envio manual (`POST /api/leads/:leadId/messages`) tem teste que registra o comportamento atual, incluindo a janela de 24 horas, e o teste passa sem alteração.
+- [ ] **O1. Descadastro pelo clique do botão**
+  - Depende de: T1, P1, D0
+  - Pronto quando: o clique é reconhecido pelo código do botão (não pelo texto), é registrado como evento "cliente pediu para parar" e não aparece como balão no chat. Testado.
+- [ ] **O2. Automação "Parar mensagens" visível**
+  - Depende de: O1
+  - Pronto quando: a automação aparece na tela de Automações, é editável, e o sistema obedece a ela. Testado.
+- [ ] **O3. Confirmação automática, atrás de flag**
+  - Depende de: O2, P1
+  - Pronto quando: o envio da confirmação passa pelo caminho de envio testado em P1, com a janela de 24 horas, e fica desligado por padrão. Nada sai para cliente sem a flag ligada e sem sua aprovação.
+- [ ] **O4. Testes E2E da trilha**
+  - Depende de: O3
+  - Pronto quando: os casos de clique, registro, descadastro e confirmação passam no E2E.
 
 ## 4. Fora desta lista
 
