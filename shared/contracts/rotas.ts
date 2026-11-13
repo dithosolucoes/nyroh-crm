@@ -137,6 +137,38 @@ export interface RespostaSenhaVendedor {
   message: string;
 }
 
+/** Campos devolvidos ao mudar um status de vendedor (o PG devolve só parte dos campos) */
+export interface VendedorStatus {
+  id: string;
+  name: string;
+  active?: boolean;
+  canGenerateAuditPdf?: boolean;
+  whatsappType?: Salesperson['whatsappType'];
+}
+
+/** PATCH /api/salespeople/:id/toggle-active, toggle-audit-pdf e whatsapp-type (sucesso) */
+export interface RespostaVendedorStatus {
+  success: true;
+  salesperson: VendedorStatus;
+}
+
+/** POST /api/salespeople/:id/roulette-config (sucesso, valores já limitados pelo servidor) */
+export interface RespostaRoletaConfig {
+  success: true;
+  salespersonId: string;
+  pctWarm: number;
+  pctCold: number;
+  limit: number;
+}
+
+/** POST /api/salespeople/distribute-roulette (sucesso) */
+export interface RespostaDistribuicaoRoleta {
+  success: true;
+  totalProcessed: number;
+  assignedCount: number;
+  assigned: Array<Record<string, unknown>>;
+}
+
 /** Exemplos conferidos pelo compilador. Se um campo mudar de nome, o build quebra aqui. */
 export const EXEMPLO_UPLOAD_ZIP = {
   success: true,

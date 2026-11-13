@@ -8,6 +8,7 @@ import {
 import { getSalespersonAppUrl, getSalespersonSlug } from '@shared/lib/salesperson';
 import { openWhatsApp, WhatsAppAppType } from '@shared/lib/phone';
 import { BulkCreateSalespeopleModal } from './BulkCreateSalespeopleModal';
+import type { RespostaDistribuicaoRoleta, RespostaErroApi } from '@shared/contracts/rotas';
 
 interface SalesTeamModalProps {
   isOpen: boolean;
@@ -148,13 +149,13 @@ export const SalesTeamModal: React.FC<SalesTeamModalProps> = ({
           leadType: batchRouletteType
         })
       });
-      const data = await res.json();
-      if (res.ok && data.success) {
+      const data = (await res.json()) as RespostaDistribuicaoRoleta | RespostaErroApi;
+      if (res.ok && 'assignedCount' in data) {
         await onRefreshLeads();
         await onRefreshSalespeople();
-        onShowToast(`Roleta executada: ${data.distributedCount} leads distribuídos!`);
+        onShowToast(`Roleta executada: ${data.assignedCount} leads distribuídos!`);
       } else {
-        onShowToast(data.message || data.error || 'Nenhum lead elegível para distribuir.');
+        onShowToast(('error' in data && data.error) || 'Nenhum lead elegível para distribuir.');
       }
     } catch (err) {
       onShowToast('Erro ao executar distribuição por roleta.');

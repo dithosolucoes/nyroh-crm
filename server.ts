@@ -17,7 +17,7 @@ import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regrasDeC
 import { validarInstanciaEscolhida, escolherInstanciaDisparo } from './shared/lib/dispatchInstancia.js';
 import { recuperarFixosDescartados } from './shared/lib/recuperacaoFixos.js';
 import { variaveisFaltando, mensagemFaltando } from './shared/lib/configObrigatoria.js';
-import type { RespostaListaUploads, UploadZipRegistro, RespostaUploadZipOk, RespostaEnviarMensagem, StatusMensagemEnviada, RespostaLoginOk, RespostaSessaoAtual, RespostaSucesso, UsuarioAdmin, RespostaListaUsuarios, RespostaAuditLogs, RespostaLogsServidor, RespostaListaVendedores, RespostaVendedorCriado, RespostaLoteVendedores, RespostaVendedorAtualizado, RespostaSenhaVendedor } from './shared/contracts/rotas.js';
+import type { RespostaListaUploads, UploadZipRegistro, RespostaUploadZipOk, RespostaEnviarMensagem, StatusMensagemEnviada, RespostaLoginOk, RespostaSessaoAtual, RespostaSucesso, UsuarioAdmin, RespostaListaUsuarios, RespostaAuditLogs, RespostaLogsServidor, RespostaListaVendedores, RespostaVendedorCriado, RespostaLoteVendedores, RespostaVendedorAtualizado, RespostaSenhaVendedor, RespostaVendedorStatus, RespostaRoletaConfig, RespostaDistribuicaoRoleta } from './shared/contracts/rotas.js';
 import { registerAutomacoesRoutes, applyAutomacoesMigration, applyAutomacoesEstadoMigration, applyAutomacoesFilaMigration, automacoesPersistenciaOn, iniciarWorkerAutomacoes } from './shared/lib/automacoesRoutes.js';
 import { registrarEventoCliente, registrarEventoGeral, pedidoDePararPelasRegras, pedidoDeAlertaPelasRegras, type ItemFila } from './shared/lib/automacoesExecucao.js';
 import type { EventoV } from './shared/lib/automacoes.js';
@@ -7064,7 +7064,8 @@ app.patch('/api/salespeople/:id/toggle-active', async (req: any, res) => {
         return res.status(404).json({ error: 'Vendedor não encontrado.' });
       }
       await pgPool.query(`UPDATE users SET active = $1 WHERE salesperson_id = $2`, [active, id]);
-      return res.json({ success: true, salesperson: result.rows[0] });
+      const respostaStatus: RespostaVendedorStatus = { success: true, salesperson: result.rows[0] };
+      return res.json(respostaStatus);
     } else {
       const seller = memorySalespeopleMap.get(id);
       if (!seller) {
@@ -7076,7 +7077,8 @@ app.patch('/api/salespeople/:id/toggle-active', async (req: any, res) => {
           u.active = active;
         }
       }
-      return res.json({ success: true, salesperson: seller });
+      const respostaStatus: RespostaVendedorStatus = { success: true, salesperson: seller };
+      return res.json(respostaStatus);
     }
   } catch (err: any) {
     console.error('Erro ao alternar status do vendedor:', err);
@@ -7102,14 +7104,16 @@ app.patch('/api/salespeople/:id/toggle-audit-pdf', async (req: any, res) => {
       if (result.rowCount === 0) {
         return res.status(404).json({ error: 'Vendedor não encontrado.' });
       }
-      return res.json({ success: true, salesperson: result.rows[0] });
+      const respostaStatus: RespostaVendedorStatus = { success: true, salesperson: result.rows[0] };
+      return res.json(respostaStatus);
     } else {
       const seller = memorySalespeopleMap.get(id);
       if (!seller) {
         return res.status(404).json({ error: 'Vendedor não encontrado.' });
       }
       seller.canGenerateAuditPdf = canGenerateAuditPdf;
-      return res.json({ success: true, salesperson: seller });
+      const respostaStatus: RespostaVendedorStatus = { success: true, salesperson: seller };
+      return res.json(respostaStatus);
     }
   } catch (err: any) {
     console.error('Erro ao alternar permissão de laudo audit PDF:', err);
@@ -7135,14 +7139,16 @@ app.patch('/api/salespeople/:id/whatsapp-type', async (req: any, res) => {
       if (result.rowCount === 0) {
         return res.status(404).json({ error: 'Vendedor não encontrado.' });
       }
-      return res.json({ success: true, salesperson: result.rows[0] });
+      const respostaStatus: RespostaVendedorStatus = { success: true, salesperson: result.rows[0] };
+      return res.json(respostaStatus);
     } else {
       const seller = memorySalespeopleMap.get(id);
       if (!seller) {
         return res.status(404).json({ error: 'Vendedor não encontrado.' });
       }
       seller.whatsappType = cleanType;
-      return res.json({ success: true, salesperson: seller });
+      const respostaStatus: RespostaVendedorStatus = { success: true, salesperson: seller };
+      return res.json(respostaStatus);
     }
   } catch (err: any) {
     console.error('Erro ao atualizar whatsapp_type do vendedor:', err);
@@ -7267,7 +7273,8 @@ app.delete('/api/salespeople/:id', async (req: any, res) => {
       // Delete salesperson
       await pgPool.query(`DELETE FROM salespeople WHERE id = $1`, [id]);
       await logAudit('VENDEDOR_EXCLUIDO', `Excluiu vendedor ID ${id} e removeu suas credenciais de login`, req);
-      return res.json({ success: true, message: 'Vendedor e sua conta de acesso foram excluídos, e seus leads foram transferidos para Thomas.' });
+      const respostaExclusao: RespostaSucesso = { success: true, message: 'Vendedor e sua conta de acesso foram excluídos, e seus leads foram transferidos para Thomas.' };
+      return res.json(respostaExclusao);
     } else {
       for (const lead of memoryLeadsMap.values()) {
         if (lead.salespersonId === id) {
@@ -7282,7 +7289,8 @@ app.delete('/api/salespeople/:id', async (req: any, res) => {
       }
       memorySalespeopleMap.delete(id);
       await logAudit('VENDEDOR_EXCLUIDO', `Excluiu vendedor ID ${id} e removeu suas credenciais de login`, req);
-      return res.json({ success: true, message: 'Vendedor e sua conta de acesso foram excluídos, e seus leads foram transferidos para Thomas.' });
+      const respostaExclusao: RespostaSucesso = { success: true, message: 'Vendedor e sua conta de acesso foram excluídos, e seus leads foram transferidos para Thomas.' };
+      return res.json(respostaExclusao);
     }
   } catch (error) {
     console.error('Error deleting salesperson:', error);
@@ -7697,7 +7705,8 @@ app.post('/api/salespeople/:id/roulette-config', async (req, res) => {
   }
 
   broadcastSSE('SALESPEOPLE_UPDATED', { salespersonId: id }, { broadcastAll: true });
-  return res.json({ success: true, salespersonId: id, pctWarm, pctCold, limit });
+  const respostaRoleta: RespostaRoletaConfig = { success: true, salespersonId: id, pctWarm, pctCold, limit };
+  return res.json(respostaRoleta);
 });
 
 // Reset manual de leads diários da equipe
@@ -7715,7 +7724,8 @@ app.post('/api/salespeople/reset-daily-leads', async (req, res) => {
   }
 
   broadcastSSE('SALESPEOPLE_UPDATED', { resetDaily: true }, { broadcastAll: true });
-  return res.json({ success: true, message: 'Contagem diária de leads zerada com sucesso!' });
+  const respostaReset: RespostaSucesso = { success: true, message: 'Contagem diária de leads zerada com sucesso!' };
+  return res.json(respostaReset);
 });
 
 // Execução da Roleta em Lote (Distribui leads pendentes respeitando limites e pesos)
@@ -7746,12 +7756,13 @@ app.post('/api/salespeople/distribute-roulette', async (req, res) => {
     if (resAssigned) assigned.push({ leadId: id, ...resAssigned });
   }
 
-  return res.json({
+  const respostaDistribuicao: RespostaDistribuicaoRoleta = {
     success: true,
     totalProcessed: leadIds.length,
     assignedCount: assigned.length,
     assigned
-  });
+  };
+  return res.json(respostaDistribuicao);
 });
 
 // ============================================================================
