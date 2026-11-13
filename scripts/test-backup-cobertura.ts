@@ -22,7 +22,7 @@ import {
   montarZip,
   montarManifesto,
   type ColetaBanco,
-} from '../src/lib/backupRoutes';
+} from '../shared/lib/backupRoutes';
 
 const raiz = process.cwd();
 
