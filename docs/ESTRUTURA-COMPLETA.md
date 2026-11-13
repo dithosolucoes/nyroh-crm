@@ -128,7 +128,7 @@ Ordem prática, quando um item não pode andar em paralelo:
 - [ ] **S1. Configuração validada na subida** (parcial: regra e teste prontos em `shared/lib/configObrigatoria.ts` e `npm run test:config`; ligar ao boot para recusar subir depende de aprovação, porque muda a produção)
   - Depende de: nada
   - Pronto quando: o sistema recusa subir com variável obrigatória faltando, com mensagem clara, e isso está testado.
-- [ ] **C1. Contratos compartilhados**
+- [ ] **C1. Contratos compartilhados** (parcial: primeira fatia em `shared/contracts/rotas.ts` com upload de ZIP, lista de uploads e envio de mensagem. Falta o servidor e o front usarem esses tipos, e as demais rotas)
   - Depende de: nada
   - Pronto quando: `packages/contracts` tem os tipos e schemas das rotas usadas pelo front, e o build confirma que front e back usam o mesmo tipo.
 - [ ] **FT1. Testes de interface das telas principais**
