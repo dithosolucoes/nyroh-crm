@@ -10,6 +10,7 @@ import { contemPalavra, quandoExecutar } from './automacoesFila';
 import { randomUUID } from 'crypto';
 import { normalizarCondicoes, proximaOcorrencia, type Condicoes, type Grupo, type AgendaHorario } from './automacoesEstado';
 import { detectOptOut } from './leadIntent';
+import { PALAVRAS_PARAR_FIXAS } from './descadastroPadrao';
 
 export interface ContextoEvento {
   /** Texto exato que o cliente mandou (ex.: "Acessar Link"), quando o gatilho exige. */
@@ -132,12 +133,14 @@ export function planejarEvento(
  * automações ativas no JSON. Sem essas automações, ninguém é marcado como opt-out pelo texto.
  */
 export function pedidoDePararPelasRegras(texto: string, regras: RegistroAutomacao[]): boolean {
-  const palavras: string[] = [];
+  // Palavras fixas do código valem sempre (não dependem de automação cadastrada).
+  const palavras: string[] = [...PALAVRAS_PARAR_FIXAS];
   for (const r of regras) {
     if (r.status !== 'ativa' || r.def?.gatilho?.evento !== 'cliente_pediu_parar') continue;
     const f = r.def.gatilho.filtro;
     if (f?.texto_contem) palavras.push(f.texto_contem);
     if (f?.texto_igual) palavras.push(f.texto_igual);
+    if (Array.isArray(f?.texto_lista)) palavras.push(...f.texto_lista);
   }
   return detectOptOut(texto, palavras);
 }

@@ -1418,9 +1418,12 @@ test('limites do JSON precisam ser inteiros de pelo menos 1', () => {
 });
 
 group('Opt-out pelas automações do JSON (sem palavra fixa no código)');
-test('sem automação de "pediu para parar" ativa, nenhuma palavra vira opt-out', () => {
-  assert.equal(pedidoDePararPelasRegras('pare', []), false);
-  assert.equal(pedidoDePararPelasRegras('pare', [{ id: 'x', status: 'inativa', def: { nome: 'x', gatilho: { evento: 'cliente_pediu_parar', filtro: { texto_contem: 'pare' } }, passos: [] } } as never]), false);
+test('palavras fixas valem sem automação; automação inativa não traz palavras extras', () => {
+  // Desde o modelo híbrido (palavras fixas no código): "pare" sempre descadastra.
+  assert.equal(pedidoDePararPelasRegras('pare', []), true);
+  // Palavra fora da lista fixa só vale por automação ativa.
+  assert.equal(pedidoDePararPelasRegras('chega', []), false);
+  assert.equal(pedidoDePararPelasRegras('chega', [{ id: 'x', status: 'inativa', def: { nome: 'x', gatilho: { evento: 'cliente_pediu_parar', filtro: { texto_contem: 'chega' } }, passos: [] } } as never]), false);
 });
 test('a palavra do JSON, numa automação ativa, marca opt-out', () => {
   const regras = [{ id: 'p', status: 'ativa', def: { nome: 'parar', gatilho: { evento: 'cliente_pediu_parar', filtro: { texto_contem: 'sair' } }, passos: [] } } as never];

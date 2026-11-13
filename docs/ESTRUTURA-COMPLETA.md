@@ -213,7 +213,7 @@ Ordem prática, quando um item não pode andar em paralelo:
 - [ ] **O1. Descadastro pelo clique do botão**
   - Depende de: T1, P1, D0
   - Pronto quando: o clique é reconhecido pelo código do botão (não pelo texto), é registrado como evento "cliente pediu para parar" e não aparece como balão no chat. Testado.
-- [ ] **O2. Automação "Parar mensagens" visível**
+- [ ] **O2. Automação "Parar mensagens" visível** (parcial: palavras fixas no código e automação padrão com ação de opt-out prontas em `shared/lib/descadastroPadrao.ts`, testadas com `npm run test:descadastro`. Falta criar a automação no banco na subida e mostrar na tela. Isso muda a produção e precisa de aprovação)
   - Depende de: O1
   - Pronto quando: a automação aparece na tela de Automações, é editável, e o sistema obedece a ela. Testado.
 - [ ] **O3. Confirmação automática, atrás de flag**
