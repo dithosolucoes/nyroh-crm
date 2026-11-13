@@ -16,7 +16,7 @@ interface BackupDeps {
   logAudit: (action: string, details?: string, req?: Request) => Promise<void>;
 }
 
-/** Tabelas exportadas. Fica de fora de propósito: auth_sessions (tokens) e system_settings (chaves). */
+/** Tabelas exportadas. */
 export const TABELAS_BACKUP = [
   'salespeople',
   'leads',
@@ -37,7 +37,30 @@ export const TABELAS_BACKUP = [
   'meta_numbers',
   'lead_meta_routes',
   'automacoes_respostas',
+  'remessas',
+  'lead_tags',
+  'lead_selections',
+  'lead_block_requests',
+  'leads_estado',
+  'phone_numbers',
+  'brands',
+  'brand_numbers',
+  'contato_marcas',
+  'regras_contato',
+  'automacoes_fila',
+  'automacoes_config',
+  'automacoes_auditoria',
 ] as const;
+
+/**
+ * Tabelas que ficam de fora DE PROPÓSITO, com o motivo.
+ * Toda tabela criada no código precisa estar em TABELAS_BACKUP ou aqui.
+ * O teste scripts/test-backup-cobertura.ts garante isso.
+ */
+export const TABELAS_EXCLUIDAS: Record<string, string> = {
+  auth_sessions: 'tokens de sessão: restaurar um backup não deve reabrir sessões antigas',
+  system_settings: 'chaves e configurações sensíveis do sistema',
+};
 
 /** Colunas que nunca saem no backup, mesmo que a tabela as tenha. */
 const COLUNA_PROIBIDA = /(password|hash|salt|token|secret|api_?key|private)/i;

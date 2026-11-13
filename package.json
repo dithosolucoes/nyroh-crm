@@ -19,6 +19,7 @@
     "test:ux": "tsx scripts/test-ux-regras.ts",
     "test:regras": "tsx scripts/test-regras-contato.ts",
     "test:boot": "tsx scripts/e2e-boot-security.ts",
+    "test:backup": "tsx scripts/test-backup-cobertura.ts",
     "mock:fluxo": "tsx scripts/mock-fluxo.ts"
   },
   "dependencies": {
