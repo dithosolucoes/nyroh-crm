@@ -28,9 +28,12 @@ Como rodar: `npm run dev` (front e API na porta 3000), `npm run build` (gera `di
 Verificado: tipos ok, 234 testes unitários ok, 6 testes do cliente ok, build ok,
 e o dev server serve `frontend/` com o alias `@shared` resolvido.
 
-Ainda não é um pacote separado: a pasta `frontend/` não tem `package.json` próprio.
-Hoje ela usa as dependências da raiz. Um `package.json` próprio é o próximo passo, se você quiser
-entregar só a pasta para um designer.
+A pasta `frontend/` é um pacote próprio: tem `package.json`, `package-lock.json` e `tsconfig.json`.
+Para trabalhar só no front: `cd frontend && npm install && npm run dev`.
+Ela não puxa nenhuma dependência de servidor (express, pg, socket.io, bullmq). As que usa:
+react, react-dom, lucide-react, jspdf, jszip, qrcode, mais as de build.
+Limite: sem o backend (ou o modo mock, ainda não feito), as telas carregam mas as chamadas à API falham.
+Observação: o `npm run build` dentro de `frontend/` grava em `../dist` (raiz), que é o que o servidor usa.
 
 ## Situação atual (medida no código)
 
