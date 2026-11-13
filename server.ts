@@ -17,6 +17,7 @@ import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regrasDeC
 import { validarInstanciaEscolhida, escolherInstanciaDisparo } from './shared/lib/dispatchInstancia.js';
 import { recuperarFixosDescartados } from './shared/lib/recuperacaoFixos.js';
 import { variaveisFaltando, mensagemFaltando } from './shared/lib/configObrigatoria.js';
+import type { RespostaListaUploads, UploadZipRegistro } from './shared/contracts/rotas.js';
 import { registerAutomacoesRoutes, applyAutomacoesMigration, applyAutomacoesEstadoMigration, applyAutomacoesFilaMigration, automacoesPersistenciaOn, iniciarWorkerAutomacoes } from './shared/lib/automacoesRoutes.js';
 import { registrarEventoCliente, registrarEventoGeral, pedidoDePararPelasRegras, pedidoDeAlertaPelasRegras, type ItemFila } from './shared/lib/automacoesExecucao.js';
 import type { EventoV } from './shared/lib/automacoes.js';
@@ -10074,8 +10075,8 @@ app.get('/api/campaign/uploads', async (_req, res) => {
         ORDER BY u.created_at DESC
         LIMIT 200`
     );
-    res.json({
-      uploads: r.rows.map((x: any) => ({
+    const resposta: RespostaListaUploads = {
+      uploads: r.rows.map((x: any): UploadZipRegistro => ({
         id: x.id,
         batchId: x.batch_id,
         batchName: x.batch_name,
@@ -10089,7 +10090,8 @@ app.get('/api/campaign/uploads', async (_req, res) => {
         landlines: x.landlines,
         createdAt: x.created_at,
       })),
-    });
+    };
+    res.json(resposta);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

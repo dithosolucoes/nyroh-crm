@@ -73,6 +73,7 @@ import { AdminDispatchTestSandbox } from './AdminDispatchTestSandbox';
 import { ZipImportProgressModal, ImportProgressData } from './ZipImportProgressModal';
 import { PaginaSubirZip, ZipUploadRegistro } from './PaginaSubirZip';
 import { isUiFlagOn } from '@shared/lib/uiFlags';
+import type { RespostaListaUploads } from '@shared/contracts/rotas';
 
 const SHOW_SIMULATE = isUiFlagOn(import.meta.env.VITE_MOSTRAR_SIMULAR);
 /** Estado real do disparo: falhou (com motivo), lido/respondeu, ou ainda sem confirmação de entrega. */
@@ -743,7 +744,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
     setZipUploadsCarregando(true);
     try {
       const r = await fetch('/api/campaign/uploads');
-      const d = await r.json();
+      const d = (await r.json()) as RespostaListaUploads;
       setZipUploads(Array.isArray(d.uploads) ? d.uploads : []);
     } catch {
       setZipUploads([]);

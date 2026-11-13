@@ -128,7 +128,7 @@ Ordem prática, quando um item não pode andar em paralelo:
 - [x] **S1. Configuração validada na subida** (concluída no código, com a chave `NYROH_EXIGIR_CONFIG` desligada por padrão. Verificado: com a chave ligada e sem `DATABASE_URL` em produção, o sistema recusa subir com mensagem clara (saída 1); com a chave desligada, sobe como antes. Teste de regra: `npm run test:config`. Ligar a chave na Railway é decisão sua, depois de revisar)
   - Depende de: nada
   - Pronto quando: o sistema recusa subir com variável obrigatória faltando, com mensagem clara, e isso está testado.
-- [ ] **C1. Contratos compartilhados** (parcial: primeira fatia em `shared/contracts/rotas.ts` com upload de ZIP, lista de uploads e envio de mensagem. Falta o servidor e o front usarem esses tipos, e as demais rotas)
+- [ ] **C1. Contratos compartilhados** (parcial: `shared/contracts/rotas.ts` tem upload de ZIP, lista de uploads e envio de mensagem. Feito: `GET /api/campaign/uploads` tipado no servidor e usado tipado em `PaginaSubirZip.tsx` e `AdminCampaignDisparosView.tsx`. Verificado: lint, qualidade completa e E2E 159/159 em banco limpo. Falta: tipar a rota de upload-zip e a de envio de mensagem no servidor e no front, e as demais rotas)
   - Depende de: nada
   - Pronto quando: `packages/contracts` tem os tipos e schemas das rotas usadas pelo front, e o build confirma que front e back usam o mesmo tipo.
 - [ ] **FT1. Testes de interface das telas principais**

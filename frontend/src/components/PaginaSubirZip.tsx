@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Upload, CheckCircle2, AlertTriangle, RefreshCw, FolderOpen } from 'lucide-react';
 import type { ImportProgressData } from './ZipImportProgressModal';
+import type { RespostaListaUploads } from '@shared/contracts/rotas';
 
 export interface ZipUploadRegistro {
   id: string;
@@ -340,7 +341,7 @@ export const HistoricoZipsAutoCarregado: React.FC<{ chave?: string; onAbrirSafra
     setCarregando(true);
     try {
       const r = await fetch('/api/campaign/uploads');
-      const d = await r.json();
+      const d = (await r.json()) as RespostaListaUploads;
       setHistorico(Array.isArray(d.uploads) ? d.uploads : []);
     } catch {
       setHistorico([]);
