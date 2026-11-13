@@ -16,6 +16,7 @@ import { getLeadNiche } from './shared/lib/niche.js';
 import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regrasDeContatoSql, instanciaDaSafra } from './shared/lib/uxRoutes.js';
 import { validarInstanciaEscolhida, escolherInstanciaDisparo } from './shared/lib/dispatchInstancia.js';
 import { recuperarFixosDescartados } from './shared/lib/recuperacaoFixos.js';
+import { variaveisFaltando, mensagemFaltando } from './shared/lib/configObrigatoria.js';
 import { registerAutomacoesRoutes, applyAutomacoesMigration, applyAutomacoesEstadoMigration, applyAutomacoesFilaMigration, automacoesPersistenciaOn, iniciarWorkerAutomacoes } from './shared/lib/automacoesRoutes.js';
 import { registrarEventoCliente, registrarEventoGeral, pedidoDePararPelasRegras, pedidoDeAlertaPelasRegras, type ItemFila } from './shared/lib/automacoesExecucao.js';
 import type { EventoV } from './shared/lib/automacoes.js';
@@ -1895,6 +1896,16 @@ async function isAdminSalesperson(salespersonId: string): Promise<boolean> {
 
 // Produção = Railway ou NODE_ENV=production. Usado para desligar tudo que é de teste.
 const IS_PRODUCTION = process.env.NODE_ENV === 'production' || Boolean(process.env.RAILWAY_ENVIRONMENT);
+
+// S1: com NYROH_EXIGIR_CONFIG=true, recusa subir se faltar variável obrigatória.
+// Desligada por padrão: sem a chave, o comportamento continua o mesmo de sempre.
+if (process.env.NYROH_EXIGIR_CONFIG === 'true') {
+  const faltandoConfig = variaveisFaltando(process.env, IS_PRODUCTION ? 'production' : 'development');
+  if (faltandoConfig.length > 0) {
+    console.error(`\n[CONFIG] ${mensagemFaltando(faltandoConfig)}\n[CONFIG] Subida recusada (NYROH_EXIGIR_CONFIG=true).\n`);
+    process.exit(1);
+  }
+}
 
 // Uma promessa sem tratamento derruba o processo inteiro no Node 20+. Num CRM em
 // atendimento isso significa todo mundo deslogado e disparo interrompido por causa de

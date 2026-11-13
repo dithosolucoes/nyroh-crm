@@ -125,7 +125,7 @@ Ordem prática, quando um item não pode andar em paralelo:
   - Depende de: nada
   - Cobre: importar leads (dedupe por telefone), disparo (cota e fila), webhook de status (assinatura e ordem), opt-out, janela de 24h.
   - Pronto quando: cada rota crítica tem um teste de caminho feliz e um de erro, e todos passam no código atual.
-- [ ] **S1. Configuração validada na subida** (parcial: regra e teste prontos em `shared/lib/configObrigatoria.ts` e `npm run test:config`; ligar ao boot para recusar subir depende de aprovação, porque muda a produção)
+- [x] **S1. Configuração validada na subida** (concluída no código, com a chave `NYROH_EXIGIR_CONFIG` desligada por padrão. Verificado: com a chave ligada e sem `DATABASE_URL` em produção, o sistema recusa subir com mensagem clara (saída 1); com a chave desligada, sobe como antes. Teste de regra: `npm run test:config`. Ligar a chave na Railway é decisão sua, depois de revisar)
   - Depende de: nada
   - Pronto quando: o sistema recusa subir com variável obrigatória faltando, com mensagem clara, e isso está testado.
 - [ ] **C1. Contratos compartilhados** (parcial: primeira fatia em `shared/contracts/rotas.ts` com upload de ZIP, lista de uploads e envio de mensagem. Falta o servidor e o front usarem esses tipos, e as demais rotas)

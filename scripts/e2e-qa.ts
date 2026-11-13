@@ -740,7 +740,7 @@ async function main() {
       ok(antes === 1, 'lote começa com 1 lead na fila de envio', antes);
 
       const r = await sendWebhook(fluxoEvent('message.received', { conversation_id: 'conv_OPT', message_id: 'msg_optout1', from: TEL_OPT, type: 'text', text: 'PARAR' }));
-      ok(r.status === 200, 'webhook com "PARAR" é aceito', r.json || r.text);
+      ok(r.status === 200, 'webhook com "PARAR" é aceito', r.json);
       await sleep(800);
       const depois = await estoque();
       ok(depois === 0, 'depois de PARAR o lead SAI da fila de envio (stagingCount 1 → 0)', { antes, depois });
