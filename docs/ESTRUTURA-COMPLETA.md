@@ -125,7 +125,7 @@ Ordem prática, quando um item não pode andar em paralelo:
   - Depende de: nada
   - Cobre: importar leads (dedupe por telefone), disparo (cota e fila), webhook de status (assinatura e ordem), opt-out, janela de 24h.
   - Pronto quando: cada rota crítica tem um teste de caminho feliz e um de erro, e todos passam no código atual.
-- [ ] **S1. Configuração validada na subida**
+- [ ] **S1. Configuração validada na subida** (parcial: regra e teste prontos em `shared/lib/configObrigatoria.ts` e `npm run test:config`; ligar ao boot para recusar subir depende de aprovação, porque muda a produção)
   - Depende de: nada
   - Pronto quando: o sistema recusa subir com variável obrigatória faltando, com mensagem clara, e isso está testado.
 - [ ] **C1. Contratos compartilhados**
@@ -134,7 +134,7 @@ Ordem prática, quando um item não pode andar em paralelo:
 - [ ] **FT1. Testes de interface das telas principais**
   - Depende de: nada
   - Pronto quando: conversas, pipeline, disparos e leads têm teste que abre a tela e checa os fluxos principais.
-- [ ] **F0. Backup do Postgres de produção**
+- [x] **F0. Backup do Postgres de produção** (concluída com o backup completo do sistema, baixado em 13/11/2026 e guardado fora do Railway. Dump do Postgres segue como complemento recomendado, ainda não feito)
   - Depende de: sua autorização
   - Pronto quando: dump salvo fora do Railway e restauração testada em base local.
 
