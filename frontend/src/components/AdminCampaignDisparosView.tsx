@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import type { RespostaUploadZip, RespostaErroApi } from '@shared/contracts/rotas';
 import { parseTemplateBody, templateVarIndexes, renderTemplateBody } from '@shared/lib/templateSegments';
 import { fillLeadTokens } from '@shared/lib/templateCopy';
 import { distribuirQuantidade } from '@shared/lib/dispatchDistribuicao';
@@ -1184,7 +1185,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
       setIsUploading(false);
       try {
         if (xhr.status >= 200 && xhr.status < 300) {
-          const res = JSON.parse(xhr.responseText);
+          const res = JSON.parse(xhr.responseText) as RespostaUploadZip;
           if (res.success) {
             setImportProgressData(prev => ({
               ...(prev || initialProgress),
@@ -1206,7 +1207,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
             if (res.batchId) setSelectedBatchId(res.batchId);
             await fetchLeads();
           } else {
-            const errTxt = res.error || 'Erro ao processar arquivo ZIP.';
+            const errTxt = (res as RespostaErroApi).error || 'Erro ao processar arquivo ZIP.';
             setImportProgressData(prev => ({
               ...(prev || initialProgress),
               stage: 'error',

@@ -17,7 +17,7 @@ import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regrasDeC
 import { validarInstanciaEscolhida, escolherInstanciaDisparo } from './shared/lib/dispatchInstancia.js';
 import { recuperarFixosDescartados } from './shared/lib/recuperacaoFixos.js';
 import { variaveisFaltando, mensagemFaltando } from './shared/lib/configObrigatoria.js';
-import type { RespostaListaUploads, UploadZipRegistro } from './shared/contracts/rotas.js';
+import type { RespostaListaUploads, UploadZipRegistro, RespostaUploadZipOk, RespostaEnviarMensagem, StatusMensagemEnviada } from './shared/contracts/rotas.js';
 import { registerAutomacoesRoutes, applyAutomacoesMigration, applyAutomacoesEstadoMigration, applyAutomacoesFilaMigration, automacoesPersistenciaOn, iniciarWorkerAutomacoes } from './shared/lib/automacoesRoutes.js';
 import { registrarEventoCliente, registrarEventoGeral, pedidoDePararPelasRegras, pedidoDeAlertaPelasRegras, type ItemFila } from './shared/lib/automacoesExecucao.js';
 import type { EventoV } from './shared/lib/automacoes.js';
@@ -10032,7 +10032,7 @@ app.post('/api/campaign/upload-zip', diskUpload.single('zipFile') as any, async 
       type: 'success'
     });
 
-    return res.json({
+    const resposta: RespostaUploadZipOk = {
       success: true,
       jobId,
       batchId: targetBatchId,
@@ -10041,7 +10041,8 @@ app.post('/api/campaign/upload-zip', diskUpload.single('zipFile') as any, async 
       landlines,
       withNyrohUrl,
       withWebsite
-    });
+    };
+    return res.json(resposta);
   } catch (err: any) {
     console.error('Erro ao importar ZIP de campanha:', err);
     updateCampaignImportProgress(jobId, {
@@ -12648,14 +12649,15 @@ app.post('/api/leads/:leadId/messages', requireDatabaseReady, async (req: any, r
     broadcastSocketEvent('message_status_update', statusPayload);
     broadcastSSE('NEW_MESSAGE', { leadId, leadName: leadTarget?.name, message: newMessage });
 
-    return res.status(202).json({
+    const resposta: RespostaEnviarMensagem = {
       success: true,
-      status: newMessage.status,
+      status: newMessage.status as StatusMensagemEnviada,
       remoteMessageId: remoteId,
       replayed: fRes.replayed === true,
       billable: (fRes.raw as any)?.billable === true,
       message: newMessage
-    });
+    };
+    return res.status(202).json(resposta);
   } catch (sendErr: any) {
     console.error('[Envio] Erro inesperado:', sendErr);
     return res.status(500).json({

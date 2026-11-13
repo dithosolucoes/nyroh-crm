@@ -6,8 +6,8 @@
  * renomeado ou removido aparece como erro antes de subir.
  */
 
-/** POST /api/campaign/upload-zip */
-export interface RespostaUploadZip {
+/** POST /api/campaign/upload-zip (sucesso) */
+export interface RespostaUploadZipOk {
   success: true;
   jobId: string;
   batchId: string;
@@ -17,6 +17,15 @@ export interface RespostaUploadZip {
   withNyrohUrl: number;
   withWebsite: number;
 }
+
+/** Resposta de erro das rotas de upload (HTTP 4xx/5xx) */
+export interface RespostaErroApi {
+  success?: false;
+  error: string;
+}
+
+/** POST /api/campaign/upload-zip: sucesso ou erro */
+export type RespostaUploadZip = RespostaUploadZipOk | RespostaErroApi;
 
 /** Item de GET /api/campaign/uploads */
 export interface UploadZipRegistro {
@@ -46,6 +55,7 @@ export type StatusMensagemEnviada = 'queued' | 'sent' | 'delivered' | 'read' | '
 export interface RespostaEnviarMensagem {
   success: boolean;
   replayed?: boolean;
+  billable?: boolean;
   status: StatusMensagemEnviada;
   remoteMessageId?: string | null;
   message?: unknown;
@@ -61,7 +71,7 @@ export const EXEMPLO_UPLOAD_ZIP = {
   landlines: 1,
   withNyrohUrl: 0,
   withWebsite: 0
-} satisfies RespostaUploadZip;
+} satisfies RespostaUploadZipOk;
 
 export const EXEMPLO_UPLOAD_REGISTRO = {
   id: 'up_1',

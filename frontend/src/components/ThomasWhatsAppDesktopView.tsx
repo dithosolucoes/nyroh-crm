@@ -43,6 +43,7 @@ import { InboxConversation, InboxPage, Lead, LeadChatMessage, Salesperson, PIPEL
 import { WhatsAppVoiceAudioPlayer } from './WhatsAppVoiceAudioPlayer';
 import { useRuntimeConfig, formatInstancePhone } from '@shared/lib/useRuntimeConfig';
 import { onRealtime, onRealtimeConnection } from '@shared/lib/realtime';
+import type { RespostaEnviarMensagem } from '@shared/contracts/rotas';
 import { QuickRepliesModal } from './QuickRepliesModal';
 import { arePhonesEquivalent } from '@shared/lib/phone';
 import { shouldApplyStatus, statusRank } from '@shared/lib/fluxoStatus';
@@ -891,7 +892,7 @@ export const ThomasWhatsAppDesktopView: React.FC<ThomasWhatsAppDesktopViewProps>
     });
     let data: any = null;
     try {
-      data = await res.json();
+      data = (await res.json()) as RespostaEnviarMensagem;
     } catch {
       /* resposta sem JSON */
     }

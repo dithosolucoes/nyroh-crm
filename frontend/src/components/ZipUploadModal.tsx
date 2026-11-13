@@ -3,6 +3,7 @@ import { Upload, FileArchive, CheckCircle, AlertCircle, RefreshCw, X, FileCheck,
 import JSZip from 'jszip';
 import { ImportResult, Salesperson } from '@shared/types';
 import type { ImportProgressData } from './ZipImportProgressModal';
+import type { RespostaUploadZip, RespostaErroApi } from '@shared/contracts/rotas';
 import { HistoricoZipsAutoCarregado, CartaoProgressoZip } from './PaginaSubirZip';
 
 interface ZipUploadModalProps {
@@ -211,7 +212,7 @@ export const ZipUploadModal: React.FC<ZipUploadModalProps> = ({
         setIsUploading(false);
         try {
           if (xhr.status >= 200 && xhr.status < 300) {
-            const data = JSON.parse(xhr.responseText);
+            const data = JSON.parse(xhr.responseText) as RespostaUploadZip;
             if (data.success) {
               setCampaignProgressData(prev => ({
                 ...(prev || initialProgress),
@@ -235,9 +236,9 @@ export const ZipUploadModal: React.FC<ZipUploadModalProps> = ({
               setCampaignProgressData(prev => ({
                 ...(prev || initialProgress),
                 stage: 'error',
-                error: data.error || 'Falha ao processar ZIP.'
+                error: (data as RespostaErroApi).error || 'Falha ao processar ZIP.'
               }));
-              onShowToast(`Erro no envio: ${data.error || 'Falha ao processar ZIP'}`);
+              onShowToast(`Erro no envio: ${(data as RespostaErroApi).error || 'Falha ao processar ZIP'}`);
             }
           } else {
             let errTxt = 'Erro na resposta do servidor.';
