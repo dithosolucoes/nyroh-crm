@@ -682,6 +682,42 @@ async function main() {
       ok(gaps.every((g: number) => g >= 0.9), `mensagens espaçadas (≥ ~1,25s): ${gaps.map((g: number) => g.toFixed(2)).join('s, ')}s`, gaps);
     }
 
+    // ==================================================================================== DEDUP NA IMPORTAÇÃO
+    group('🧹 Importação: dedupe por telefone (já disparado e repetido no arquivo)');
+    {
+      const subirZip = async (nomeArquivo: string, leads: Array<{ id: string; name: string; phone: string }>) => {
+        const zip = new JSZip();
+        zip.file('leads.json', JSON.stringify(leads));
+        const zbuf = await zip.generateAsync({ type: 'nodebuffer' });
+        const form = new FormData();
+        form.append('zipFile', new Blob([new Uint8Array(zbuf)], { type: 'application/zip' }), nomeArquivo);
+        form.append('safraName', `Safra ${nomeArquivo}`);
+        return admin.req('POST', '/api/campaign/upload-zip', { form });
+      };
+      const registro = async (nomeArquivo: string) => {
+        const lista = await admin.get('/api/campaign/uploads');
+        return (lista.json?.uploads || []).find((u: any) => u.fileName === nomeArquivo);
+      };
+
+      // Caminho feliz: lead novo entra; o mesmo telefone repetido no arquivo é descartado.
+      const novos = await subirZip('dedup-novos.zip', [
+        { id: 'N1', name: 'Novo Um', phone: '(19) 98888-0001' },
+        { id: 'N2', name: 'Novo Um Repetido', phone: '(19) 98888-0001' }
+      ]);
+      ok(novos.status === 200 && !!novos.json?.batchId, 'importa safra com lead novo e um telefone repetido', novos.json || novos.text.slice(0, 200));
+      const uNovos = await registro('dedup-novos.zip');
+      ok(uNovos?.leadsSaved === 1, 'lead novo entra (1 salvo)', uNovos);
+      ok(uNovos?.skippedRepeated === 1 && uNovos?.skippedContacted === 0, 'telefone repetido no arquivo é descartado (1 repetido, 0 já disparado)', uNovos);
+
+      // Caso de erro: telefone que já recebeu disparo na safra anterior não sobe de novo.
+      const ja = await subirZip('dedup-ja-disparados.zip', [
+        { id: 'J1', name: 'Padaria Um (de novo)', phone: '(19) 99999-0001' }
+      ]);
+      ok(ja.status === 200, 'importa safra com telefone que já recebeu disparo', ja.json || ja.text.slice(0, 200));
+      const uJa = await registro('dedup-ja-disparados.zip');
+      ok(uJa?.leadsSaved === 0 && uJa?.skippedContacted === 1, 'telefone já disparado não sobe de novo (0 salvo, 1 já disparado)', uJa);
+    }
+
     // ==================================================================================== DIAGNÓSTICO
     group('🩺 Diagnóstico honesto');
     {
