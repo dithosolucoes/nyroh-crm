@@ -110,7 +110,7 @@ Ordem prática, quando um item não pode andar em paralelo:
 
 ### Onda 0
 
-- [ ] **G1. Portão de qualidade**
+- [x] **G1. Portão de qualidade** (concluída: `npm run qualidade`)
   - Depende de: nada
   - Pronto quando: lint, testes unitários, teste do cliente e build rodam num único comando, e esse comando precisa passar para aprovar um PR.
 - [ ] **T1. Testes de rotas críticas (HTTP)**
