@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
 import { QrCode, X, ExternalLink, PhoneCall } from 'lucide-react';
-import { getQrTelLink, extractDigits } from '../lib/phone';
+import { getQrTelLink, extractDigits } from '@shared/lib/phone';
 
 interface QrCodeModalProps {
   isOpen: boolean;

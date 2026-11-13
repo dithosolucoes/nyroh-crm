@@ -3,7 +3,7 @@
  * Rodar: npx tsx scripts/test-fase4-metricas.ts
  */
 import assert from 'node:assert/strict';
-import { countSellerLeads } from '../src/lib/sellerCounts';
+import { countSellerLeads } from '../shared/lib/sellerCounts';
 
 let passed = 0, failed = 0;
 function test(name: string, fn: () => void) {

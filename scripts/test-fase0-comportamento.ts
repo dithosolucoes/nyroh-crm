@@ -8,8 +8,8 @@
  * Rodar: npx tsx scripts/test-fase0-comportamento.ts
  */
 import assert from 'node:assert/strict';
-import { detectOptOut, sanitizeTemplateVariable } from '../src/lib/leadIntent';
-import { dispatchRpm, maxDispatchPerSecond } from '../src/lib/dispatchRate';
+import { detectOptOut, sanitizeTemplateVariable } from '../shared/lib/leadIntent';
+import { dispatchRpm, maxDispatchPerSecond } from '../shared/lib/dispatchRate';
 
 let passed = 0;
 let failed = 0;

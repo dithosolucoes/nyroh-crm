@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Lead, CallLog, CustomTag, PIPELINE_COLUMNS, ColumnStatus, Salesperson, User as UserType, MasterColumnId } from '../types';
+import { Lead, CallLog, CustomTag, PIPELINE_COLUMNS, ColumnStatus, Salesperson, User as UserType, MasterColumnId } from '@shared/types';
 import { 
   X, Phone, ExternalLink, Calendar, MessageSquare, Plus, CheckCircle2, 
   QrCode, Tag as TagIcon, Play, Pause, RotateCcw, Clock, ArrowRight, PhoneCall, PhoneOff,
@@ -7,21 +7,21 @@ import {
   Inbox, Star, Trophy, XCircle, Trash2, Globe, Copy, Check, FileSearch, Download, Pencil,
   Ban
 } from 'lucide-react';
-import { openWhatsApp, getStoredWhatsAppAppType, setStoredWhatsAppAppType, WhatsAppAppType, getDialerTelLink, getStoredWhatsAppTemplate, formatWhatsAppMessage } from '../lib/phone';
+import { openWhatsApp, getStoredWhatsAppAppType, setStoredWhatsAppAppType, WhatsAppAppType, getDialerTelLink, getStoredWhatsAppTemplate, formatWhatsAppMessage } from '@shared/lib/phone';
 import { QrCodeModal } from './QrCodeModal';
 import { BlockRequestDialog, BlockHistory } from './BlockRequestDialog';
 import { LeadTimeline } from './LeadTimeline';
 import { AuditReportModal } from './AuditReportModal';
-import { WebsiteAuditReport } from '../types/audit';
-import { getFollowUpInfo } from '../lib/followUp';
-import { getLeadNiche } from '../lib/niche';
+import { WebsiteAuditReport } from '@shared/types/audit';
+import { getFollowUpInfo } from '@shared/lib/followUp';
+import { getLeadNiche } from '@shared/lib/niche';
 import { 
   MASTER_COLUMNS_CONFIG, 
   MASTER_COLUMNS_ORDER, 
   getMasterColumn, 
   resolveTargetColumnStatus 
-} from '../lib/pipeline';
-import { callResultToSave } from '../lib/callResult';
+} from '@shared/lib/pipeline';
+import { callResultToSave } from '@shared/lib/callResult';
 
 interface LeadDetailModalProps {
   isOpen: boolean;

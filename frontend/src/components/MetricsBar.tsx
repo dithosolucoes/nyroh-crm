@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Lead, CustomTag } from '../types';
-import { getLeadNiche } from '../lib/niche';
+import { Lead, CustomTag } from '@shared/types';
+import { getLeadNiche } from '@shared/lib/niche';
 import { PhoneCall, Clock, TrendingUp, AlertCircle, Download, Tag as TagIcon, Filter, RefreshCw, ChevronDown, Check, X, FileCode, Search, Briefcase, Globe, SlidersHorizontal } from 'lucide-react';
 
 interface CallLogItem {

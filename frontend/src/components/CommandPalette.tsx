@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Search, Kanban, Table2, MessageSquare, LayoutDashboard, Settings, ArrowRight } from 'lucide-react';
-import { Lead } from '../types';
+import { Lead } from '@shared/types';
 
 export type PaletteTab = 'kanban' | 'table' | 'whatsapp' | 'dashboard' | 'admin';
 

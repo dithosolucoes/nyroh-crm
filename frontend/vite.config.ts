@@ -3,13 +3,22 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
 
+// Front-end isolado: a raiz do Vite é esta pasta (frontend/).
+// Código compartilhado com o backend fica em ../shared e é importado como @shared/...
 export default defineConfig(() => {
   return {
+    root: __dirname,
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, '.'),
+        '@': path.resolve(__dirname, 'src'),
+        '@shared': path.resolve(__dirname, '../shared'),
       },
+    },
+    build: {
+      // Saída continua em dist/ na raiz, como o servidor espera.
+      outDir: path.resolve(__dirname, '../dist'),
+      emptyOutDir: true,
     },
     server: {
       allowedHosts: true as const,

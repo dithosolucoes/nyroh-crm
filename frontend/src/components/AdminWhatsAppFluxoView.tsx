@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { isUiFlagOn } from '../lib/uiFlags';
+import { isUiFlagOn } from '@shared/lib/uiFlags';
 const SHOW_LAB = isUiFlagOn(import.meta.env.VITE_MOSTRAR_LAB);
-import { useRuntimeConfig, formatInstancePhone } from '../lib/useRuntimeConfig';
-import { onRealtime } from '../lib/realtime';
+import { useRuntimeConfig, formatInstancePhone } from '@shared/lib/useRuntimeConfig';
+import { onRealtime } from '@shared/lib/realtime';
 import MetaAccountsPanel from './MetaAccountsPanel';
 import MetaStatusStrip from './MetaStatusStrip';
 import {
@@ -47,7 +47,7 @@ import {
   HelpCircle,
   Share2
 } from 'lucide-react';
-import { FluxoConfig, FluxoInstance, User } from '../types';
+import { FluxoConfig, FluxoInstance, User } from '@shared/types';
 
 interface AdminWhatsAppFluxoViewProps {
   currentUser: User;

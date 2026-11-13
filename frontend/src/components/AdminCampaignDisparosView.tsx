@@ -1,14 +1,14 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { parseTemplateBody, templateVarIndexes, renderTemplateBody } from '../lib/templateSegments';
-import { fillLeadTokens } from '../lib/templateCopy';
-import { distribuirQuantidade } from '../lib/dispatchDistribuicao';
+import { parseTemplateBody, templateVarIndexes, renderTemplateBody } from '@shared/lib/templateSegments';
+import { fillLeadTokens } from '@shared/lib/templateCopy';
+import { distribuirQuantidade } from '@shared/lib/dispatchDistribuicao';
 
 /** Acima deste total, o disparo pede confirmação extra. */
 const CONFIRMA_ACIMA_DE = 200;
-import { sanitizeTemplateVariable } from '../lib/leadIntent';
-import { resolveLeadTokens } from '../lib/leadTokens';
-import { useRuntimeConfig, formatInstancePhone } from '../lib/useRuntimeConfig';
-import { onRealtime } from '../lib/realtime';
+import { sanitizeTemplateVariable } from '@shared/lib/leadIntent';
+import { resolveLeadTokens } from '@shared/lib/leadTokens';
+import { useRuntimeConfig, formatInstancePhone } from '@shared/lib/useRuntimeConfig';
+import { onRealtime } from '@shared/lib/realtime';
 import {
   Send,
   Layers,
@@ -68,11 +68,11 @@ import {
   CheckCheck,
   RotateCcw
 } from 'lucide-react';
-import { CampaignBatch, CampaignLead, CampaignLeadStatus, CampaignCopyTemplate, Salesperson } from '../types';
+import { CampaignBatch, CampaignLead, CampaignLeadStatus, CampaignCopyTemplate, Salesperson } from '@shared/types';
 import { AdminDispatchTestSandbox } from './AdminDispatchTestSandbox';
 import { ZipImportProgressModal, ImportProgressData } from './ZipImportProgressModal';
 import { PaginaSubirZip, ZipUploadRegistro } from './PaginaSubirZip';
-import { isUiFlagOn } from '../lib/uiFlags';
+import { isUiFlagOn } from '@shared/lib/uiFlags';
 
 const SHOW_SIMULATE = isUiFlagOn(import.meta.env.VITE_MOSTRAR_SIMULAR);
 /** Estado real do disparo: falhou (com motivo), lido/respondeu, ou ainda sem confirmação de entrega. */

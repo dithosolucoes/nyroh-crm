@@ -3,7 +3,7 @@
  * Rodar: npx tsx scripts/test-fase1-optout.ts
  */
 import assert from 'node:assert/strict';
-import { resolveManualInterest } from '../src/lib/leadIntent';
+import { resolveManualInterest } from '../shared/lib/leadIntent';
 
 let passed = 0, failed = 0;
 function test(name: string, fn: () => void) {

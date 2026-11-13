@@ -11,8 +11,8 @@ import {
   type Automacao,
   type AcaoV,
   type EventoV,
-} from '../lib/automacoes';
-import { TOKEN_NAMES } from '../lib/leadTokens';
+} from '@shared/lib/automacoes';
+import { TOKEN_NAMES } from '@shared/lib/leadTokens';
 
 /**
  * Tela de Automações de resposta (admin). Mostra só o que existe de verdade no servidor.

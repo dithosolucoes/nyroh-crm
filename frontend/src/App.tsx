@@ -1,8 +1,8 @@
-import { onRealtime, prepararNotificacoes, notificarSeEmSegundoPlano } from './lib/realtime';
+import { onRealtime, prepararNotificacoes, notificarSeEmSegundoPlano } from '@shared/lib/realtime';
 import React, { useState, useEffect, useCallback, useMemo, useDeferredValue, useRef } from 'react';
-import { Lead, ColumnStatus, CustomTag, Salesperson, User } from './types';
+import { Lead, ColumnStatus, CustomTag, Salesperson, User } from '@shared/types';
 import { MenuLateral } from './components/MenuLateral';
-import { caminhoDe, destinoDoCaminho, Destino, SecaoAdmin, AbaPrincipal } from './lib/rotas';
+import { caminhoDe, destinoDoCaminho, Destino, SecaoAdmin, AbaPrincipal } from '@shared/lib/rotas';
 import { KanbanBoard } from './components/KanbanBoard';
 import { CommandPalette } from './components/CommandPalette';
 import { MeuDia } from './components/MeuDia';
@@ -24,10 +24,10 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { MetricsBar } from './components/MetricsBar';
 import { Toast } from './components/Toast';
 import { ChangePasswordModal } from './components/ChangePasswordModal';
-import { getLeadNiche } from './lib/niche';
-import { setStoredWhatsAppAppType } from './lib/phone';
+import { getLeadNiche } from '@shared/lib/niche';
+import { setStoredWhatsAppAppType } from '@shared/lib/phone';
 import { PhoneCall, Users, CheckCircle, RefreshCw, UserCheck, Share2, Plus, ArrowLeft, ExternalLink, Shield, LogOut, Lock, MessageSquare } from 'lucide-react';
-import { getSalespersonSlug, matchSalespersonFromRoute } from './lib/salesperson';
+import { getSalespersonSlug, matchSalespersonFromRoute } from '@shared/lib/salesperson';
 
 export default function App() {
   // Authentication & RBAC

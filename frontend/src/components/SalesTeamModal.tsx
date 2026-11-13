@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Salesperson, Lead, CustomTag } from '../types';
+import { Salesperson, Lead, CustomTag } from '@shared/types';
 import { 
   X, UserPlus, Users, Share2, Shield, Trash2, Edit3, Check, 
   Sparkles, AlertCircle, ArrowRight, UserCheck, CheckCircle2, Percent, Hash,
   Link, ExternalLink, MessageCircle, Copy, Code2, RotateCw, Sliders, ShieldCheck, RefreshCw
 } from 'lucide-react';
-import { getSalespersonAppUrl, getSalespersonSlug } from '../lib/salesperson';
-import { openWhatsApp, WhatsAppAppType } from '../lib/phone';
+import { getSalespersonAppUrl, getSalespersonSlug } from '@shared/lib/salesperson';
+import { openWhatsApp, WhatsAppAppType } from '@shared/lib/phone';
 import { BulkCreateSalespeopleModal } from './BulkCreateSalespeopleModal';
 
 interface SalesTeamModalProps {

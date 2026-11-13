@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { WebsiteAuditReport } from '../types/audit';
-import { generateAuditPdf } from '../lib/pdfReportGenerator';
+import { WebsiteAuditReport } from '@shared/types/audit';
+import { generateAuditPdf } from '@shared/lib/pdfReportGenerator';
 import { 
   X, FileText, Download, CheckCircle2, AlertTriangle, XCircle, 
   ExternalLink, Sparkles, Smartphone, Shield, Zap, Search, ArrowRight, RefreshCw, MessageSquare

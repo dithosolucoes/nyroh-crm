@@ -5,7 +5,7 @@
  */
 import { renderToStaticMarkup } from 'react-dom/server';
 import assert from 'node:assert/strict';
-import AdminAutomacoesView from '../src/components/AdminAutomacoesView';
+import AdminAutomacoesView from '../frontend/src/components/AdminAutomacoesView';
 
 const html = renderToStaticMarkup(<AdminAutomacoesView />);
 

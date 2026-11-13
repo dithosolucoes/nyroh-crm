@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { Lead, ColumnStatus, CustomTag, MasterColumnId } from '../types';
+import { Lead, ColumnStatus, CustomTag, MasterColumnId } from '@shared/types';
 import { Copy, QrCode, Phone, ExternalLink, MessageCircle, ChevronLeft, ChevronRight, Check, CalendarClock, AlertTriangle, Clock, PhoneCall, Sparkles, CheckCircle, Globe } from 'lucide-react';
-import { openWhatsApp, getStoredWhatsAppAppType, getQrTelLink, getStoredWhatsAppTemplate, formatWhatsAppMessage } from '../lib/phone';
+import { openWhatsApp, getStoredWhatsAppAppType, getQrTelLink, getStoredWhatsAppTemplate, formatWhatsAppMessage } from '@shared/lib/phone';
 import { QrCodeModal } from './QrCodeModal';
-import { getFollowUpInfo } from '../lib/followUp';
-import { getLeadNiche } from '../lib/niche';
+import { getFollowUpInfo } from '@shared/lib/followUp';
+import { getLeadNiche } from '@shared/lib/niche';
 import { 
   getMasterColumn, 
   getPrevMasterColumn, 
@@ -12,7 +12,7 @@ import {
   resolveTargetColumnStatus, 
   getAttemptLevel,
   MASTER_COLUMNS_CONFIG 
-} from '../lib/pipeline';
+} from '@shared/lib/pipeline';
 
 interface KanbanCardProps {
   lead: Lead;

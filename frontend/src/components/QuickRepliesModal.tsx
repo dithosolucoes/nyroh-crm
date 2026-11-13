@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { QuickReply, Salesperson } from '../types';
+import { QuickReply, Salesperson } from '@shared/types';
 import { X, Zap, Plus, Trash2, Edit3, Check, Sparkles, MessageSquare, Mic, FileText, Image as ImageIcon, Copy } from 'lucide-react';
 
 interface QuickRepliesModalProps {

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CustomTag } from '../types';
+import { CustomTag } from '@shared/types';
 import { X, Tag, Plus, Trash2, CheckCircle2 } from 'lucide-react';
 
 interface TagManagerModalProps {

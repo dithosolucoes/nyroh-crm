@@ -1,4 +1,4 @@
-import { buildFluxoAuthHeaders } from '../src/lib/fluxoClient';
+import { buildFluxoAuthHeaders } from '../shared/lib/fluxoClient';
 
 async function runQATests() {
   console.log('=====================================================');

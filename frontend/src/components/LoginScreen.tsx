@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Shield, Lock, Mail, ArrowRight, User, Eye, EyeOff, CheckCircle2, ShieldCheck, KeyRound, Sparkles, Zap, ShieldAlert } from 'lucide-react';
-import { User as UserType } from '../types';
+import { User as UserType } from '@shared/types';
 
 interface LoginScreenProps {
   onLoginSuccess: (user: UserType) => void;

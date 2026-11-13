@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { onRealtime } from '../lib/realtime';
+import { onRealtime } from '@shared/lib/realtime';
 import {
   Send,
   Phone,
@@ -38,7 +38,7 @@ import {
   AlertTriangle,
   CheckCheck
 } from 'lucide-react';
-import { CampaignCopyTemplate, Salesperson, LeadChatMessage } from '../types';
+import { CampaignCopyTemplate, Salesperson, LeadChatMessage } from '@shared/types';
 
 interface MetaTemplateButton {
   type: 'QUICK_REPLY' | 'URL' | 'PHONE_NUMBER' | 'COPY_CODE';

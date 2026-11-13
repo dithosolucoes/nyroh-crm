@@ -11,7 +11,7 @@ import {
   delayForIndex,
   estimateSeconds,
   FluxoRateLimitedError
-} from '../src/lib/dispatchRate.js';
+} from '../shared/lib/dispatchRate.js';
 
 // ============================================================================
 // REDIS CONNECTION & CLIENT FACTORY

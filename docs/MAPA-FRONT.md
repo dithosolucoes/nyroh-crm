@@ -3,6 +3,35 @@
 Objetivo: permitir mexer só na interface (e entregar para um designer) sem subir o backend,
 e depois integrar de volta com revisão. Nada disso pode alterar disparo, fila, webhook ou deploy.
 
+## Estrutura atual (feita na branch `refactor/front-separado`)
+
+```
+nyroh/
+├── frontend/                  # SÓ a interface
+│   ├── index.html
+│   ├── vite.config.ts         # raiz do Vite = esta pasta
+│   ├── public/                # manifest.json, sw.js
+│   └── src/
+│       ├── App.tsx, main.tsx, index.css, vite-env.d.ts
+│       ├── components/        # telas e modais
+│       └── api/client.ts      # cliente de API (etapa 1)
+├── shared/                    # usado pelo backend E pelo front
+│   ├── lib/                   # regras puras (fluxo, telefone, automações...)
+│   ├── types.ts, types/
+├── server.ts                  # backend (monolito ainda, aponta para shared/ e frontend/)
+├── server/, scripts/, migrations/, docs/
+└── dist/                      # gerado pelo build (ignorado pelo git)
+```
+
+Como o front importa o que é compartilhado: `@shared/lib/...` e `@shared/types`.
+Como rodar: `npm run dev` (front e API na porta 3000), `npm run build` (gera `dist/`).
+Verificado: tipos ok, 234 testes unitários ok, 6 testes do cliente ok, build ok,
+e o dev server serve `frontend/` com o alias `@shared` resolvido.
+
+Ainda não é um pacote separado: a pasta `frontend/` não tem `package.json` próprio.
+Hoje ela usa as dependências da raiz. Um `package.json` próprio é o próximo passo, se você quiser
+entregar só a pasta para um designer.
+
 ## Situação atual (medida no código)
 
 - Front em `src/` (React + Vite). Backend em `server.ts` (13.397 linhas, 136 rotas).

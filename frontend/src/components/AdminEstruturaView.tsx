@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Lead, User } from '../types';
+import { Lead, User } from '@shared/types';
 import { AdminWhatsAppFluxoView } from './AdminWhatsAppFluxoView';
 
 type Tab = 'central' | 'marcas' | 'numeros' | 'bloqueios' | 'regras' | 'integracoes';

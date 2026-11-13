@@ -1,10 +1,10 @@
 import React, { useState, useMemo, useDeferredValue } from 'react';
-import { Lead, PIPELINE_COLUMNS, ColumnStatus, CustomTag } from '../types';
+import { Lead, PIPELINE_COLUMNS, ColumnStatus, CustomTag } from '@shared/types';
 import { Search, Phone, ExternalLink, QrCode, Copy, Trash2, Eye, MessageCircle, Check, CalendarClock, AlertTriangle, Clock, FileCode, ChevronLeft, ChevronRight, CheckSquare, Square, MinusSquare, Globe } from 'lucide-react';
-import { openWhatsApp, getStoredWhatsAppAppType, getStoredWhatsAppTemplate, formatWhatsAppMessage } from '../lib/phone';
+import { openWhatsApp, getStoredWhatsAppAppType, getStoredWhatsAppTemplate, formatWhatsAppMessage } from '@shared/lib/phone';
 import { QrCodeModal } from './QrCodeModal';
-import { getFollowUpInfo } from '../lib/followUp';
-import { getLeadNiche } from '../lib/niche';
+import { getFollowUpInfo } from '@shared/lib/followUp';
+import { getLeadNiche } from '@shared/lib/niche';
 
 interface AllLeadsTableProps {
   leads: Lead[];

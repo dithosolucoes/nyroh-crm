@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { isUiFlagOn } from '../lib/uiFlags';
-import { User } from '../types';
-import { Destino } from '../lib/rotas';
+import { isUiFlagOn } from '@shared/lib/uiFlags';
+import { User } from '@shared/types';
+import { Destino } from '@shared/lib/rotas';
 import {
   LayoutGrid,
   Table,

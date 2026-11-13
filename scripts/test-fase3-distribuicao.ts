@@ -3,7 +3,7 @@
  * Rodar: npx tsx scripts/test-fase3-distribuicao.ts
  */
 import assert from 'node:assert/strict';
-import { distributionByCount } from '../src/lib/distribution';
+import { distributionByCount } from '../shared/lib/distribution';
 
 let passed = 0, failed = 0;
 function test(name: string, fn: () => void) {

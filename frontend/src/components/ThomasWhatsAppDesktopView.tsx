@@ -39,14 +39,14 @@ import {
   Settings,
   Zap
 } from 'lucide-react';
-import { InboxConversation, InboxPage, Lead, LeadChatMessage, Salesperson, PIPELINE_COLUMNS, ColumnStatus, QuickReply } from '../types';
+import { InboxConversation, InboxPage, Lead, LeadChatMessage, Salesperson, PIPELINE_COLUMNS, ColumnStatus, QuickReply } from '@shared/types';
 import { WhatsAppVoiceAudioPlayer } from './WhatsAppVoiceAudioPlayer';
-import { useRuntimeConfig, formatInstancePhone } from '../lib/useRuntimeConfig';
-import { onRealtime, onRealtimeConnection } from '../lib/realtime';
+import { useRuntimeConfig, formatInstancePhone } from '@shared/lib/useRuntimeConfig';
+import { onRealtime, onRealtimeConnection } from '@shared/lib/realtime';
 import { QuickRepliesModal } from './QuickRepliesModal';
-import { arePhonesEquivalent } from '../lib/phone';
-import { shouldApplyStatus, statusRank } from '../lib/fluxoStatus';
-import { isUiFlagOn } from '../lib/uiFlags';
+import { arePhonesEquivalent } from '@shared/lib/phone';
+import { shouldApplyStatus, statusRank } from '@shared/lib/fluxoStatus';
+import { isUiFlagOn } from '@shared/lib/uiFlags';
 
 const SHOW_SIMULATE = isUiFlagOn(import.meta.env.VITE_MOSTRAR_SIMULAR);
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { countSellerLeads } from '../lib/sellerCounts';
-import { Salesperson, Lead } from '../types';
-import { getSalespersonSlug, matchSalespersonFromRoute } from '../lib/salesperson';
+import { countSellerLeads } from '@shared/lib/sellerCounts';
+import { Salesperson, Lead } from '@shared/types';
+import { getSalespersonSlug, matchSalespersonFromRoute } from '@shared/lib/salesperson';
 import {
   TrendingUp,
   Layers,

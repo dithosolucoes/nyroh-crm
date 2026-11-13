@@ -131,7 +131,7 @@ async function main() {
 
   // ------------------------------------------------------------------ promoção indevida a admin
   console.log('\n🛡️  Quem é administrador');
-  const { isUserAdmin } = await import('../src/lib/serverAuth');
+  const { isUserAdmin } = await import('../shared/lib/serverAuth');
   ok(isUserAdmin({ id: 'u1', name: 'Thomas Silva', email: 'thomas.silva@loja.com', role: 'salesperson' }) === false, 'vendedor "Thomas Silva" NÃO vira admin');
   ok(isUserAdmin({ id: 'u2', name: 'Ana Admin', email: 'adminana@loja.com', role: 'salesperson' }) === false, 'vendedora "adminana@…" NÃO vira admin');
   ok(isUserAdmin({ id: 'user-thomas', name: 'Thomas', email: 'thomas@nyroh.com', role: 'salesperson' }) === true, 'o dono (thomas@nyroh.com) continua admin');

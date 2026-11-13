@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Lead } from '../types';
+import { Lead } from '@shared/types';
 import { Phone, Sparkles, Star, CalendarClock, Ban } from 'lucide-react';
 import { BlockRequestDialog } from './BlockRequestDialog';
 

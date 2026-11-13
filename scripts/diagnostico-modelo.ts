@@ -4,7 +4,7 @@
  *   npx tsx scripts/diagnostico-modelo.ts dns_escassez_np4__portuguese_br
  * Não mostra chaves. Só imprime o que a FluxoAPI devolve para o modelo.
  */
-import { executeFluxoRequest, fluxoInstancePath } from '../src/lib/fluxoClient';
+import { executeFluxoRequest, fluxoInstancePath } from '../shared/lib/fluxoClient';
 
 const name = process.argv[2] || 'dns_escassez_np4__portuguese_br';
 const language = process.argv[3] || 'pt_BR';

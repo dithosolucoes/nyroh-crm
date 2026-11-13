@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Upload, FileArchive, CheckCircle, AlertCircle, RefreshCw, X, FileCheck, Info, Users, UserCheck, Percent, ArrowLeft } from 'lucide-react';
 import JSZip from 'jszip';
-import { ImportResult, Salesperson } from '../types';
+import { ImportResult, Salesperson } from '@shared/types';
 import type { ImportProgressData } from './ZipImportProgressModal';
 import { HistoricoZipsAutoCarregado, CartaoProgressoZip } from './PaginaSubirZip';
 

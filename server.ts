@@ -11,38 +11,38 @@ import { createServer as createViteServer } from 'vite';
 import multer from 'multer';
 import JSZip from 'jszip';
 import pg from 'pg';
-import { Lead, CallLog, ColumnStatus, PIPELINE_COLUMNS, CustomTag, Salesperson, DistributeLeadsParams, User, AuditLog, QuickReply } from './src/types.js';
-import { getLeadNiche } from './src/lib/niche.js';
-import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regrasDeContatoSql, instanciaDaSafra } from './src/lib/uxRoutes.js';
-import { validarInstanciaEscolhida, escolherInstanciaDisparo } from './src/lib/dispatchInstancia.js';
-import { registerAutomacoesRoutes, applyAutomacoesMigration, applyAutomacoesEstadoMigration, applyAutomacoesFilaMigration, automacoesPersistenciaOn, iniciarWorkerAutomacoes } from './src/lib/automacoesRoutes.js';
-import { registrarEventoCliente, registrarEventoGeral, pedidoDePararPelasRegras, pedidoDeAlertaPelasRegras, type ItemFila } from './src/lib/automacoesExecucao.js';
-import type { EventoV } from './src/lib/automacoes.js';
-import type { ContextoEvento } from './src/lib/automacoesExecucao.js';
-import { registerBackupRoutes } from './src/lib/backupRoutes.js';
-import { hashPassword, verifyPassword, generateSessionToken, DEFAULT_USERS, StoredUser, isUserAdmin } from './src/lib/serverAuth.js';
-import { performWebsiteAudit } from './src/lib/auditEngine.js';
-import { missingFluxoVars, summarizeFluxoInstance } from './src/lib/fluxoInstanceStatus.js';
-import { buildLeadVariables } from './src/lib/templateCopy.js';
-import { buildFluxoAudioMedia, isFluxoAudioVoiceEnabled, uploadFluxoAudioMedia } from './src/lib/fluxoAudio.js';
-import { installLogBuffer, readLogs, logCategories } from './src/lib/logBuffer.js';
+import { Lead, CallLog, ColumnStatus, PIPELINE_COLUMNS, CustomTag, Salesperson, DistributeLeadsParams, User, AuditLog, QuickReply } from './shared/types.js';
+import { getLeadNiche } from './shared/lib/niche.js';
+import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regrasDeContatoSql, instanciaDaSafra } from './shared/lib/uxRoutes.js';
+import { validarInstanciaEscolhida, escolherInstanciaDisparo } from './shared/lib/dispatchInstancia.js';
+import { registerAutomacoesRoutes, applyAutomacoesMigration, applyAutomacoesEstadoMigration, applyAutomacoesFilaMigration, automacoesPersistenciaOn, iniciarWorkerAutomacoes } from './shared/lib/automacoesRoutes.js';
+import { registrarEventoCliente, registrarEventoGeral, pedidoDePararPelasRegras, pedidoDeAlertaPelasRegras, type ItemFila } from './shared/lib/automacoesExecucao.js';
+import type { EventoV } from './shared/lib/automacoes.js';
+import type { ContextoEvento } from './shared/lib/automacoesExecucao.js';
+import { registerBackupRoutes } from './shared/lib/backupRoutes.js';
+import { hashPassword, verifyPassword, generateSessionToken, DEFAULT_USERS, StoredUser, isUserAdmin } from './shared/lib/serverAuth.js';
+import { performWebsiteAudit } from './shared/lib/auditEngine.js';
+import { missingFluxoVars, summarizeFluxoInstance } from './shared/lib/fluxoInstanceStatus.js';
+import { buildLeadVariables } from './shared/lib/templateCopy.js';
+import { buildFluxoAudioMedia, isFluxoAudioVoiceEnabled, uploadFluxoAudioMedia } from './shared/lib/fluxoAudio.js';
+import { installLogBuffer, readLogs, logCategories } from './shared/lib/logBuffer.js';
 installLogBuffer();
-import { executeFluxoRequest, downloadFluxoMediaBinary, prepareOutboundMedia, fluxoInstancePath, hasFfmpeg } from './src/lib/fluxoClient.js';
-import { setMetaRegistry, listMetaRegistry, encryptMetaToken, decryptMetaToken, metaDownloadMedia, metaSyncAccount, metaValidateToken, resolveMetaAccount, receivingPhoneNumberId, parseCoexistenceEchoes, getEmbeddedSignupConfig, metaExchangeSignupCode, metaSubscribeWaba, metaDiscoverWabaIds, type MetaAccountRecord, type MetaNumberRecord } from './src/lib/metaClient.js';
-import type { FluxoApiResult } from './src/lib/fluxoClient.js';
-import { verifyFluxoWebhook } from './src/lib/webhookAuth.js';
-import { sanitizeTemplateVariable, resolveManualInterest, SEM_INTERESSE_TAG } from './src/lib/leadIntent.js';
-import { distributionByCount } from './src/lib/distribution.js';
-import { getMetaProvider, getMetaCredentials, verifyMetaSignature, metaSendText, metaSendTemplate, metaSendMedia, metaMarkRead, metaCreateTemplate, metaDeleteTemplate, metaListPhoneNumbers, metaListTemplates } from './src/lib/metaClient.js';
-import { listExtraFieldKeys, normalizeFieldKey, TOKEN_NAMES } from './src/lib/leadTokens.js';
-import { validateTemplateCategory, buildMetaButtons, defaultExamples as neutralExamples, validateTemplateVariables } from './src/lib/templateRules.js';
-import { arePhonesEquivalent, normalizeE164Phone, phoneDigitVariants, formatAndValidateE164Phone } from './src/lib/phone.js';
-import { getUploadsDir, getInboxDir, INBOX_SUBDIR, isUploadsDirDurable, publicBaseUrl, saveMediaBuffer, extensionFor } from './src/lib/mediaStorage.js';
-import { statusRank, shouldApplyStatus, normalizeStatus } from './src/lib/fluxoStatus.js';
-import { describeFluxoError } from './src/lib/fluxoErrors.js';
-import { buildTemplatePayload, type CatalogTemplate, type TemplateValues } from './src/lib/fluxoTemplate.js';
-import { WINDOW_MS, windowExpiryFromInbound, latestExpiry, isWindowOpen } from './src/lib/windowUtil.js';
-import { effectiveSpeedPerSecond, maxDispatchPerSecond, dispatchRpm, planRpm, FluxoRateLimitedError } from './src/lib/dispatchRate.js';
+import { executeFluxoRequest, downloadFluxoMediaBinary, prepareOutboundMedia, fluxoInstancePath, hasFfmpeg } from './shared/lib/fluxoClient.js';
+import { setMetaRegistry, listMetaRegistry, encryptMetaToken, decryptMetaToken, metaDownloadMedia, metaSyncAccount, metaValidateToken, resolveMetaAccount, receivingPhoneNumberId, parseCoexistenceEchoes, getEmbeddedSignupConfig, metaExchangeSignupCode, metaSubscribeWaba, metaDiscoverWabaIds, type MetaAccountRecord, type MetaNumberRecord } from './shared/lib/metaClient.js';
+import type { FluxoApiResult } from './shared/lib/fluxoClient.js';
+import { verifyFluxoWebhook } from './shared/lib/webhookAuth.js';
+import { sanitizeTemplateVariable, resolveManualInterest, SEM_INTERESSE_TAG } from './shared/lib/leadIntent.js';
+import { distributionByCount } from './shared/lib/distribution.js';
+import { getMetaProvider, getMetaCredentials, verifyMetaSignature, metaSendText, metaSendTemplate, metaSendMedia, metaMarkRead, metaCreateTemplate, metaDeleteTemplate, metaListPhoneNumbers, metaListTemplates } from './shared/lib/metaClient.js';
+import { listExtraFieldKeys, normalizeFieldKey, TOKEN_NAMES } from './shared/lib/leadTokens.js';
+import { validateTemplateCategory, buildMetaButtons, defaultExamples as neutralExamples, validateTemplateVariables } from './shared/lib/templateRules.js';
+import { arePhonesEquivalent, normalizeE164Phone, phoneDigitVariants, formatAndValidateE164Phone } from './shared/lib/phone.js';
+import { getUploadsDir, getInboxDir, INBOX_SUBDIR, isUploadsDirDurable, publicBaseUrl, saveMediaBuffer, extensionFor } from './shared/lib/mediaStorage.js';
+import { statusRank, shouldApplyStatus, normalizeStatus } from './shared/lib/fluxoStatus.js';
+import { describeFluxoError } from './shared/lib/fluxoErrors.js';
+import { buildTemplatePayload, type CatalogTemplate, type TemplateValues } from './shared/lib/fluxoTemplate.js';
+import { WINDOW_MS, windowExpiryFromInbound, latestExpiry, isWindowOpen } from './shared/lib/windowUtil.js';
+import { effectiveSpeedPerSecond, maxDispatchPerSecond, dispatchRpm, planRpm, FluxoRateLimitedError } from './shared/lib/dispatchRate.js';
 import {
   initSocketServer,
   enqueueIncomingWebhook,
@@ -70,7 +70,7 @@ const PORT = Number(process.env.NYROH_PORT) || (process.env.RAILWAY_ENVIRONMENT 
   ? (Number(process.env.PORT) || 3000)
   : 3000);
 
-// Pasta de mídia (UPLOADS_DIR > volume da Railway > ./uploads). Ver src/lib/mediaStorage.ts
+// Pasta de mídia (UPLOADS_DIR > volume da Railway > ./uploads). Ver shared/lib/mediaStorage.ts
 const UPLOADS_DIR = getUploadsDir();
 
 // Enable HTTP gzip/brotli compression for fast network payloads
@@ -13092,6 +13092,8 @@ async function main() {
   const isProduction = process.env.NODE_ENV === 'production' || !!process.env.RAILWAY_ENVIRONMENT;
   if (!isProduction) {
     const vite = await createViteServer({
+      root: path.resolve(process.cwd(), 'frontend'),
+      configFile: path.resolve(process.cwd(), 'frontend/vite.config.ts'),
       server: { middlewareMode: true, allowedHosts: true },
       appType: 'spa'
     });

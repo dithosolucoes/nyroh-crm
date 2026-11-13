@@ -4,7 +4,7 @@
  *
  * Rodar: npm run test:ux
  */
-import { TAMANHOS_BLOCO, MOTIVOS_BLOQUEIO, uxSchemaOn, regraForaDoDisparoSql } from '../src/lib/uxRoutes.js';
+import { TAMANHOS_BLOCO, MOTIVOS_BLOQUEIO, uxSchemaOn, regraForaDoDisparoSql } from '../shared/lib/uxRoutes.js';
 
 let passou = 0;
 let falhou = 0;

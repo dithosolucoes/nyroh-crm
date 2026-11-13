@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, MessageSquare, Check, RotateCcw, Sparkles, Send, Info, Briefcase, Smartphone, HelpCircle } from 'lucide-react';
-import { DEFAULT_WHATSAPP_TEMPLATE, getStoredWhatsAppTemplate, formatWhatsAppMessage, WhatsAppAppType, getStoredWhatsAppAppType, setStoredWhatsAppAppType } from '../lib/phone';
-import { Salesperson } from '../types';
+import { DEFAULT_WHATSAPP_TEMPLATE, getStoredWhatsAppTemplate, formatWhatsAppMessage, WhatsAppAppType, getStoredWhatsAppAppType, setStoredWhatsAppAppType } from '@shared/lib/phone';
+import { Salesperson } from '@shared/types';
 
 interface WhatsAppSettingsModalProps {
   isOpen: boolean;

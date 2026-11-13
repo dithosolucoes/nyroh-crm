@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Lead, CustomTag, PIPELINE_COLUMNS, PIPELINE_STAGE_META, ColumnStatus, Salesperson } from '../types';
+import { Lead, CustomTag, PIPELINE_COLUMNS, PIPELINE_STAGE_META, ColumnStatus, Salesperson } from '@shared/types';
 import {
   BarChart3,
   TrendingUp,
@@ -19,9 +19,9 @@ import {
   UserCheck,
   Briefcase
 } from 'lucide-react';
-import { openWhatsApp } from '../lib/phone';
-import { getFollowUpInfo } from '../lib/followUp';
-import { getLeadNiche } from '../lib/niche';
+import { openWhatsApp } from '@shared/lib/phone';
+import { getFollowUpInfo } from '@shared/lib/followUp';
+import { getLeadNiche } from '@shared/lib/niche';
 
 interface CallLogItem {
   id: string;

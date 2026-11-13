@@ -2,7 +2,7 @@
 // Uso: TEST_DATABASE_URL=postgres://... npm run test:regras
 // Sem TEST_DATABASE_URL, o teste é pulado (não falha).
 import pg from 'pg';
-import { regrasDeContatoSql, invalidarCacheRegras } from '../src/lib/uxRoutes.js';
+import { regrasDeContatoSql, invalidarCacheRegras } from '../shared/lib/uxRoutes.js';
 
 const url = process.env.TEST_DATABASE_URL;
 if (!url) {

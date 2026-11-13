@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Lead, ColumnStatus, CustomTag, MasterColumnId } from '../types';
+import { Lead, ColumnStatus, CustomTag, MasterColumnId } from '@shared/types';
 import { KanbanCard } from './KanbanCard';
 import { 
   MASTER_COLUMNS_ORDER, 
@@ -8,7 +8,7 @@ import {
   matchesSubFilter, 
   resolveTargetColumnStatus,
   ColumnSubTab 
-} from '../lib/pipeline';
+} from '@shared/lib/pipeline';
 import { 
   Inbox, 
   PhoneCall, 

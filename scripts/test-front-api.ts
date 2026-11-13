@@ -3,7 +3,7 @@
  * Rodar: npm run test:front-api
  */
 import assert from 'node:assert/strict';
-import { apiFetch, isMockApiAllowed } from '../src/shared/api/client';
+import { apiFetch, isMockApiAllowed } from '../frontend/src/api/client';
 
 let falhas = 0;
 function test(nome: string, fn: () => void | Promise<void>) {
