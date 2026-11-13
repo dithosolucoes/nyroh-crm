@@ -15,6 +15,7 @@ import { Lead, CallLog, ColumnStatus, PIPELINE_COLUMNS, CustomTag, Salesperson, 
 import { getLeadNiche } from './shared/lib/niche.js';
 import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regrasDeContatoSql, instanciaDaSafra } from './shared/lib/uxRoutes.js';
 import { validarInstanciaEscolhida, escolherInstanciaDisparo } from './shared/lib/dispatchInstancia.js';
+import { recuperarFixosDescartados } from './shared/lib/recuperacaoFixos.js';
 import { registerAutomacoesRoutes, applyAutomacoesMigration, applyAutomacoesEstadoMigration, applyAutomacoesFilaMigration, automacoesPersistenciaOn, iniciarWorkerAutomacoes } from './shared/lib/automacoesRoutes.js';
 import { registrarEventoCliente, registrarEventoGeral, pedidoDePararPelasRegras, pedidoDeAlertaPelasRegras, type ItemFila } from './shared/lib/automacoesExecucao.js';
 import type { EventoV } from './shared/lib/automacoes.js';
@@ -10093,12 +10094,7 @@ app.get('/api/campaign/leads', async (req, res) => {
 
   try {
     // Recupera automaticamente quaisquer leads fixos que tenham sido marcados incorretamente como descartados
-    for (const lead of memoryCampaignLeadsMap.values()) {
-      if (lead.status === 'DESCARTADO' && (lead.responsePreview?.includes('Telefone fixo') || (lead.phoneNumber && lead.phoneNumber.replace(/\D/g, '').length >= 8))) {
-        lead.status = 'STAGING';
-        lead.responsePreview = undefined;
-      }
-    }
+    recuperarFixosDescartados(memoryCampaignLeadsMap.values());
 
     if (usePostgres && pgPool) {
       await pgPool.query(`

@@ -13,7 +13,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "qualidade": "npm run lint && npm test && npm run test:backup && npm run test:front-api && npm run test:config && npm run test:descadastro && npm run build",
+    "qualidade": "npm run lint && npm test && npm run test:backup && npm run test:front-api && npm run test:config && npm run test:descadastro && npm run test:recuperacao && npm run build",
     "test": "tsx scripts/test-units.ts",
     "test:tela": "tsx scripts/test-tela-automacoes.tsx",
     "test:e2e": "tsx scripts/e2e-qa.ts",
@@ -24,7 +24,8 @@
     "test:backup": "tsx scripts/test-backup-cobertura.ts",
     "mock:fluxo": "tsx scripts/mock-fluxo.ts",
     "test:config": "tsx scripts/test-config-obrigatoria.ts",
-    "test:descadastro": "tsx scripts/test-descadastro.ts"
+    "test:descadastro": "tsx scripts/test-descadastro.ts",
+    "test:recuperacao": "tsx scripts/test-recuperacao-fixos.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
