@@ -4,6 +4,7 @@ import { isUiFlagOn } from '@shared/lib/uiFlags';
 const AUTOMACOES_ON = import.meta.env.VITE_MOSTRAR_AUTOMACOES !== 'false';
 const INFRA_ON = isUiFlagOn(import.meta.env.VITE_MOSTRAR_INFRA);
 import { User, Salesperson, Lead, AuditLog, PIPELINE_COLUMNS, PIPELINE_STAGE_META } from '@shared/types';
+import type { RespostaSucesso, RespostaErroApi, RespostaListaUsuarios, RespostaAuditLogs, UsuarioAdmin } from '@shared/contracts/rotas';
 import { BulkCreateSalespeopleModal } from './BulkCreateSalespeopleModal';
 import { AdminWhatsAppFluxoView } from './AdminWhatsAppFluxoView';
 import {
@@ -159,12 +160,12 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
     }
     try {
       const res = await fetch(`/api/admin/users/${userToDelete.id}`, { method: 'DELETE' });
-      const data = await res.json();
+      const data = (await res.json()) as RespostaSucesso | RespostaErroApi;
       if (res.ok) {
-        onShowToast(data.message || `Usuário "${userToDelete.name}" excluído com sucesso.`);
+        onShowToast(('message' in data && data.message) || `Usuário "${userToDelete.name}" excluído com sucesso.`);
         await fetchUsers();
       } else {
-        onShowToast(data.error || 'Erro ao excluir usuário.');
+        onShowToast(('error' in data && data.error) || 'Erro ao excluir usuário.');
       }
     } catch (err) {
       onShowToast('Erro de conexão ao excluir usuário.');
@@ -196,8 +197,8 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
     try {
       const res = await fetch('/api/admin/users');
       if (res.ok) {
-        const data = await res.json();
-        setUsers(Array.isArray(data) ? data : []);
+        const data = (await res.json()) as RespostaListaUsuarios;
+        setUsers(Array.isArray(data) ? (data as User[]) : []);
       }
     } catch (err) {
       console.error('Erro ao buscar usuários:', err);
@@ -211,7 +212,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
     try {
       const res = await fetch('/api/admin/audit-logs');
       if (res.ok) {
-        const data = await res.json();
+        const data = (await res.json()) as RespostaAuditLogs;
         setAuditLogs(Array.isArray(data) ? data : []);
       }
     } catch (err) {
@@ -242,9 +243,9 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
         })
       });
 
-      const data = await res.json();
+      const data = (await res.json()) as UsuarioAdmin | RespostaErroApi;
       if (res.ok) {
-        onShowToast(`Usuário ${data.name} criado com sucesso!`);
+        onShowToast(`Usuário ${(data as UsuarioAdmin).name} criado com sucesso!`);
         setShowCreateUserModal(false);
         setNewUserName('');
         setNewUserEmail('');
@@ -252,7 +253,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
         fetchUsers();
         fetchAuditLogs();
       } else {
-        onShowToast(data.error || 'Erro ao criar usuário.');
+        onShowToast(('error' in data && data.error) || 'Erro ao criar usuário.');
       }
     } catch (err) {
       console.error(err);

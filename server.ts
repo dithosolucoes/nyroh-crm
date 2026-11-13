@@ -17,7 +17,7 @@ import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regrasDeC
 import { validarInstanciaEscolhida, escolherInstanciaDisparo } from './shared/lib/dispatchInstancia.js';
 import { recuperarFixosDescartados } from './shared/lib/recuperacaoFixos.js';
 import { variaveisFaltando, mensagemFaltando } from './shared/lib/configObrigatoria.js';
-import type { RespostaListaUploads, UploadZipRegistro, RespostaUploadZipOk, RespostaEnviarMensagem, StatusMensagemEnviada } from './shared/contracts/rotas.js';
+import type { RespostaListaUploads, UploadZipRegistro, RespostaUploadZipOk, RespostaEnviarMensagem, StatusMensagemEnviada, RespostaLoginOk, RespostaSessaoAtual, RespostaSucesso, UsuarioAdmin, RespostaListaUsuarios, RespostaAuditLogs, RespostaLogsServidor, RespostaListaVendedores, RespostaVendedorCriado, RespostaLoteVendedores, RespostaVendedorAtualizado, RespostaSenhaVendedor } from './shared/contracts/rotas.js';
 import { registerAutomacoesRoutes, applyAutomacoesMigration, applyAutomacoesEstadoMigration, applyAutomacoesFilaMigration, automacoesPersistenciaOn, iniciarWorkerAutomacoes } from './shared/lib/automacoesRoutes.js';
 import { registrarEventoCliente, registrarEventoGeral, pedidoDePararPelasRegras, pedidoDeAlertaPelasRegras, type ItemFila } from './shared/lib/automacoesExecucao.js';
 import type { EventoV } from './shared/lib/automacoes.js';
@@ -2098,10 +2098,11 @@ app.post('/api/auth/login', async (req, res) => {
     (req as any).user = publicUserData;
     await logAudit('LOGIN_SUCESSO', `Usuário ${foundUser.name} (${foundUser.role}) logou com sucesso.`, req);
 
-    return res.json({
+    const respostaLogin: RespostaLoginOk = {
       user: publicUserData,
       token
-    });
+    };
+    return res.json(respostaLogin);
   } catch (err: any) {
     console.error('Erro no login:', err);
     res.status(500).json({ error: 'Erro interno ao realizar autenticação.' });
@@ -2121,7 +2122,8 @@ app.post('/api/auth/logout', async (req, res) => {
 
   await logAudit('LOGOUT', 'Usuário encerrou sessão.', req);
   res.clearCookie('crm_session', { path: '/' });
-  return res.json({ success: true, message: 'Sessão encerrada com sucesso.' });
+  const respostaLogout: RespostaSucesso = { success: true, message: 'Sessão encerrada com sucesso.' };
+  return res.json(respostaLogout);
 });
 
 // 3. Me (Current User)
@@ -2129,7 +2131,8 @@ app.get('/api/auth/me', (req: any, res) => {
   if (!req.user) {
     return res.status(401).json({ error: 'Não autenticado' });
   }
-  return res.json({ user: req.user });
+  const respostaMe: RespostaSessaoAtual = { user: req.user };
+  return res.json(respostaMe);
 });
 
 // 3.1 Alterar a própria senha (qualquer usuário autenticado)
@@ -2175,7 +2178,8 @@ app.post('/api/auth/change-password', async (req: any, res) => {
     }
 
     await logAudit('SENHA_ALTERADA', `Usuário ${req.user.name} (${req.user.email}) alterou sua própria senha.`, req);
-    return res.json({ success: true, message: 'Sua senha foi alterada com sucesso!' });
+    const respostaSenha: RespostaSucesso = { success: true, message: 'Sua senha foi alterada com sucesso!' };
+    return res.json(respostaSenha);
   } catch (error: any) {
     console.error('Erro ao alterar senha:', error);
     return res.status(500).json({ error: 'Erro ao processar alteração de senha.' });
@@ -2211,9 +2215,10 @@ app.get('/api/admin/users', async (req: any, res) => {
          FROM users
          ORDER BY created_at ASC`
       );
-      return res.json(result.rows);
+      const listaBanco: RespostaListaUsuarios = result.rows;
+      return res.json(listaBanco);
     } else {
-      const list = Array.from(memoryUsersMap.values()).map(u => ({
+      const list: RespostaListaUsuarios = Array.from(memoryUsersMap.values()).map(u => ({
         id: u.id,
         name: u.name,
         email: u.email,
@@ -2279,7 +2284,7 @@ app.post('/api/admin/users', async (req: any, res) => {
 
     await logAudit('USUARIO_CRIADO', `Admin criou usuário ${name} (${cleanEmail}) como ${userRole}`, req);
 
-    return res.status(201).json({
+    const novoUsuario: UsuarioAdmin = {
       id: newId,
       name: String(name).trim(),
       email: cleanEmail,
@@ -2287,7 +2292,8 @@ app.post('/api/admin/users', async (req: any, res) => {
       salespersonId,
       active: true,
       createdAt: now
-    });
+    };
+    return res.status(201).json(novoUsuario);
   } catch (err: any) {
     console.error('Erro ao criar usuário:', err);
     res.status(500).json({ error: 'Erro ao cadastrar novo usuário.' });
@@ -2354,7 +2360,8 @@ app.patch('/api/admin/users/:id', async (req: any, res) => {
     }
 
     await logAudit('USUARIO_ATUALIZADO', `Admin alterou dados/permissão do usuário ID ${id}`, req);
-    return res.json({ success: true, message: 'Usuário atualizado com sucesso.' });
+    const respostaAtualizado: RespostaSucesso = { success: true, message: 'Usuário atualizado com sucesso.' };
+    return res.json(respostaAtualizado);
   } catch (err: any) {
     res.status(500).json({ error: 'Erro ao atualizar dados do usuário.' });
   }
@@ -2388,7 +2395,8 @@ app.delete('/api/admin/users/:id', async (req: any, res) => {
       await logAudit('USUARIO_EXCLUIDO', `Admin excluiu o usuário ${u.name} (${u.email})`, req);
     }
 
-    return res.json({ success: true, message: 'Usuário excluído com sucesso.' });
+    const respostaExcluido: RespostaSucesso = { success: true, message: 'Usuário excluído com sucesso.' };
+    return res.json(respostaExcluido);
   } catch (err: any) {
     console.error('Erro ao excluir usuário:', err);
     return res.status(500).json({ error: 'Erro ao excluir usuário.' });
@@ -2408,7 +2416,8 @@ app.get('/api/admin/logs', (req: any, res) => {
     afterId: Number(req.query.afterId) || 0,
     limit: Number(req.query.limit) || 500
   });
-  res.json({ logs, categories: logCategories() });
+  const respostaLogs: RespostaLogsServidor = { logs, categories: logCategories() };
+  res.json(respostaLogs);
 });
 
 app.get('/api/admin/audit-logs', async (req: any, res) => {
@@ -2424,9 +2433,11 @@ app.get('/api/admin/audit-logs', async (req: any, res) => {
          ORDER BY created_at DESC
          LIMIT 100`
       );
-      return res.json(result.rows);
+      const auditoriaBanco: RespostaAuditLogs = result.rows;
+      return res.json(auditoriaBanco);
     } else {
-      return res.json(memoryAuditLogs.slice(0, 100));
+      const auditoriaMemoria: RespostaAuditLogs = memoryAuditLogs.slice(0, 100);
+      return res.json(auditoriaMemoria);
     }
   } catch (err: any) {
     res.status(500).json({ error: 'Erro ao buscar logs de auditoria.' });
@@ -6559,7 +6570,8 @@ app.get('/api/salespeople', async (req, res) => {
         GROUP BY s.id, s.name, s.email, s.phone, s.color, s.bg_color, s.is_default, s.slug, s.active, s.can_generate_audit_pdf, s.whatsapp_type, s.created_at
         ORDER BY s.is_default DESC, s.created_at ASC
       `);
-      return res.json(spRes.rows);
+      const listaBancoVendedores: RespostaListaVendedores = spRes.rows;
+      return res.json(listaBancoVendedores);
     } else {
       const allLeads = Array.from(memoryLeadsMap.values());
       const sellers = Array.from(memorySalespeopleMap.values()).map(s => {
@@ -6586,7 +6598,8 @@ app.get('/api/salespeople', async (req, res) => {
           refusedLeads: refused
         };
       });
-      return res.json(sellers);
+      const listaMemoriaVendedores: RespostaListaVendedores = sellers;
+      return res.json(listaMemoriaVendedores);
     }
   } catch (error) {
     console.error('Error fetching salespeople:', error);
@@ -6632,7 +6645,7 @@ app.post('/api/salespeople', async (req, res) => {
         [userId, nameTrim, sellerEmail, hashedPass.hash, hashedPass.salt, sellerId]
       );
 
-      return res.status(201).json({
+      const criadoBanco: RespostaVendedorCriado = {
         ...result.rows[0],
         totalLeads: 0,
         uncontactedLeads: 0,
@@ -6641,7 +6654,8 @@ app.post('/api/salespeople', async (req, res) => {
         refusedLeads: 0,
         loginEmail: sellerEmail,
         initialPassword: creds.defaultPassword
-      });
+      };
+      return res.status(201).json(criadoBanco);
     } else {
       const newSeller: Salesperson = {
         id: sellerId,
@@ -6670,7 +6684,7 @@ app.post('/api/salespeople', async (req, res) => {
         createdAt
       });
 
-      return res.status(201).json({
+      const criadoMemoria: RespostaVendedorCriado = {
         ...newSeller,
         totalLeads: 0,
         uncontactedLeads: 0,
@@ -6679,7 +6693,8 @@ app.post('/api/salespeople', async (req, res) => {
         refusedLeads: 0,
         loginEmail: sellerEmail,
         initialPassword: creds.defaultPassword
-      });
+      };
+      return res.status(201).json(criadoMemoria);
     }
   } catch (error: any) {
     console.error('Error creating salesperson:', error);
@@ -6816,12 +6831,13 @@ app.post('/api/salespeople/batch', async (req, res) => {
       return res.status(400).json({ error: 'Nenhum vendedor válido com nome preenchido foi encontrado no JSON.' });
     }
 
-    return res.status(201).json({
+    const loteCriado: RespostaLoteVendedores = {
       success: true,
       count: createdList.length,
       salespeople: createdList,
       message: `${createdList.length} vendedor(es) cadastrado(s) com logins @nyroh.com e senhas gerados com sucesso!`
-    });
+    };
+    return res.status(201).json(loteCriado);
   } catch (error: any) {
     console.error('Error in batch salespeople creation:', error);
     res.status(500).json({ error: `Erro ao cadastrar vendedores em lote: ${error.message}` });
@@ -6873,7 +6889,8 @@ app.put('/api/salespeople/:id', async (req, res) => {
         await pgPool.query(`UPDATE users SET active = $1, name = $2 WHERE salesperson_id = $3`, [sellerActive, nameTrim, id]);
       }
 
-      return res.json(result.rows[0]);
+      const vendedorAtualizado: RespostaVendedorAtualizado = result.rows[0];
+      return res.json(vendedorAtualizado);
     } else {
       const seller = memorySalespeopleMap.get(id);
       if (!seller) {
@@ -6905,7 +6922,8 @@ app.put('/api/salespeople/:id', async (req, res) => {
         }
       }
 
-      return res.json(seller);
+      const vendedorAtualizadoMemoria: RespostaVendedorAtualizado = seller;
+      return res.json(vendedorAtualizadoMemoria);
     }
   } catch (error: any) {
     console.error('Error updating salesperson:', error);
@@ -6953,11 +6971,12 @@ app.post('/api/salespeople/:id/reset-password', async (req: any, res) => {
           `UPDATE users SET password_hash = $1, password_salt = $2, active = TRUE WHERE id = $3`,
           [creds.hash, creds.salt, userId]
         );
-        return res.json({
+        const respostaSenhaAtualizada: RespostaSenhaVendedor = {
           success: true,
           email: userRes.rows[0].email,
           message: `Senha de ${seller.name} atualizada com sucesso!`
-        });
+        };
+        return res.json(respostaSenhaAtualizada);
       } else {
         // Create user account for this closer
         const credsInfo = getSalespersonCredentials(seller.name, seller.email);
@@ -6968,11 +6987,12 @@ app.post('/api/salespeople/:id/reset-password', async (req: any, res) => {
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
           [newUserId, seller.name, email.toLowerCase(), creds.hash, creds.salt, 'salesperson', id, true, now]
         );
-        return res.json({
+        const respostaCredencialCriada: RespostaSenhaVendedor = {
           success: true,
           email: email.toLowerCase(),
           message: `Credencial criada com sucesso para ${seller.name}!`
-        });
+        };
+        return res.json(respostaCredencialCriada);
       }
     } else {
       const seller = memorySalespeopleMap.get(id);
@@ -6990,11 +7010,12 @@ app.post('/api/salespeople/:id/reset-password', async (req: any, res) => {
         foundUser.passwordHash = creds.hash;
         foundUser.passwordSalt = creds.salt;
         foundUser.active = true;
-        return res.json({
+        const respostaSenhaMemoria: RespostaSenhaVendedor = {
           success: true,
           email: foundUser.email,
           message: `Senha de ${seller.name} atualizada com sucesso!`
-        });
+        };
+        return res.json(respostaSenhaMemoria);
       } else {
         const credsInfo = getSalespersonCredentials(seller.name, seller.email);
         const email = credsInfo.email;
@@ -7010,11 +7031,12 @@ app.post('/api/salespeople/:id/reset-password', async (req: any, res) => {
           active: true,
           createdAt: now
         });
-        return res.json({
+        const respostaCredencialCriada: RespostaSenhaVendedor = {
           success: true,
           email: email.toLowerCase(),
           message: `Credencial criada com sucesso para ${seller.name}!`
-        });
+        };
+        return res.json(respostaCredencialCriada);
       }
     }
   } catch (error: any) {

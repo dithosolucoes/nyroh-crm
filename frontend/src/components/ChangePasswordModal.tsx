@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, Lock, KeyRound, CheckCircle2, AlertCircle, RefreshCw, Eye, EyeOff } from 'lucide-react';
+import type { RespostaAlterarSenha } from '@shared/contracts/rotas';
 
 interface ChangePasswordModalProps {
   isOpen: boolean;
@@ -45,9 +46,9 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
         body: JSON.stringify({ newPassword })
       });
 
-      const data = await res.json();
+      const data = (await res.json()) as RespostaAlterarSenha;
       if (!res.ok) {
-        throw new Error(data.error || 'Erro ao alterar senha.');
+        throw new Error(('error' in data && data.error) || 'Erro ao alterar senha.');
       }
 
       onShowToast('Sua senha foi alterada com sucesso!');

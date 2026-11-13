@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Shield, Lock, Mail, ArrowRight, User, Eye, EyeOff, CheckCircle2, ShieldCheck, KeyRound, Sparkles, Zap, ShieldAlert } from 'lucide-react';
 import { User as UserType } from '@shared/types';
+import type { RespostaLogin } from '@shared/contracts/rotas';
 
 interface LoginScreenProps {
   onLoginSuccess: (user: UserType) => void;
@@ -33,12 +34,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onShow
         body: JSON.stringify({ email: targetEmail, password: targetPass })
       });
 
-      const data = await res.json();
-      if (res.ok && data.user) {
+      const data = (await res.json()) as RespostaLogin;
+      if (res.ok && 'user' in data) {
         onShowToast(`Bem-vindo de volta, ${data.user.name}!`);
         onLoginSuccess(data.user);
       } else {
-        setErrorMsg(data.error || 'Credenciais inválidas. Verifique seu login.');
+        setErrorMsg(('error' in data && data.error) || 'Credenciais inválidas. Verifique seu login.');
       }
     } catch (err) {
       console.error(err);

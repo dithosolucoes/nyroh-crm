@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import type { RespostaLogsServidor } from '@shared/contracts/rotas';
 
 type Entrada = { id: number; at: string; level: 'info' | 'warn' | 'error'; category: string; message: string };
 
@@ -37,7 +38,7 @@ export const AdminLogsView: React.FC = () => {
         setErro(res.status === 403 ? 'Acesso restrito ao Administrador.' : `Erro ${res.status} ao buscar os logs.`);
         return;
       }
-      const data = await res.json();
+      const data = (await res.json()) as RespostaLogsServidor;
       setErro('');
       setCategorias(Array.isArray(data.categories) ? data.categories : []);
       const lista: Entrada[] = Array.isArray(data.logs) ? data.logs : [];

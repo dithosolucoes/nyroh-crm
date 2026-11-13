@@ -43,7 +43,7 @@ import { InboxConversation, InboxPage, Lead, LeadChatMessage, Salesperson, PIPEL
 import { WhatsAppVoiceAudioPlayer } from './WhatsAppVoiceAudioPlayer';
 import { useRuntimeConfig, formatInstancePhone } from '@shared/lib/useRuntimeConfig';
 import { onRealtime, onRealtimeConnection } from '@shared/lib/realtime';
-import type { RespostaEnviarMensagem } from '@shared/contracts/rotas';
+import type { RespostaEnviarMensagem, RespostaSessaoAtual } from '@shared/contracts/rotas';
 import { QuickRepliesModal } from './QuickRepliesModal';
 import { arePhonesEquivalent } from '@shared/lib/phone';
 import { shouldApplyStatus, statusRank } from '@shared/lib/fluxoStatus';
@@ -168,7 +168,7 @@ export const ThomasWhatsAppDesktopView: React.FC<ThomasWhatsAppDesktopViewProps>
   useEffect(() => {
     let alive = true;
     fetch('/api/auth/me')
-      .then(r => (r.ok ? r.json() : null))
+      .then(r => (r.ok ? (r.json() as Promise<RespostaSessaoAtual>) : null))
       .then(d => {
         if (alive && d?.user) setCurrentUser(d.user);
       })

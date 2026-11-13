@@ -1,3 +1,6 @@
+import type { User, AuditLog, Salesperson } from '../types';
+import type { LogEntry } from '../lib/logBuffer';
+
 /**
  * Contratos (C1): formato das respostas das rotas críticas, compartilhado entre back e front.
  *
@@ -59,6 +62,79 @@ export interface RespostaEnviarMensagem {
   status: StatusMensagemEnviada;
   remoteMessageId?: string | null;
   message?: unknown;
+}
+
+/** POST /api/auth/login (sucesso) */
+export interface RespostaLoginOk {
+  user: User;
+  token: string;
+}
+
+/** POST /api/auth/login: sucesso ou erro (400, 401, 403, 429, 500) */
+export type RespostaLogin = RespostaLoginOk | RespostaErroApi;
+
+/** GET /api/auth/me (logado; sem sessão responde 401 com erro) */
+export interface RespostaSessaoAtual {
+  user: User;
+}
+
+/** Resposta de sucesso genérica (logout, troca de senha, atualização e exclusão de usuário) */
+export interface RespostaSucesso {
+  success: true;
+  message: string;
+}
+
+/** POST /api/auth/change-password: sucesso ou erro */
+export type RespostaAlterarSenha = RespostaSucesso | RespostaErroApi;
+
+/** Item de GET /api/admin/users e corpo de POST /api/admin/users (201) */
+export interface UsuarioAdmin {
+  id: string;
+  name: string;
+  email: string;
+  role: User['role'];
+  salespersonId?: string | null;
+  active: boolean;
+  createdAt: string;
+}
+
+/** GET /api/admin/users */
+export type RespostaListaUsuarios = UsuarioAdmin[];
+
+/** GET /api/admin/audit-logs (últimos 100) */
+export type RespostaAuditLogs = AuditLog[];
+
+/** GET /api/admin/logs (painel de logs do servidor) */
+export interface RespostaLogsServidor {
+  logs: LogEntry[];
+  categories: string[];
+}
+
+/** GET /api/salespeople (vendedores com métricas) */
+export type RespostaListaVendedores = Salesperson[];
+
+/** POST /api/salespeople (201) e cada item de POST /api/salespeople/batch */
+export type RespostaVendedorCriado = Salesperson & {
+  loginEmail: string;
+  initialPassword: string;
+};
+
+/** POST /api/salespeople/batch (201) */
+export interface RespostaLoteVendedores {
+  success: true;
+  count: number;
+  salespeople: RespostaVendedorCriado[];
+  message: string;
+}
+
+/** PUT /api/salespeople/:id (sucesso devolve o vendedor atualizado) */
+export type RespostaVendedorAtualizado = Salesperson;
+
+/** POST /api/salespeople/:id/reset-password (sucesso) */
+export interface RespostaSenhaVendedor {
+  success: true;
+  email: string;
+  message: string;
 }
 
 /** Exemplos conferidos pelo compilador. Se um campo mudar de nome, o build quebra aqui. */
