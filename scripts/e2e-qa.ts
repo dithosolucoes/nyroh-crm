@@ -400,7 +400,7 @@ async function main() {
       ok(bd?.media?.filename === 'proposta.pdf' && !('caption' in (bd?.media || {})), 'nome do arquivo vai; o texto-marcador "[Arquivo: …]" NÃO vira legenda', bd?.media);
 
       // áudio já em OGG/Opus: não precisa de ffmpeg
-      const rao = await admin.post(`/api/leads/${leadA}/messages`, sendBody({ clientMessageId: 'c' + crypto.randomBytes(6).toString('hex'), text: '🎤 Mensagem de voz (4s)', isAudio: true, audioDuration: 4, mediaType: 'audio', mediaUrl: `data:audio/ogg;codecs=opus;base64,${Buffer.from('OggS-fake').toString('base64')}` }));
+      const rao = await admin.post(`/api/leads/${leadA}/messages`, sendBody({ clientMessageId: 'c' + crypto.randomBytes(6).toString('hex'), text: '🎤 Mensagem de voz (4s)', isAudio: true, audioDuration: 4, mediaType: 'audio', mediaUrl: `data:audio/ogg;codecs=opus;base64,${Buffer.concat([Buffer.from('OggS'), Buffer.alloc(2048, 7)]).toString('base64')}` }));
       ok(rao.status === 202, 'áudio OGG/Opus → 202', rao.json);
       const ba = (await mock('GET', '/__mock/state')).accepted.find((a: any) => a.body?.type === 'audio')?.body;
       ok(!!ba?.media?.url && !('caption' in (ba?.media || {})), 'áudio sem legenda (a Meta não aceita)', ba?.media);
