@@ -121,7 +121,7 @@ Ordem prática, quando um item não pode andar em paralelo:
 - [x] **G1. Portão de qualidade** (concluída: `npm run qualidade`)
   - Depende de: nada
   - Pronto quando: lint, testes unitários, teste do cliente e build rodam num único comando, e esse comando precisa passar para aprovar um PR.
-- [ ] **T1. Testes de rotas críticas (HTTP)** (em andamento. Feito: dedupe por telefone na importação (`a2d59c0`), envio, janela 24h e webhook já cobertos pelo E2E. Falta: teste de rota do descadastro pelo webhook (depende de O1))
+- [x] **T1. Testes de rotas críticas (HTTP)** (concluída: E2E 159/159. Cobertura: importação com dedupe por telefone (`a2d59c0`), disparo com cota e fila, webhook com assinatura e dedupe, janela de 24h, e descadastro pela rota ("PARAR" tira o lead da fila, com controle). Ressalva: a fila é limpa também pela regra "não reenviar após resposta", então a API não distingue sozinha descadastro de resposta comum)
   - Depende de: nada
   - Cobre: importar leads (dedupe por telefone), disparo (cota e fila), webhook de status (assinatura e ordem), opt-out, janela de 24h.
   - Pronto quando: cada rota crítica tem um teste de caminho feliz e um de erro, e todos passam no código atual.

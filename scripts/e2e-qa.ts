@@ -718,6 +718,50 @@ async function main() {
       ok(uJa?.leadsSaved === 0 && uJa?.skippedContacted === 1, 'telefone já disparado não sobe de novo (0 salvo, 1 já disparado)', uJa);
     }
 
+    // ==================================================================================== DESCADASTRO PELA ROTA
+    group('🚫 Descadastro: lead de safra que responde PARAR sai da fila de envio');
+    {
+      const TEL_OPT = '5519977776666';
+      const zip = new JSZip();
+      zip.file('leads.json', JSON.stringify([{ id: 'OPT1', name: 'Quer Parar', phone: '(19) 97777-6666' }]));
+      const zbuf = await zip.generateAsync({ type: 'nodebuffer' });
+      const form = new FormData();
+      form.append('zipFile', new Blob([new Uint8Array(zbuf)], { type: 'application/zip' }), 'safra-optout.zip');
+      form.append('safraName', 'Safra Descadastro');
+      const up = await admin.req('POST', '/api/campaign/upload-zip', { form });
+      const batchId = up.json?.batchId;
+      ok(up.status === 200 && !!batchId, 'importa safra com um lead para o teste de descadastro', up.json || up.text.slice(0, 200));
+
+      const estoque = async () => {
+        const lista = await admin.get('/api/campaign/batches');
+        return (lista.json || []).find((b: any) => b.id === batchId)?.stagingCount;
+      };
+      const antes = await estoque();
+      ok(antes === 1, 'lote começa com 1 lead na fila de envio', antes);
+
+      const r = await sendWebhook(fluxoEvent('message.received', { conversation_id: 'conv_OPT', message_id: 'msg_optout1', from: TEL_OPT, type: 'text', text: 'PARAR' }));
+      ok(r.status === 200, 'webhook com "PARAR" é aceito', r.json || r.text);
+      await sleep(800);
+      const depois = await estoque();
+      ok(depois === 0, 'depois de PARAR o lead SAI da fila de envio (stagingCount 1 → 0)', { antes, depois });
+
+      // Erro: quem não pediu para parar continua na fila (controle)
+      const zip2 = new JSZip();
+      zip2.file('leads.json', JSON.stringify([{ id: 'CTL1', name: 'Quer Saber', phone: '(19) 97777-7777' }]));
+      const zbuf2 = await zip2.generateAsync({ type: 'nodebuffer' });
+      const form2 = new FormData();
+      form2.append('zipFile', new Blob([new Uint8Array(zbuf2)], { type: 'application/zip' }), 'safra-controle.zip');
+      form2.append('safraName', 'Safra Controle');
+      const up2 = await admin.req('POST', '/api/campaign/upload-zip', { form: form2 });
+      const batchCtl = up2.json?.batchId;
+      // Controle: este lead NÃO responde nada, então tem que continuar na fila.
+      // (Quem responde qualquer coisa sai da fila pela regra "não reenviar após resposta".)
+      await sleep(500);
+      const lista2 = await admin.get('/api/campaign/batches');
+      const ctl = (lista2.json || []).find((b: any) => b.id === batchCtl)?.stagingCount;
+      ok(ctl === 1, 'lead que não respondeu continua na fila (controle)', ctl);
+    }
+
     // ==================================================================================== DIAGNÓSTICO
     group('🩺 Diagnóstico honesto');
     {
