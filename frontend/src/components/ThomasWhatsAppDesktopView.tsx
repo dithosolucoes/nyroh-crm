@@ -43,7 +43,7 @@ import { InboxConversation, InboxPage, Lead, LeadChatMessage, Salesperson, PIPEL
 import { WhatsAppVoiceAudioPlayer } from './WhatsAppVoiceAudioPlayer';
 import { useRuntimeConfig, formatInstancePhone } from '@shared/lib/useRuntimeConfig';
 import { onRealtime, onRealtimeConnection } from '@shared/lib/realtime';
-import type { RespostaEnviarMensagem, RespostaSessaoAtual } from '@shared/contracts/rotas';
+import type { RespostaEnviarMensagem, RespostaSessaoAtual, RespostaListaNotas } from '@shared/contracts/rotas';
 import { QuickRepliesModal } from './QuickRepliesModal';
 import { arePhonesEquivalent } from '@shared/lib/phone';
 import { shouldApplyStatus, statusRank } from '@shared/lib/fluxoStatus';
@@ -557,7 +557,7 @@ export const ThomasWhatsAppDesktopView: React.FC<ThomasWhatsAppDesktopViewProps>
   const carregarNotas = async (leadId: string) => {
     try {
       const r = await fetch(`/api/leads/${leadId}/notes`);
-      if (r.ok && leadId === openLeadIdRef.current) setNotes((await r.json()).notes || []);
+      if (r.ok && leadId === openLeadIdRef.current) setNotes(((await r.json()) as RespostaListaNotas).notes || []);
     } catch {
       /* ignora */
     }

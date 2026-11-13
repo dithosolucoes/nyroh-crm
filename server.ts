@@ -17,7 +17,7 @@ import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regrasDeC
 import { validarInstanciaEscolhida, escolherInstanciaDisparo } from './shared/lib/dispatchInstancia.js';
 import { recuperarFixosDescartados } from './shared/lib/recuperacaoFixos.js';
 import { variaveisFaltando, mensagemFaltando } from './shared/lib/configObrigatoria.js';
-import type { RespostaListaUploads, UploadZipRegistro, RespostaUploadZipOk, RespostaEnviarMensagem, StatusMensagemEnviada, RespostaLoginOk, RespostaSessaoAtual, RespostaSucesso, UsuarioAdmin, RespostaListaUsuarios, RespostaAuditLogs, RespostaLogsServidor, RespostaListaVendedores, RespostaVendedorCriado, RespostaLoteVendedores, RespostaVendedorAtualizado, RespostaSenhaVendedor, RespostaVendedorStatus, RespostaRoletaConfig, RespostaDistribuicaoRoleta } from './shared/contracts/rotas.js';
+import type { RespostaListaUploads, UploadZipRegistro, RespostaUploadZipOk, RespostaEnviarMensagem, StatusMensagemEnviada, RespostaLoginOk, RespostaSessaoAtual, RespostaSucesso, UsuarioAdmin, RespostaListaUsuarios, RespostaAuditLogs, RespostaLogsServidor, RespostaListaVendedores, RespostaVendedorCriado, RespostaLoteVendedores, RespostaVendedorAtualizado, RespostaSenhaVendedor, RespostaVendedorStatus, RespostaRoletaConfig, RespostaDistribuicaoRoleta, RespostaListaEtiquetas, RespostaEtiquetaSalva, RespostaOk, RespostaListaNotas, RespostaNotaCriada, RespostaResolucao } from './shared/contracts/rotas.js';
 import { registerAutomacoesRoutes, applyAutomacoesMigration, applyAutomacoesEstadoMigration, applyAutomacoesFilaMigration, automacoesPersistenciaOn, iniciarWorkerAutomacoes } from './shared/lib/automacoesRoutes.js';
 import { registrarEventoCliente, registrarEventoGeral, pedidoDePararPelasRegras, pedidoDeAlertaPelasRegras, type ItemFila } from './shared/lib/automacoesExecucao.js';
 import type { EventoV } from './shared/lib/automacoes.js';
@@ -6267,7 +6267,7 @@ app.get('/api/messages/search', async (req: any, res) => {
 /** Notas internas da conversa: só a equipe vê, o cliente nunca recebe. */
 app.get('/api/leads/:id/notes', async (req: any, res) => {
   const { id } = req.params;
-  if (!usePostgres || !pgPool) return res.json({ notes: [] });
+  if (!usePostgres || !pgPool) return res.json({ notes: [] } satisfies RespostaListaNotas);
   try {
     const r = await pgPool.query(
       `SELECT id, author_id AS "authorId", author_name AS "authorName", text,
@@ -6275,9 +6275,9 @@ app.get('/api/leads/:id/notes', async (req: any, res) => {
          FROM lead_notes WHERE lead_id = $1 ORDER BY created_at DESC LIMIT 100`,
       [id]
     );
-    return res.json({ notes: r.rows });
+    return res.json({ notes: r.rows } satisfies RespostaListaNotas);
   } catch {
-    return res.json({ notes: [] });
+    return res.json({ notes: [] } satisfies RespostaListaNotas);
   }
 });
 
@@ -6292,7 +6292,7 @@ app.post('/api/leads/:id/notes', async (req: any, res) => {
       `INSERT INTO lead_notes (id, lead_id, author_id, author_name, text) VALUES ($1, $2, $3, $4, $5)`,
       [noteId, id, req.user?.id || null, req.user?.name || 'Equipe', text]
     );
-    return res.json({ success: true, id: noteId });
+    return res.json({ success: true, id: noteId } satisfies RespostaNotaCriada);
   } catch (err: any) {
     return res.status(500).json({ error: 'Erro ao gravar a nota.' });
   }
@@ -6308,7 +6308,7 @@ app.post('/api/leads/:id/resolve', async (req: any, res) => {
       `UPDATE leads SET resolved_at = ${resolver ? 'CURRENT_TIMESTAMP' : 'NULL'} WHERE id = $1`,
       [id]
     );
-    return res.json({ success: true, resolved: resolver });
+    return res.json({ success: true, resolved: resolver } satisfies RespostaResolucao);
   } catch {
     return res.status(500).json({ error: 'Erro ao atualizar a conversa.' });
   }
@@ -6470,9 +6470,9 @@ app.get('/api/tags', async (req, res) => {
          FROM custom_tags
          ORDER BY created_at ASC`
       );
-      return res.json(result.rows);
+      return res.json(result.rows satisfies RespostaListaEtiquetas);
     } else {
-      return res.json(Array.from(memoryTagsMap.values()));
+      return res.json(Array.from(memoryTagsMap.values()) satisfies RespostaListaEtiquetas);
     }
   } catch (error) {
     console.error('Error fetching custom tags:', error);
@@ -6500,13 +6500,13 @@ app.post('/api/tags', async (req, res) => {
          RETURNING id, name, color, bg_color AS "bgColor", created_at AS "createdAt"`,
         [tagId, nameTrim, tagColor, tagBgColor]
       );
-      return res.status(201).json(result.rows[0]);
+      return res.status(201).json(result.rows[0] satisfies RespostaEtiquetaSalva);
     } else {
       const existingTag = Array.from(memoryTagsMap.values()).find(t => t.name.toLowerCase() === nameTrim.toLowerCase());
       if (existingTag) {
         existingTag.color = tagColor;
         existingTag.bgColor = tagBgColor;
-        return res.json(existingTag);
+        return res.json(existingTag satisfies RespostaEtiquetaSalva);
       }
       const newTag: CustomTag = {
         id: tagId,
@@ -6516,7 +6516,7 @@ app.post('/api/tags', async (req, res) => {
         createdAt: new Date().toISOString()
       };
       memoryTagsMap.set(tagId, newTag);
-      return res.status(201).json(newTag);
+      return res.status(201).json(newTag satisfies RespostaEtiquetaSalva);
     }
   } catch (error: any) {
     console.error('Error creating tag:', error);
@@ -6529,10 +6529,10 @@ app.delete('/api/tags/:id', async (req, res) => {
   try {
     if (usePostgres && pgPool) {
       await pgPool.query(`DELETE FROM custom_tags WHERE id = $1`, [id]);
-      return res.json({ success: true });
+      return res.json({ success: true } satisfies RespostaOk);
     } else {
       memoryTagsMap.delete(id);
-      return res.json({ success: true });
+      return res.json({ success: true } satisfies RespostaOk);
     }
   } catch (error) {
     console.error('Error deleting tag:', error);

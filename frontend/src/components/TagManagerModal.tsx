@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { CustomTag } from '@shared/types';
+import type { RespostaErroApi } from '@shared/contracts/rotas';
 import { X, Tag, Plus, Trash2, CheckCircle2 } from 'lucide-react';
 
 interface TagManagerModalProps {
@@ -62,7 +63,7 @@ export const TagManagerModal: React.FC<TagManagerModalProps> = ({
         setTagName('');
         await onRefreshTags();
       } else {
-        const errData = await res.json().catch(() => ({}));
+        const errData = (await res.json().catch(() => ({}))) as RespostaErroApi;
         onShowToast(errData.error || 'Erro ao criar etiqueta.');
       }
     } catch (err) {

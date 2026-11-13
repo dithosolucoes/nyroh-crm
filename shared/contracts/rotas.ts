@@ -1,4 +1,4 @@
-import type { User, AuditLog, Salesperson } from '../types';
+import type { User, AuditLog, Salesperson, CustomTag } from '../types';
 import type { LogEntry } from '../lib/logBuffer';
 
 /**
@@ -167,6 +167,43 @@ export interface RespostaDistribuicaoRoleta {
   totalProcessed: number;
   assignedCount: number;
   assigned: Array<Record<string, unknown>>;
+}
+
+/** GET /api/tags (lista de etiquetas) */
+export type RespostaListaEtiquetas = CustomTag[];
+
+/** POST /api/tags (201, ou 200 quando a etiqueta já existia pelo nome) */
+export type RespostaEtiquetaSalva = CustomTag;
+
+/** Resposta de sucesso sem corpo além do flag (DELETE /api/tags/:id) */
+export interface RespostaOk {
+  success: true;
+}
+
+/** Nota interna de uma conversa: só a equipe vê, o cliente nunca recebe */
+export interface NotaInterna {
+  id: string;
+  authorId: string | null;
+  authorName: string;
+  text: string;
+  createdAt: string;
+}
+
+/** GET /api/leads/:id/notes */
+export interface RespostaListaNotas {
+  notes: NotaInterna[];
+}
+
+/** POST /api/leads/:id/notes (sucesso) */
+export interface RespostaNotaCriada {
+  success: true;
+  id: string;
+}
+
+/** POST /api/leads/:id/resolve (sucesso) */
+export interface RespostaResolucao {
+  success: true;
+  resolved: boolean;
 }
 
 /** Exemplos conferidos pelo compilador. Se um campo mudar de nome, o build quebra aqui. */

@@ -28,7 +28,7 @@ import { getLeadNiche } from '@shared/lib/niche';
 import { setStoredWhatsAppAppType } from '@shared/lib/phone';
 import { PhoneCall, Users, CheckCircle, RefreshCw, UserCheck, Share2, Plus, ArrowLeft, ExternalLink, Shield, LogOut, Lock, MessageSquare } from 'lucide-react';
 import { getSalespersonSlug, matchSalespersonFromRoute } from '@shared/lib/salesperson';
-import type { RespostaSessaoAtual } from '@shared/contracts/rotas';
+import type { RespostaSessaoAtual, RespostaListaEtiquetas } from '@shared/contracts/rotas';
 
 export default function App() {
   // Authentication & RBAC
@@ -439,7 +439,7 @@ export default function App() {
       const res = await fetch('/api/tags');
       const contentType = res.headers.get('content-type') || '';
       if (res.ok && contentType.includes('application/json')) {
-        const data = await res.json();
+        const data = (await res.json()) as RespostaListaEtiquetas;
         setTags(data);
       }
     } catch (err) {
