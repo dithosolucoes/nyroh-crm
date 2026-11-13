@@ -68,8 +68,8 @@ export const AdminEstruturaView: React.FC<Props> = ({ leads, currentUser, onShow
         {secao === 'configuracoes' && (
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-neutral-200 bg-white px-4 py-3">
             <div>
-              <p className="text-sm font-semibold text-neutral-900">Baixar backup do banco</p>
-              <p className="text-xs text-neutral-500">Arquivo JSON com leads, conversas, vendedores e registros. Contém dados pessoais: guarde com cuidado. Cada download fica na auditoria.</p>
+              <p className="text-sm font-semibold text-neutral-900">Baixar backup completo</p>
+              <p className="text-xs text-neutral-500">Arquivo .zip com todos os dados (leads, conversas, vendedores, marcas, regras) e todas as fotos e áudios. Segredos ficam omitidos. Contém dados pessoais: guarde com cuidado. Cada download fica na auditoria.</p>
             </div>
             <a
               href="/api/admin/backup/exportar"
