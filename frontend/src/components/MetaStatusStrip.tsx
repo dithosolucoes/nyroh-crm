@@ -1,16 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import type { RespostaStatusMeta, RespostaSincronizacaoTodas } from '@shared/contracts/rotas';
+import type { RespostaStatusMeta, RespostaSincronizacaoTodas, RespostaStatusFluxo } from '@shared/contracts/rotas';
 import { CheckCircle2, AlertTriangle, RefreshCw } from 'lucide-react';
 
 
-interface FluxoStatus {
-  provider: 'meta' | 'fluxo';
-  connected: boolean;
-  missing: string[];
-  source: string;
-  message: string;
-  instance: { found: boolean; status: string; name: string | null; phone: string | null };
-}
 
 interface Props {
   onShowToast: (msg: string) => void;
@@ -21,7 +13,7 @@ interface Props {
 export default function MetaStatusStrip({ onShowToast, onChanged }: Props) {
   const [status, setStatus] = useState<RespostaStatusMeta | null>(null);
   const [busy, setBusy] = useState(false);
-  const [fluxo, setFluxo] = useState<FluxoStatus | null>(null);
+  const [fluxo, setFluxo] = useState<RespostaStatusFluxo | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -30,7 +22,7 @@ export default function MetaStatusStrip({ onShowToast, onChanged }: Props) {
     } catch { /* faixa é informativa */ }
     try {
       const res = await fetch('/api/admin/fluxo/status');
-      if (res.ok) setFluxo(await res.json());
+      if (res.ok) setFluxo((await res.json()) as RespostaStatusFluxo);
     } catch { /* faixa é informativa */ }
   }, []);
 

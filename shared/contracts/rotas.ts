@@ -382,6 +382,60 @@ export interface RespostaMetaRemovida {
   success: true;
 }
 
+/**
+ * GET /api/admin/fluxo/config (só admin). Segredos vêm mascarados (••••1234): o segredo
+ * inteiro nunca sai do servidor, então não existe apiSecret na resposta.
+ */
+export interface RespostaConfigFluxo {
+  apiKey: string;
+  hasApiKey: boolean;
+  hasSecret: boolean;
+  instanceId: string;
+  isConfigured: boolean;
+  source: 'env' | 'custom' | 'none';
+  metaAccessToken: string;
+  hasMetaToken: boolean;
+  metaWabaId: string;
+  metaPhoneNumberId: string;
+  metaVerifyToken: string;
+  isMetaConfigured: boolean;
+}
+
+/** Resumo da instância da FluxoAPI usada pelo CRM */
+export interface InstanciaFluxoResumo {
+  found: boolean;
+  status: string;
+  name: string | null;
+  phone: string | null;
+}
+
+/** GET /api/admin/fluxo/status (200; a falha de servidor não tem este formato) */
+export interface RespostaStatusFluxo {
+  provider: 'meta' | 'fluxo';
+  missing: string[];
+  source: 'railway' | 'sistema' | 'nenhuma';
+  webhookPath: string;
+  connected: boolean;
+  instance: InstanciaFluxoResumo;
+  message: string;
+}
+
+/** Evento recebido do webhook da FluxoAPI (ou simulado) */
+export interface EventoWebhookFluxo {
+  id: string;
+  receivedAt: string;
+  type: string;
+  summary: string;
+  payload: unknown;
+}
+
+/** GET /api/admin/fluxo/events */
+export interface RespostaEventosFluxo {
+  success: true;
+  total: number;
+  events: EventoWebhookFluxo[];
+}
+
 /** Exemplos conferidos pelo compilador. Se um campo mudar de nome, o build quebra aqui. */
 export const EXEMPLO_UPLOAD_ZIP = {
   success: true,

@@ -138,9 +138,10 @@ Ordem prática, quando um item não pode andar em paralelo:
     - [x] Respostas rápidas
     - [x] Meta: status, contas, sincronização e remoção de conta
     - [x] Upload de ZIP de campanha, lista de uploads e envio de mensagem
+    - [x] Fluxo: config (sem segredo na resposta), status e eventos de webhook (o tipo `FluxoConfig` antigo, com `source` errado, foi removido)
   - Falta:
     - [ ] Meta: cadastro de conta, embedded signup, leitura da Meta
-    - [ ] Fluxo: config, instâncias, eventos e templates
+    - [ ] Fluxo: instâncias, templates, envio de teste e modo de instância
     - [ ] Disparos (`/api/campaign/*`): lotes, cópias, envio, pausa e cancelamento
     - [ ] Automações
     - [ ] Inbox e mensagens (`/api/inbox`, `/api/messages/search`, `/api/leads/:id/messages`)

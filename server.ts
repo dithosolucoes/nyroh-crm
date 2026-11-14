@@ -17,7 +17,7 @@ import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regrasDeC
 import { validarInstanciaEscolhida, escolherInstanciaDisparo } from './shared/lib/dispatchInstancia.js';
 import { recuperarFixosDescartados } from './shared/lib/recuperacaoFixos.js';
 import { variaveisFaltando, mensagemFaltando } from './shared/lib/configObrigatoria.js';
-import type { RespostaListaUploads, UploadZipRegistro, RespostaUploadZipOk, RespostaEnviarMensagem, StatusMensagemEnviada, RespostaLoginOk, RespostaSessaoAtual, RespostaSucesso, UsuarioAdmin, RespostaListaUsuarios, RespostaAuditLogs, RespostaLogsServidor, RespostaListaVendedores, RespostaVendedorCriado, RespostaLoteVendedores, RespostaVendedorAtualizado, RespostaSenhaVendedor, RespostaVendedorStatus, RespostaRoletaConfig, RespostaDistribuicaoRoleta, RespostaListaEtiquetas, RespostaEtiquetaSalva, RespostaOk, RespostaListaNotas, RespostaNotaCriada, RespostaResolucao, RespostaAuditoriaSite, RespostaAtualizacaoLead, RespostaResumoLead, RespostaListaLigacoes, RespostaLigacaoRegistrada, RespostaListaLigacoesGerais, RespostaListaLeads, RespostaListaRespostasRapidas, RespostaRespostaRapidaCriada, RespostaRespostaRapidaExcluida, RespostaStatusMeta, RespostaContasMeta, RespostaSincronizacaoConta, RespostaSincronizacaoTodas, RespostaMetaRemovida } from './shared/contracts/rotas.js';
+import type { RespostaListaUploads, UploadZipRegistro, RespostaUploadZipOk, RespostaEnviarMensagem, StatusMensagemEnviada, RespostaLoginOk, RespostaSessaoAtual, RespostaSucesso, UsuarioAdmin, RespostaListaUsuarios, RespostaAuditLogs, RespostaLogsServidor, RespostaListaVendedores, RespostaVendedorCriado, RespostaLoteVendedores, RespostaVendedorAtualizado, RespostaSenhaVendedor, RespostaVendedorStatus, RespostaRoletaConfig, RespostaDistribuicaoRoleta, RespostaListaEtiquetas, RespostaEtiquetaSalva, RespostaOk, RespostaListaNotas, RespostaNotaCriada, RespostaResolucao, RespostaAuditoriaSite, RespostaAtualizacaoLead, RespostaResumoLead, RespostaListaLigacoes, RespostaLigacaoRegistrada, RespostaListaLigacoesGerais, RespostaListaLeads, RespostaListaRespostasRapidas, RespostaRespostaRapidaCriada, RespostaRespostaRapidaExcluida, RespostaStatusMeta, RespostaContasMeta, RespostaSincronizacaoConta, RespostaSincronizacaoTodas, RespostaMetaRemovida, RespostaConfigFluxo, RespostaStatusFluxo, RespostaEventosFluxo } from './shared/contracts/rotas.js';
 import { registerAutomacoesRoutes, applyAutomacoesMigration, applyAutomacoesEstadoMigration, applyAutomacoesFilaMigration, automacoesPersistenciaOn, iniciarWorkerAutomacoes } from './shared/lib/automacoesRoutes.js';
 import { registrarEventoCliente, registrarEventoGeral, pedidoDePararPelasRegras, pedidoDeAlertaPelasRegras, type ItemFila } from './shared/lib/automacoesExecucao.js';
 import type { EventoV } from './shared/lib/automacoes.js';
@@ -2513,7 +2513,7 @@ app.get('/api/admin/fluxo/config', (req: any, res) => {
     metaPhoneNumberId: effectiveMetaPhoneId,
     metaVerifyToken: effectiveMetaVerify,
     isMetaConfigured: Boolean(effectiveMetaToken && effectiveMetaWabaId)
-  });
+  } satisfies RespostaConfigFluxo);
 });
 
 // POST config
@@ -2708,19 +2708,19 @@ app.get('/api/admin/fluxo/status', async (req: any, res) => {
     instanceId: Boolean(instanceId),
     webhookSecret: Boolean((process.env.FLUXO_WEBHOOK_SECRET || '').trim())
   });
-  const base = {
+  const base: Pick<RespostaStatusFluxo, 'provider' | 'missing' | 'source' | 'webhookPath'> = {
     provider: getMetaProvider(),
     missing,
     source: (process.env.FLUXO_KEY && process.env.FLUXO_SECRET) ? 'railway' : (memoryFluxoConfig.apiKey ? 'sistema' : 'nenhuma'),
     webhookPath: '/api/webhooks/fluxo'
   };
   if (!apiKey || !apiSecret) {
-    return res.json({ ...base, connected: false, instance: summarizeFluxoInstance([], instanceId), message: 'Faltam credenciais da FluxoAPI.' });
+    return res.json({ ...base, connected: false, instance: summarizeFluxoInstance([], instanceId), message: 'Faltam credenciais da FluxoAPI.' } satisfies RespostaStatusFluxo);
   }
   try {
     const r = await executeFluxoRequest({ method: 'GET', path: '/v1/instances', apiKey, apiSecret });
     if (!r.success) {
-      return res.json({ ...base, connected: false, instance: summarizeFluxoInstance([], instanceId), message: r.error?.message || 'FluxoAPI não respondeu com sucesso.' });
+      return res.json({ ...base, connected: false, instance: summarizeFluxoInstance([], instanceId), message: r.error?.message || 'FluxoAPI não respondeu com sucesso.' } satisfies RespostaStatusFluxo);
     }
     const list = Array.isArray(r.data) ? r.data : (r.data?.instances || r.data?.data || []);
     const instance = summarizeFluxoInstance(list, instanceId);
@@ -2729,7 +2729,7 @@ app.get('/api/admin/fluxo/status', async (req: any, res) => {
       connected: instance.found && instance.status === 'no_ar',
       instance,
       message: instance.status === 'no_ar' ? 'FluxoAPI conectada e instância No ar.' : 'Instância encontrada, mas não está No ar.'
-    });
+    } satisfies RespostaStatusFluxo);
   } catch (err: any) {
     return res.status(500).json({ ...base, connected: false, message: err?.message || 'Erro ao consultar a FluxoAPI.' });
   }
@@ -4413,13 +4413,13 @@ app.get('/api/admin/fluxo/events', (req: any, res) => {
     success: true,
     total: lastFluxoWebhookEvents.length,
     events: lastFluxoWebhookEvents
-  });
+  } satisfies RespostaEventosFluxo);
 });
 
 // DELETE Webhook Events (Clear logs)
 app.delete('/api/admin/fluxo/events', (req: any, res) => {
   lastFluxoWebhookEvents.length = 0;
-  return res.json({ success: true, message: 'Logs de eventos limpos com sucesso.' });
+  return res.json({ success: true, message: 'Logs de eventos limpos com sucesso.' } satisfies RespostaSucesso);
 });
 
 // Simulate Webhook Event

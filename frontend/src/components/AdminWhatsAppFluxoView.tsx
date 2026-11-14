@@ -3,6 +3,7 @@ import { isUiFlagOn } from '@shared/lib/uiFlags';
 const SHOW_LAB = isUiFlagOn(import.meta.env.VITE_MOSTRAR_LAB);
 import { useRuntimeConfig, formatInstancePhone } from '@shared/lib/useRuntimeConfig';
 import { onRealtime } from '@shared/lib/realtime';
+import type { RespostaConfigFluxo, RespostaEventosFluxo } from '@shared/contracts/rotas';
 import MetaAccountsPanel from './MetaAccountsPanel';
 import MetaStatusStrip from './MetaStatusStrip';
 import {
@@ -47,7 +48,7 @@ import {
   HelpCircle,
   Share2
 } from 'lucide-react';
-import { FluxoConfig, FluxoInstance, User } from '@shared/types';
+import { FluxoInstance, User } from '@shared/types';
 
 interface AdminWhatsAppFluxoViewProps {
   currentUser: User;
@@ -92,12 +93,19 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
   >('instances');
 
   // Config state
-  const [config, setConfig] = useState<FluxoConfig>({
+  const [config, setConfig] = useState<RespostaConfigFluxo>({
     apiKey: '',
-    apiSecret: '',
+    hasApiKey: false,
+    hasSecret: false,
     instanceId: '',
     isConfigured: false,
-    source: 'none'
+    source: 'none',
+    metaAccessToken: '',
+    hasMetaToken: false,
+    metaWabaId: '',
+    metaPhoneNumberId: '',
+    metaVerifyToken: '',
+    isMetaConfigured: false
   });
   const [loadingConfig, setLoadingConfig] = useState(true);
 
@@ -237,7 +245,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
     try {
       const res = await fetch('/api/admin/fluxo/config');
       if (res.ok) {
-        const data = await res.json();
+        const data = (await res.json()) as RespostaConfigFluxo;
         setConfig(data);
         // `data.apiKey` vem mascarado (••••1234). Serve de indicação, nunca de valor do campo.
         const resolvedInstance = data.instanceId || savedLocalInstance;
@@ -368,7 +376,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
     try {
       const res = await fetch('/api/admin/fluxo/events');
       if (res.ok) {
-        const data = await res.json();
+        const data = (await res.json()) as RespostaEventosFluxo;
         if (data.events && Array.isArray(data.events)) {
           setWebhookEvents(data.events);
         }

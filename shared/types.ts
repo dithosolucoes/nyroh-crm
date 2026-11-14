@@ -181,25 +181,6 @@ export interface ImportResult {
   errors: string[];
 }
 
-export interface FluxoConfig {
-  /** Mascarado (••••1234). O segredo inteiro nunca sai do servidor. */
-  apiKey: string;
-  apiSecret: string;
-  hasApiKey?: boolean;
-  hasSecret?: boolean;
-  instanceId?: string;
-  isConfigured: boolean;
-  source: 'env' | 'database' | 'memory' | 'none';
-  // Meta Cloud API Oficial
-  /** Mascarado, como `apiKey`. */
-  metaAccessToken?: string;
-  hasMetaToken?: boolean;
-  metaWabaId?: string;
-  metaPhoneNumberId?: string;
-  metaVerifyToken?: string;
-  isMetaConfigured?: boolean;
-}
-
 export interface FluxoInstance {
   id: string;
   name: string;
