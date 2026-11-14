@@ -1,4 +1,4 @@
-import type { User, AuditLog, Salesperson, CustomTag, Lead } from '../types';
+import type { User, AuditLog, Salesperson, CustomTag, Lead, LeadChatMessage } from '../types';
 import type { WebsiteAuditReport } from '../types/audit';
 import type { LogEntry } from '../lib/logBuffer';
 
@@ -776,6 +776,30 @@ export interface RespostaDevolucaoLeads {
   removedFromQueue: number;
   skippedInvalid: number;
   message: string;
+}
+
+/**
+ * POST /api/campaign/test-dispatch: disparo de teste para um número. `lead` e `dispatchResult`
+ * ainda são `unknown` (no servidor são `any`). Tipar esses dois é pendência de depois.
+ */
+export interface RespostaTesteDisparo {
+  success: boolean;
+  message?: string;
+  error?: string;
+  lead: unknown;
+  outgoingMessage: LeadChatMessage;
+  dispatchResult: unknown;
+}
+
+/** GET /api/campaign/test-dispatch/status/:messageId: situação de entrega do teste */
+export interface RespostaStatusTesteDisparo {
+  success: true;
+  messageId: string;
+  deliveryStatus: string;
+  error?: unknown;
+  translation?: unknown;
+  eventTimestamp?: string;
+  message?: string;
 }
 
 /** POST /api/campaign/dispatch (sucesso): leads da safra entraram na fila de envio */
