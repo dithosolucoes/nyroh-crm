@@ -3,7 +3,7 @@ import { isUiFlagOn } from '@shared/lib/uiFlags';
 const SHOW_LAB = isUiFlagOn(import.meta.env.VITE_MOSTRAR_LAB);
 import { useRuntimeConfig, formatInstancePhone } from '@shared/lib/useRuntimeConfig';
 import { onRealtime } from '@shared/lib/realtime';
-import type { RespostaConfigFluxo, RespostaEventosFluxo, RespostaListaModelosFluxo, RespostaSincronizacaoModelos, RespostaErroApi } from '@shared/contracts/rotas';
+import type { RespostaConfigFluxo, RespostaEventosFluxo, RespostaListaModelosFluxo, RespostaSincronizacaoModelos, RespostaModeloCriado, RespostaErroApi } from '@shared/contracts/rotas';
 import MetaAccountsPanel from './MetaAccountsPanel';
 import MetaStatusStrip from './MetaStatusStrip';
 import {
@@ -549,13 +549,13 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
         })
       });
 
-      const data = await res.json();
-      if (res.ok && data.success) {
+      const data = (await res.json()) as RespostaModeloCriado | RespostaErroApi;
+      if (res.ok && 'template' in data) {
         onShowToast(data.message || 'Modelo enviado para a fila de aprovação da Meta!');
         await fetchTemplates();
         setTemplateSubView('kanban');
       } else {
-        onShowToast(data.error || 'Erro ao submeter modelo para a Meta.');
+        onShowToast(('error' in data && data.error) || 'Erro ao submeter modelo para a Meta.');
       }
     } catch (err: any) {
       onShowToast(`Erro ao criar template: ${err.message}`);
@@ -602,13 +602,13 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
         })
       });
 
-      const data = await res.json();
-      if (res.ok && data.success) {
+      const data = (await res.json()) as RespostaModeloCriado | RespostaErroApi;
+      if (res.ok && 'template' in data) {
         onShowToast('Template salvo como Rascunho com sucesso!');
         await fetchTemplates();
         setTemplateSubView('kanban');
       } else {
-        onShowToast(data.error || 'Erro ao salvar rascunho.');
+        onShowToast(('error' in data && data.error) || 'Erro ao salvar rascunho.');
       }
     } catch (err: any) {
       onShowToast(`Erro ao salvar rascunho: ${err.message}`);

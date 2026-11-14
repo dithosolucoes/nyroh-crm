@@ -493,6 +493,17 @@ export interface RespostaListaModelosFluxo {
   metaConnected?: boolean;
 }
 
+/**
+ * POST /api/admin/fluxo/templates (criar, enviar para aprovação ou salvar rascunho; sucesso).
+ * O modelo recém-criado ainda não tem rejectedReason no servidor, por isso é opcional aqui.
+ */
+export interface RespostaModeloCriado {
+  success: true;
+  template: Omit<ModeloFluxo, 'rejectedReason'> & { rejectedReason?: string | null };
+  remoteResult?: unknown;
+  message: string;
+}
+
 /** POST /api/admin/fluxo/templates/sync-meta (sucesso) */
 export interface RespostaSincronizacaoModelos {
   success: true;
