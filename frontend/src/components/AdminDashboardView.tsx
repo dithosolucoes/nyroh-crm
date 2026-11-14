@@ -133,13 +133,13 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
     }
     try {
       const res = await fetch(`/api/salespeople/${seller.id}`, { method: 'DELETE' });
-      const data = await res.json();
+      const data = (await res.json()) as RespostaSucesso | RespostaErroApi;
       if (res.ok) {
-        onShowToast(data.message || `Vendedor "${seller.name}" excluído.`);
+        onShowToast(('message' in data && data.message) || `Vendedor "${seller.name}" excluído.`);
         onRefreshData();
         await fetchUsers();
       } else {
-        onShowToast(data.error || 'Erro ao excluir vendedor.');
+        onShowToast(('error' in data && data.error) || 'Erro ao excluir vendedor.');
       }
     } catch (err) {
       onShowToast('Erro de conexão ao excluir vendedor.');

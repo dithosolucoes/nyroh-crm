@@ -74,7 +74,7 @@ import { AdminDispatchTestSandbox } from './AdminDispatchTestSandbox';
 import { ZipImportProgressModal, ImportProgressData } from './ZipImportProgressModal';
 import { PaginaSubirZip, ZipUploadRegistro } from './PaginaSubirZip';
 import { isUiFlagOn } from '@shared/lib/uiFlags';
-import type { RespostaListaUploads, RespostaListaModelosFluxo, RespostaInstanciasFluxo, RespostaListaCopias, RespostaCopiaSalva, CopiaCampanha, RespostaListaLotes, RespostaVelocidadeDisparo, LoteCampanha } from '@shared/contracts/rotas';
+import type { RespostaListaUploads, RespostaListaModelosFluxo, RespostaInstanciasFluxo, RespostaListaCopias, RespostaCopiaSalva, CopiaCampanha, RespostaListaLotes, RespostaVelocidadeDisparo, LoteCampanha, RespostaLiberacaoQuarentena, RespostaDevolucaoLeads } from '@shared/contracts/rotas';
 
 const SHOW_SIMULATE = isUiFlagOn(import.meta.env.VITE_MOSTRAR_SIMULAR);
 /** Estado real do disparo: falhou (com motivo), lido/respondeu, ou ainda sem confirmação de entrega. */
@@ -1720,14 +1720,14 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
       const res = await fetch(`/api/campaign/batches/${selectedBatchId}/release-quarantine`, {
         method: 'POST'
       });
-      const data = await res.json();
+      const data = (await res.json()) as RespostaLiberacaoQuarentena | RespostaErroApi;
       if (res.ok && data.success) {
         showNotification('success', data.message || 'Quarentena liberada com sucesso!');
         await fetchBatches();
         await fetchLeads();
         setActiveTab('distribuicao');
       } else {
-        showNotification('error', data.error || 'Erro ao liberar quarentena.');
+        showNotification('error', ('error' in data && data.error) || 'Erro ao liberar quarentena.');
       }
     } catch (err: any) {
       showNotification('error', `Falha ao liberar quarentena: ${err.message}`);
@@ -1768,13 +1768,13 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
     if (!ok) return;
     try {
       const res = await fetch(`/api/campaign/batches/${selectedBatchId}/return-unsent`, { method: 'POST' });
-      const data = await res.json();
-      if (res.ok && data.success) {
+      const data = (await res.json()) as RespostaDevolucaoLeads | RespostaErroApi;
+      if (res.ok && 'returned' in data) {
         showNotification('success', data.message);
         await fetchBatches();
         await fetchLeads();
       } else {
-        showNotification('error', data.error || 'Erro ao devolver leads.');
+        showNotification('error', ('error' in data && data.error) || 'Erro ao devolver leads.');
       }
     } catch (err: any) {
       showNotification('error', `Falha ao devolver leads: ${err.message}`);

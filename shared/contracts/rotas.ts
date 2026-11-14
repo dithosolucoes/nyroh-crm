@@ -762,6 +762,22 @@ export interface RespostaCancelamentoLote {
   message: string;
 }
 
+/** POST /api/campaign/batches/:id/release-quarantine (sucesso) */
+export interface RespostaLiberacaoQuarentena {
+  success: true;
+  releasedCount: number;
+  message: string;
+}
+
+/** POST /api/campaign/batches/:id/return-unsent (sucesso): leads que a Meta não aceitou voltam para Novos */
+export interface RespostaDevolucaoLeads {
+  success: true;
+  returned: number;
+  removedFromQueue: number;
+  skippedInvalid: number;
+  message: string;
+}
+
 /** Exemplos conferidos pelo compilador. Se um campo mudar de nome, o build quebra aqui. */
 export const EXEMPLO_UPLOAD_ZIP = {
   success: true,
