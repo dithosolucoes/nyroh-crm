@@ -300,6 +300,39 @@ export interface LeadListado {
 /** GET /api/leads (base de leads, filtrada pela carteira de quem pede) */
 export type RespostaListaLeads = LeadListado[];
 
+/**
+ * Resposta rápida como sai de /api/quick-replies. O Postgres manda null em mediaUrl
+ * quando não há mídia, e o tipo `type` vem do banco sem validação (o POST aceita qualquer texto).
+ */
+export interface RespostaRapida {
+  id: string;
+  salespersonId?: string | null;
+  shortcut: string;
+  title: string;
+  type: string;
+  content: string;
+  mediaUrl?: string | null;
+  createdAt?: string | null;
+}
+
+/** GET /api/quick-replies */
+export interface RespostaListaRespostasRapidas {
+  success: true;
+  quickReplies: RespostaRapida[];
+}
+
+/** POST /api/quick-replies (201) */
+export interface RespostaRespostaRapidaCriada {
+  success: true;
+  quickReply: RespostaRapida;
+}
+
+/** DELETE /api/quick-replies/:id */
+export interface RespostaRespostaRapidaExcluida {
+  success: true;
+  id: string;
+}
+
 /** Exemplos conferidos pelo compilador. Se um campo mudar de nome, o build quebra aqui. */
 export const EXEMPLO_UPLOAD_ZIP = {
   success: true,

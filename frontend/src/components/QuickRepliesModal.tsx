@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { QuickReply, Salesperson } from '@shared/types';
+import { Salesperson } from '@shared/types';
+import type { RespostaRapida, RespostaListaRespostasRapidas, RespostaErroApi } from '@shared/contracts/rotas';
 import { X, Zap, Plus, Trash2, Edit3, Check, Sparkles, MessageSquare, Mic, FileText, Image as ImageIcon, Copy } from 'lucide-react';
 
 interface QuickRepliesModalProps {
@@ -17,7 +18,7 @@ export const QuickRepliesModal: React.FC<QuickRepliesModalProps> = ({
   onShowToast,
   onSelectReply
 }) => {
-  const [replies, setReplies] = useState<QuickReply[]>([]);
+  const [replies, setReplies] = useState<RespostaRapida[]>([]);
   const [loading, setLoading] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
 
@@ -34,7 +35,7 @@ export const QuickRepliesModal: React.FC<QuickRepliesModalProps> = ({
     try {
       const res = await fetch('/api/quick-replies');
       if (res.ok) {
-        const data = await res.json();
+        const data = (await res.json()) as RespostaListaRespostasRapidas;
         const list = Array.isArray(data.quickReplies) ? data.quickReplies : (Array.isArray(data) ? data : []);
         setReplies(list);
       }
@@ -87,7 +88,7 @@ export const QuickRepliesModal: React.FC<QuickRepliesModalProps> = ({
         setIsCreating(false);
         fetchReplies();
       } else {
-        const err = await res.json();
+        const err = (await res.json()) as RespostaErroApi;
         onShowToast(err.error || 'Erro ao salvar resposta rápida.');
       }
     } catch (err: any) {

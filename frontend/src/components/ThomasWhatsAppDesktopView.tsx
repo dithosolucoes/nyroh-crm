@@ -43,7 +43,7 @@ import { InboxConversation, InboxPage, Lead, LeadChatMessage, Salesperson, PIPEL
 import { WhatsAppVoiceAudioPlayer } from './WhatsAppVoiceAudioPlayer';
 import { useRuntimeConfig, formatInstancePhone } from '@shared/lib/useRuntimeConfig';
 import { onRealtime, onRealtimeConnection } from '@shared/lib/realtime';
-import type { RespostaEnviarMensagem, RespostaSessaoAtual, RespostaListaNotas } from '@shared/contracts/rotas';
+import type { RespostaEnviarMensagem, RespostaSessaoAtual, RespostaListaNotas, RespostaListaRespostasRapidas, RespostaRapida } from '@shared/contracts/rotas';
 import { QuickRepliesModal } from './QuickRepliesModal';
 import { arePhonesEquivalent } from '@shared/lib/phone';
 import { shouldApplyStatus, statusRank } from '@shared/lib/fluxoStatus';
@@ -240,7 +240,7 @@ export const ThomasWhatsAppDesktopView: React.FC<ThomasWhatsAppDesktopViewProps>
 
   // Quick Replies (Atalhos com '/') & Autocomplete
   const [isQuickRepliesModalOpen, setIsQuickRepliesModalOpen] = useState<boolean>(false);
-  const [quickReplies, setQuickReplies] = useState<QuickReply[]>([]);
+  const [quickReplies, setQuickReplies] = useState<RespostaRapida[]>([]);
   const [selectedSlashIndex, setSelectedSlashIndex] = useState<number>(0);
   const [showSlashDropdown, setShowSlashDropdown] = useState<boolean>(false);
   const [slashQuery, setSlashQuery] = useState<string>('');
@@ -249,7 +249,7 @@ export const ThomasWhatsAppDesktopView: React.FC<ThomasWhatsAppDesktopViewProps>
     try {
       const res = await fetch('/api/quick-replies');
       if (res.ok) {
-        const data = await res.json();
+        const data = (await res.json()) as RespostaListaRespostasRapidas;
         const list = Array.isArray(data.quickReplies) ? data.quickReplies : (Array.isArray(data) ? data : []);
         setQuickReplies(list);
       }
@@ -438,7 +438,7 @@ export const ThomasWhatsAppDesktopView: React.FC<ThomasWhatsAppDesktopViewProps>
   }, [showSlashDropdown, slashQuery, quickReplies]);
 
   // Inserir atalho selecionado no composer
-  const handleSelectQuickReply = (qr: QuickReply) => {
+  const handleSelectQuickReply = (qr: RespostaRapida) => {
     const formatted = replaceLeadVariables(qr.content, activeLead);
     setInputText(formatted);
     setShowSlashDropdown(false);

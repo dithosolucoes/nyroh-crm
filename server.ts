@@ -17,7 +17,7 @@ import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regrasDeC
 import { validarInstanciaEscolhida, escolherInstanciaDisparo } from './shared/lib/dispatchInstancia.js';
 import { recuperarFixosDescartados } from './shared/lib/recuperacaoFixos.js';
 import { variaveisFaltando, mensagemFaltando } from './shared/lib/configObrigatoria.js';
-import type { RespostaListaUploads, UploadZipRegistro, RespostaUploadZipOk, RespostaEnviarMensagem, StatusMensagemEnviada, RespostaLoginOk, RespostaSessaoAtual, RespostaSucesso, UsuarioAdmin, RespostaListaUsuarios, RespostaAuditLogs, RespostaLogsServidor, RespostaListaVendedores, RespostaVendedorCriado, RespostaLoteVendedores, RespostaVendedorAtualizado, RespostaSenhaVendedor, RespostaVendedorStatus, RespostaRoletaConfig, RespostaDistribuicaoRoleta, RespostaListaEtiquetas, RespostaEtiquetaSalva, RespostaOk, RespostaListaNotas, RespostaNotaCriada, RespostaResolucao, RespostaAuditoriaSite, RespostaAtualizacaoLead, RespostaResumoLead, RespostaListaLigacoes, RespostaLigacaoRegistrada, RespostaListaLigacoesGerais, RespostaListaLeads } from './shared/contracts/rotas.js';
+import type { RespostaListaUploads, UploadZipRegistro, RespostaUploadZipOk, RespostaEnviarMensagem, StatusMensagemEnviada, RespostaLoginOk, RespostaSessaoAtual, RespostaSucesso, UsuarioAdmin, RespostaListaUsuarios, RespostaAuditLogs, RespostaLogsServidor, RespostaListaVendedores, RespostaVendedorCriado, RespostaLoteVendedores, RespostaVendedorAtualizado, RespostaSenhaVendedor, RespostaVendedorStatus, RespostaRoletaConfig, RespostaDistribuicaoRoleta, RespostaListaEtiquetas, RespostaEtiquetaSalva, RespostaOk, RespostaListaNotas, RespostaNotaCriada, RespostaResolucao, RespostaAuditoriaSite, RespostaAtualizacaoLead, RespostaResumoLead, RespostaListaLigacoes, RespostaLigacaoRegistrada, RespostaListaLigacoesGerais, RespostaListaLeads, RespostaListaRespostasRapidas, RespostaRespostaRapidaCriada, RespostaRespostaRapidaExcluida } from './shared/contracts/rotas.js';
 import { registerAutomacoesRoutes, applyAutomacoesMigration, applyAutomacoesEstadoMigration, applyAutomacoesFilaMigration, automacoesPersistenciaOn, iniciarWorkerAutomacoes } from './shared/lib/automacoesRoutes.js';
 import { registrarEventoCliente, registrarEventoGeral, pedidoDePararPelasRegras, pedidoDeAlertaPelasRegras, type ItemFila } from './shared/lib/automacoesExecucao.js';
 import type { EventoV } from './shared/lib/automacoes.js';
@@ -7780,7 +7780,7 @@ app.get('/api/quick-replies', async (req, res) => {
          FROM quick_replies
          ORDER BY created_at ASC`
       );
-      return res.json({ success: true, quickReplies: qRes.rows });
+      return res.json({ success: true, quickReplies: qRes.rows } satisfies RespostaListaRespostasRapidas);
     } catch (err: any) {
       console.warn('[PostgreSQL] Erro ao buscar quick_replies:', err.message);
       return res.status(503).json({ error: 'Não foi possível ler as respostas rápidas.' });
@@ -7789,7 +7789,7 @@ app.get('/api/quick-replies', async (req, res) => {
   return res.json({
     success: true,
     quickReplies: Array.from(memoryQuickRepliesMap.values())
-  });
+  } satisfies RespostaListaRespostasRapidas);
 });
 
 app.post('/api/quick-replies', async (req, res) => {
@@ -7827,7 +7827,7 @@ app.post('/api/quick-replies', async (req, res) => {
   }
 
   broadcastSSE('QUICK_REPLY_CREATED', { quickReply: newQR }, { broadcastAll: true });
-  return res.status(201).json({ success: true, quickReply: newQR });
+  return res.status(201).json({ success: true, quickReply: newQR } satisfies RespostaRespostaRapidaCriada);
 });
 
 app.delete('/api/quick-replies/:id', async (req, res) => {
@@ -7843,7 +7843,7 @@ app.delete('/api/quick-replies/:id', async (req, res) => {
   }
 
   broadcastSSE('QUICK_REPLY_DELETED', { id }, { broadcastAll: true });
-  return res.json({ success: true, id });
+  return res.json({ success: true, id } satisfies RespostaRespostaRapidaExcluida);
 });
 
 // Robust Helper functions for Phone & Nyroh URL Extraction
