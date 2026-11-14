@@ -17,7 +17,7 @@ import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regrasDeC
 import { validarInstanciaEscolhida, escolherInstanciaDisparo } from './shared/lib/dispatchInstancia.js';
 import { recuperarFixosDescartados } from './shared/lib/recuperacaoFixos.js';
 import { variaveisFaltando, mensagemFaltando } from './shared/lib/configObrigatoria.js';
-import type { RespostaListaUploads, UploadZipRegistro, RespostaUploadZipOk, RespostaEnviarMensagem, StatusMensagemEnviada, RespostaLoginOk, RespostaSessaoAtual, RespostaSucesso, UsuarioAdmin, RespostaListaUsuarios, RespostaAuditLogs, RespostaLogsServidor, RespostaListaVendedores, RespostaVendedorCriado, RespostaLoteVendedores, RespostaVendedorAtualizado, RespostaSenhaVendedor, RespostaVendedorStatus, RespostaRoletaConfig, RespostaDistribuicaoRoleta, RespostaListaEtiquetas, RespostaEtiquetaSalva, RespostaOk, RespostaListaNotas, RespostaNotaCriada, RespostaResolucao } from './shared/contracts/rotas.js';
+import type { RespostaListaUploads, UploadZipRegistro, RespostaUploadZipOk, RespostaEnviarMensagem, StatusMensagemEnviada, RespostaLoginOk, RespostaSessaoAtual, RespostaSucesso, UsuarioAdmin, RespostaListaUsuarios, RespostaAuditLogs, RespostaLogsServidor, RespostaListaVendedores, RespostaVendedorCriado, RespostaLoteVendedores, RespostaVendedorAtualizado, RespostaSenhaVendedor, RespostaVendedorStatus, RespostaRoletaConfig, RespostaDistribuicaoRoleta, RespostaListaEtiquetas, RespostaEtiquetaSalva, RespostaOk, RespostaListaNotas, RespostaNotaCriada, RespostaResolucao, RespostaAuditoriaSite, RespostaAtualizacaoLead } from './shared/contracts/rotas.js';
 import { registerAutomacoesRoutes, applyAutomacoesMigration, applyAutomacoesEstadoMigration, applyAutomacoesFilaMigration, automacoesPersistenciaOn, iniciarWorkerAutomacoes } from './shared/lib/automacoesRoutes.js';
 import { registrarEventoCliente, registrarEventoGeral, pedidoDePararPelasRegras, pedidoDeAlertaPelasRegras, type ItemFila } from './shared/lib/automacoesExecucao.js';
 import type { EventoV } from './shared/lib/automacoes.js';
@@ -7181,7 +7181,7 @@ app.post('/api/leads/:id/audit', async (req: any, res) => {
     }
 
     const report = await performWebsiteAudit(id, leadName, websiteUrl);
-    return res.json(report);
+    return res.json(report satisfies RespostaAuditoriaSite);
   } catch (err: any) {
     console.error('Erro ao gerar auditoria do site:', err);
     res.status(500).json({ error: `Falha ao analisar site: ${err.message}` });
@@ -7334,7 +7334,7 @@ app.put('/api/leads/:id/assign', async (req: any, res) => {
       if (result.rowCount === 0) {
         return res.status(404).json({ error: 'Lead não encontrado.' });
       }
-      return res.json({ success: true, lead: result.rows[0] });
+      return res.json({ success: true, lead: result.rows[0] } satisfies RespostaAtualizacaoLead);
     } else {
       const lead = memoryLeadsMap.get(id);
       if (!lead) {
@@ -7344,7 +7344,7 @@ app.put('/api/leads/:id/assign', async (req: any, res) => {
       lead.salespersonName = resolvedName;
       lead.updatedAt = new Date().toISOString();
       memoryLeadsMap.set(id, lead);
-      return res.json({ success: true, lead });
+      return res.json({ success: true, lead } satisfies RespostaAtualizacaoLead);
     }
   } catch (error) {
     console.error('Error assigning lead:', error);
@@ -8942,7 +8942,7 @@ app.put('/api/leads/:id/status', async (req, res) => {
         return res.status(404).json({ error: 'Lead não encontrado.' });
       }
       if (columnStatus) emitirEventoLead('funil_entrou', id, { funil: String(columnStatus) });
-      return res.json({ success: true, lead: result.rows[0] });
+      return res.json({ success: true, lead: result.rows[0] } satisfies RespostaAtualizacaoLead);
     } else {
       const lead = memoryLeadsMap.get(id);
       if (!lead) {
@@ -8953,7 +8953,7 @@ app.put('/api/leads/:id/status', async (req, res) => {
       if (lossReason !== undefined) lead.lossReason = lossReason;
       lead.updatedAt = new Date().toISOString();
       memoryLeadsMap.set(id, lead);
-      return res.json({ success: true, lead });
+      return res.json({ success: true, lead } satisfies RespostaAtualizacaoLead);
     }
   } catch (error) {
     console.error('Error updating lead status:', error);

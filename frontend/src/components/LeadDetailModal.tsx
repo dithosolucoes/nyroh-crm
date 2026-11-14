@@ -10,6 +10,7 @@ import {
 import { openWhatsApp, getStoredWhatsAppAppType, setStoredWhatsAppAppType, WhatsAppAppType, getDialerTelLink, getStoredWhatsAppTemplate, formatWhatsAppMessage } from '@shared/lib/phone';
 import { QrCodeModal } from './QrCodeModal';
 import { BlockRequestDialog, BlockHistory } from './BlockRequestDialog';
+import type { RespostaAuditoriaSite } from '@shared/contracts/rotas';
 import { LeadTimeline } from './LeadTimeline';
 import { AuditReportModal } from './AuditReportModal';
 import { WebsiteAuditReport } from '@shared/types/audit';
@@ -176,7 +177,7 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
         headers: { 'Content-Type': 'application/json' }
       });
       if (res.ok) {
-        const data = await res.json();
+        const data = (await res.json()) as RespostaAuditoriaSite;
         setAuditReport(data);
       } else {
         onShowToast('Não foi possível auditar o site do cliente.');

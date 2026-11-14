@@ -1,4 +1,5 @@
 import type { User, AuditLog, Salesperson, CustomTag } from '../types';
+import type { WebsiteAuditReport } from '../types/audit';
 import type { LogEntry } from '../lib/logBuffer';
 
 /**
@@ -204,6 +205,20 @@ export interface RespostaNotaCriada {
 export interface RespostaResolucao {
   success: true;
   resolved: boolean;
+}
+
+/** POST /api/leads/:id/audit (relatório instantâneo do site do lead) */
+export type RespostaAuditoriaSite = WebsiteAuditReport;
+
+/**
+ * PUT /api/leads/:id/status e PUT /api/leads/:id/assign (sucesso).
+ * `lead` fica como unknown de propósito: no Postgres o servidor devolve as colunas
+ * do banco (snake_case, RETURNING *), e na memória devolve o Lead. Ninguém no front lê
+ * esse campo hoje. Tipar com precisão exige alinhar o SELECT do Postgres (fase futura).
+ */
+export interface RespostaAtualizacaoLead {
+  success: true;
+  lead: unknown;
 }
 
 /** Exemplos conferidos pelo compilador. Se um campo mudar de nome, o build quebra aqui. */
