@@ -146,8 +146,9 @@ Ordem prática, quando um item não pode andar em paralelo:
     - [x] Fluxo: criação de instância (POST `instances`), envio de teste de texto e envio de modelo de teste
     - [x] Meta: cadastro de conta (POST `accounts`), embedded signup (config e complete) e leitura direta da Meta (GET `sync`)
     - [x] Front dos vendedores: `SalesTeamModal`, `AdminSellerInspectionView`, `BulkCreateSalespeopleModal` (criar, lote, editar, senha, excluir, estatísticas, transferência em lote, distribuição)
+    - [x] Disparos (parte 1): cópias de mensagem (listar, criar, editar, excluir), lotes (listar), velocidade (ler e alterar), pausar, retomar e cancelar lote
   - Falta:
-    - [ ] Disparos (`/api/campaign/*`): lotes, cópias, envio, pausa e cancelamento
+    - [ ] Disparos (parte 2): criar lote, progresso, envio (`dispatch`, `test-dispatch`), quarentena, devolução de leads, reset de fila, sincronização do WhatsApp Web, leads e campos, importação e apagar uploads
     - [ ] Automações
     - [ ] Inbox e mensagens (`/api/inbox`, `/api/messages/search`, `/api/leads/:id/messages`)
     - [ ] Resto das rotas (~20), entre elas leads em lote e recuperação

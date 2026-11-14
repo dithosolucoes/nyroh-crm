@@ -661,6 +661,107 @@ export interface RespostaTransferenciaLote {
   message: string;
 }
 
+/**
+ * Modelo de copy de disparo (GET/POST/PUT /api/campaign/copies).
+ * As variáveis são sempre texto: o servidor grava '' quando não há valor.
+ */
+export interface CopiaCampanha {
+  id: string;
+  name: string;
+  description?: string | null;
+  category?: string | null;
+  var1: string;
+  var2: string;
+  var3: string;
+  metaTemplateName?: string | null;
+  values?: Record<string, string>;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  isDefault?: boolean;
+}
+
+/** GET /api/campaign/copies */
+export type RespostaListaCopias = CopiaCampanha[];
+
+/** POST /api/campaign/copies (201) e PUT /api/campaign/copies/:id (copia salva) */
+export type RespostaCopiaSalva = CopiaCampanha;
+
+/** DELETE /api/campaign/copies/:id */
+export interface RespostaCopiaRemovida {
+  success: true;
+  message: string;
+}
+
+/**
+ * Lote de disparo como sai de GET /api/campaign/batches. O Postgres manda mais campos
+ * que o CampaignBatch do front (ex.: stagingCount) e null em quarentena não iniciada.
+ */
+export interface LoteCampanha {
+  id: string;
+  name: string;
+  totalLeads: number;
+  validMobiles: number;
+  landlines: number;
+  withNyrohUrl: number;
+  withWebsite: number;
+  status: string;
+  templateName: string | null;
+  quarantineHours: number | null;
+  quarantineStartedAt?: string | null;
+  quarantineEndsAt?: string | null;
+  allowedClosers?: string[] | null;
+  hotLeadsRetainedByAdmin: boolean;
+  onReplyAction?: string | null;
+  onExpireAction?: string | null;
+  dispatchedCount: number;
+  acceptedCount?: number;
+  deliveredCount?: number;
+  failedCount?: number;
+  hotCount: number;
+  coldCount: number;
+  optOutCount: number;
+  stagingCount?: number;
+  createdAt: string;
+}
+
+/** GET /api/campaign/batches */
+export type RespostaListaLotes = LoteCampanha[];
+
+/** GET /api/campaign/dispatch/speed */
+export interface RespostaVelocidadeDisparo {
+  currentSpeed: number;
+  currentPerMinute: number;
+  maxSpeed: number;
+  maxPerMinute: number;
+  planRpm: number;
+  presets: Array<{ label: string; speed: number; perMinute: number; description: string }>;
+}
+
+/** POST /api/campaign/dispatch/speed */
+export interface RespostaAlteracaoVelocidade {
+  success: true;
+  speed: number;
+  perMinute: number;
+  cappedByPlan: boolean;
+  planRpm: number;
+}
+
+/** POST /api/campaign/batches/:id/pause e /resume */
+export interface RespostaAcaoLote {
+  success: boolean;
+  batchId: string;
+}
+
+/** POST /api/campaign/batches/:id/cancel (devolve os leads que a Meta não aceitou) */
+export interface RespostaCancelamentoLote {
+  success: boolean;
+  batchId: string;
+  returned: number;
+  removedFromQueue?: number;
+  skippedInvalid?: number;
+  message: string;
+}
+
 /** Exemplos conferidos pelo compilador. Se um campo mudar de nome, o build quebra aqui. */
 export const EXEMPLO_UPLOAD_ZIP = {
   success: true,

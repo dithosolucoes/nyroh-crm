@@ -74,7 +74,7 @@ import { AdminDispatchTestSandbox } from './AdminDispatchTestSandbox';
 import { ZipImportProgressModal, ImportProgressData } from './ZipImportProgressModal';
 import { PaginaSubirZip, ZipUploadRegistro } from './PaginaSubirZip';
 import { isUiFlagOn } from '@shared/lib/uiFlags';
-import type { RespostaListaUploads, RespostaListaModelosFluxo, RespostaInstanciasFluxo } from '@shared/contracts/rotas';
+import type { RespostaListaUploads, RespostaListaModelosFluxo, RespostaInstanciasFluxo, RespostaListaCopias, RespostaCopiaSalva, CopiaCampanha, RespostaListaLotes, RespostaVelocidadeDisparo, LoteCampanha } from '@shared/contracts/rotas';
 
 const SHOW_SIMULATE = isUiFlagOn(import.meta.env.VITE_MOSTRAR_SIMULAR);
 /** Estado real do disparo: falhou (com motivo), lido/respondeu, ou ainda sem confirmação de entrega. */
@@ -168,7 +168,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   const runtime = useRuntimeConfig();
   const instanceLabel = formatInstancePhone(runtime.instancePhone);
   const [activeTab, setActiveTab] = useState<SubPageTab>('kanban');
-  const [batches, setBatches] = useState<CampaignBatch[]>([]);
+  const [batches, setBatches] = useState<LoteCampanha[]>([]);
   // Safras marcadas para disparo (mais de uma = dispara todas marcadas com a mesma copy e quantidade)
   const [checkedBatchIds, setCheckedBatchIds] = useState<string[]>([]);
   const [brandOptions, setBrandOptions] = useState<Array<{ id: string; name: string }>>([]);
@@ -452,7 +452,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   const setTemplateVar3 = (v: string) => setCopyAt(3, v);
 
   // Biblioteca de Templates de Copy (O que vai DENTRO das variáveis do template da Meta)
-  const [copyTemplates, setCopyTemplates] = useState<CampaignCopyTemplate[]>([]);
+  const [copyTemplates, setCopyTemplates] = useState<CopiaCampanha[]>([]);
   const [selectedCopyTemplateId, setSelectedCopyTemplateId] = useState<string>(() => {
     try {
       return localStorage.getItem('nyroh_selected_copy_id') || 'tpl_prospeccao_proativo';
@@ -508,7 +508,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
       setLoadingCopies(true);
       const res = await fetch('/api/campaign/copies');
       if (res.ok) {
-        const data = await res.json();
+        const data = (await res.json()) as RespostaListaCopias;
         if (Array.isArray(data)) {
           setCopyTemplates(data);
           // Manter a seleção salva no localStorage se existir
@@ -591,14 +591,14 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
         })
       });
       if (res.ok) {
-        const updated = await res.json();
+        const updated = (await res.json()) as RespostaCopiaSalva;
         setCopyTemplates(prev => prev.map(c => c.id === updated.id ? updated : c));
         setActionNotification({
           type: 'success',
           message: `Alterações salvas com sucesso na copy "${updated.name}"!`
         });
       } else {
-        const err = await res.json();
+        const err = (await res.json()) as RespostaErroApi;
         setActionNotification({
           type: 'error',
           message: err.error || 'Não foi possível atualizar o template de copy.'
@@ -648,7 +648,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
       });
 
       if (res.ok) {
-        const created = await res.json();
+        const created = (await res.json()) as RespostaCopiaSalva;
         setCopyTemplates(prev => [created, ...prev]);
         setSelectedCopyTemplateId(created.id);
         try {
@@ -782,7 +782,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
       setLoading(true);
       const res = await fetch('/api/campaign/batches');
       if (res.ok) {
-        const data = await res.json();
+        const data = (await res.json()) as RespostaListaLotes;
         setBatches(data);
         if (data.length > 0 && !selectedBatchId) {
           setSelectedBatchId(data[0].id);
@@ -886,7 +886,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
     try {
       const res = await fetch('/api/campaign/dispatch/speed');
       if (res.ok) {
-        const data = await res.json();
+        const data = (await res.json()) as RespostaVelocidadeDisparo;
         if (data.currentSpeed) setDispatchSpeed(data.currentSpeed);
         if (data.presets) setSpeedPresets(data.presets);
         if (data.maxSpeed) setSpeedLimits({ maxSpeed: data.maxSpeed, maxPerMinute: data.maxPerMinute, planRpm: data.planRpm });

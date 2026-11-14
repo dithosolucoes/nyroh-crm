@@ -17,7 +17,7 @@ import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regrasDeC
 import { validarInstanciaEscolhida, escolherInstanciaDisparo } from './shared/lib/dispatchInstancia.js';
 import { recuperarFixosDescartados } from './shared/lib/recuperacaoFixos.js';
 import { variaveisFaltando, mensagemFaltando } from './shared/lib/configObrigatoria.js';
-import type { RespostaListaUploads, UploadZipRegistro, RespostaUploadZipOk, RespostaEnviarMensagem, StatusMensagemEnviada, RespostaLoginOk, RespostaSessaoAtual, RespostaSucesso, UsuarioAdmin, RespostaListaUsuarios, RespostaAuditLogs, RespostaLogsServidor, RespostaListaVendedores, RespostaVendedorCriado, RespostaLoteVendedores, RespostaVendedorAtualizado, RespostaSenhaVendedor, RespostaVendedorStatus, RespostaRoletaConfig, RespostaDistribuicaoRoleta, RespostaListaEtiquetas, RespostaEtiquetaSalva, RespostaOk, RespostaListaNotas, RespostaNotaCriada, RespostaResolucao, RespostaAuditoriaSite, RespostaAtualizacaoLead, RespostaResumoLead, RespostaListaLigacoes, RespostaLigacaoRegistrada, RespostaListaLigacoesGerais, RespostaListaLeads, RespostaListaRespostasRapidas, RespostaRespostaRapidaCriada, RespostaRespostaRapidaExcluida, RespostaStatusMeta, RespostaContasMeta, RespostaSincronizacaoConta, RespostaSincronizacaoTodas, RespostaMetaRemovida, RespostaConfigFluxo, RespostaStatusFluxo, RespostaEventosFluxo, RespostaModoInstancia, RespostaListaModelosFluxo, RespostaSincronizacaoModelos, RespostaModeloCriado, RespostaInstanciasFluxo, RespostaCadastroContaOk, RespostaConfigEmbeddedSignup, RespostaEmbeddedSignupConcluido, RespostaLeituraMeta, RespostaCriacaoInstancia, RespostaEnvioTesteSucesso, RespostaDistribuicaoLeads, RespostaEstatisticasVendedor, RespostaTransferenciaLote } from './shared/contracts/rotas.js';
+import type { RespostaListaUploads, UploadZipRegistro, RespostaUploadZipOk, RespostaEnviarMensagem, StatusMensagemEnviada, RespostaLoginOk, RespostaSessaoAtual, RespostaSucesso, UsuarioAdmin, RespostaListaUsuarios, RespostaAuditLogs, RespostaLogsServidor, RespostaListaVendedores, RespostaVendedorCriado, RespostaLoteVendedores, RespostaVendedorAtualizado, RespostaSenhaVendedor, RespostaVendedorStatus, RespostaRoletaConfig, RespostaDistribuicaoRoleta, RespostaListaEtiquetas, RespostaEtiquetaSalva, RespostaOk, RespostaListaNotas, RespostaNotaCriada, RespostaResolucao, RespostaAuditoriaSite, RespostaAtualizacaoLead, RespostaResumoLead, RespostaListaLigacoes, RespostaLigacaoRegistrada, RespostaListaLigacoesGerais, RespostaListaLeads, RespostaListaRespostasRapidas, RespostaRespostaRapidaCriada, RespostaRespostaRapidaExcluida, RespostaStatusMeta, RespostaContasMeta, RespostaSincronizacaoConta, RespostaSincronizacaoTodas, RespostaMetaRemovida, RespostaConfigFluxo, RespostaStatusFluxo, RespostaEventosFluxo, RespostaModoInstancia, RespostaListaModelosFluxo, RespostaSincronizacaoModelos, RespostaModeloCriado, RespostaInstanciasFluxo, RespostaCadastroContaOk, RespostaConfigEmbeddedSignup, RespostaEmbeddedSignupConcluido, RespostaLeituraMeta, RespostaCriacaoInstancia, RespostaEnvioTesteSucesso, RespostaDistribuicaoLeads, RespostaEstatisticasVendedor, RespostaTransferenciaLote, RespostaListaCopias, RespostaCopiaSalva, RespostaCopiaRemovida, RespostaListaLotes, RespostaVelocidadeDisparo, RespostaAlteracaoVelocidade, RespostaAcaoLote, RespostaCancelamentoLote } from './shared/contracts/rotas.js';
 import { registerAutomacoesRoutes, applyAutomacoesMigration, applyAutomacoesEstadoMigration, applyAutomacoesFilaMigration, automacoesPersistenciaOn, iniciarWorkerAutomacoes } from './shared/lib/automacoesRoutes.js';
 import { registrarEventoCliente, registrarEventoGeral, pedidoDePararPelasRegras, pedidoDeAlertaPelasRegras, type ItemFila } from './shared/lib/automacoesExecucao.js';
 import type { EventoV } from './shared/lib/automacoes.js';
@@ -9484,12 +9484,12 @@ app.get('/api/campaign/batches', async (req, res) => {
         FROM campaign_batches b
         ORDER BY b.created_at DESC
       `);
-      return res.json(result.rows);
+      return res.json(result.rows satisfies RespostaListaLotes);
     } else {
       const batches = Array.from(memoryCampaignBatchesMap.values()).sort(
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
-      return res.json(batches);
+      return res.json(batches satisfies RespostaListaLotes);
     }
   } catch (err: any) {
     console.error('Erro ao buscar safras de disparo:', err);
@@ -10352,7 +10352,7 @@ app.get('/api/campaign/copies', async (req: any, res) => {
               isDefault: row.isDefault
             });
           }
-          return res.json(result.rows.map((r: any) => ({ ...r, values: valoresDaLinhaCopy(r) })));
+          return res.json(result.rows.map((r: any) => ({ ...r, values: valoresDaLinhaCopy(r) })) satisfies RespostaListaCopias);
         } else {
           // Se a tabela estiver vazia, semear com os padrões e retornar
           for (const defTpl of Array.from(memoryCampaignCopyTemplatesMap.values())) {
@@ -10370,7 +10370,7 @@ app.get('/api/campaign/copies', async (req: any, res) => {
             ORDER BY is_default DESC, created_at DESC
           `);
           if (seeded.rows.length > 0) {
-            return res.json(seeded.rows.map((r: any) => ({ ...r, values: valoresDaLinhaCopy(r) })));
+            return res.json(seeded.rows.map((r: any) => ({ ...r, values: valoresDaLinhaCopy(r) })) satisfies RespostaListaCopias);
           }
         }
       } catch (tableErr: any) {
@@ -10378,7 +10378,7 @@ app.get('/api/campaign/copies', async (req: any, res) => {
       }
     }
     const list = Array.from(memoryCampaignCopyTemplatesMap.values()).map(r => ({ ...r, values: valoresDaLinhaCopy(r) }));
-    return res.json(list);
+    return res.json(list satisfies RespostaListaCopias);
   } catch (err: any) {
     console.error('Erro ao buscar templates de copy:', err);
     res.status(500).json({ error: 'Erro ao listar templates de copy.' });
@@ -10429,7 +10429,7 @@ app.post('/api/campaign/copies', async (req: any, res) => {
     memoryCampaignCopyTemplatesMap.set(id, newTemplate);
     await logAudit('COPY_TEMPLATE_CRIADO', `Criado template de copy "${newTemplate.name}"`, req);
 
-    return res.status(201).json(newTemplate);
+    return res.status(201).json(newTemplate satisfies RespostaCopiaSalva);
   } catch (err: any) {
     console.error('Erro ao salvar template de copy:', err);
     res.status(500).json({ error: 'Erro ao salvar template de copy no banco: ' + err.message });
@@ -10504,7 +10504,7 @@ app.put('/api/campaign/copies/:id', async (req: any, res) => {
     }
 
     await logAudit('COPY_TEMPLATE_ATUALIZADO', `Atualizado template de copy "${updated.name}"`, req);
-    return res.json(updated);
+    return res.json(updated satisfies RespostaCopiaSalva);
   } catch (err: any) {
     console.error('Erro ao atualizar template de copy:', err);
     res.status(500).json({ error: 'Erro ao atualizar template de copy.' });
@@ -10544,7 +10544,7 @@ app.delete('/api/campaign/copies/:id', async (req: any, res) => {
     }
 
     await logAudit('COPY_TEMPLATE_EXCLUIDO', `Excluído template de copy "${existing.name}"`, req);
-    return res.json({ success: true, message: 'Template de copy removido com sucesso.' });
+    return res.json({ success: true, message: 'Template de copy removido com sucesso.' } satisfies RespostaCopiaRemovida);
   } catch (err: any) {
     console.error('Erro ao excluir template de copy:', err);
     res.status(500).json({ error: 'Erro ao excluir template de copy.' });
@@ -11076,7 +11076,7 @@ app.get('/api/campaign/dispatch/speed', (req, res) => {
       preset('Equilibrado', 0.5, 'Ritmo comercial seguro'),
       preset('Máximo do plano', 1, 'Teto do seu plano FluxoAPI (reserva fôlego p/ o atendimento)')
     ]
-  });
+  } satisfies RespostaVelocidadeDisparo);
 });
 
 app.post('/api/campaign/dispatch/speed', (req, res) => {
@@ -11086,7 +11086,7 @@ app.post('/api/campaign/dispatch/speed', (req, res) => {
   const cappedByPlan = Number.isFinite(requested) && requested > newSpeed + 1e-9;
   broadcastSocketEvent('campaign_speed_changed', { speed: newSpeed });
   broadcastSSE('CAMPAIGN_SPEED_CHANGED', { speed: newSpeed });
-  res.json({ success: true, speed: newSpeed, perMinute: Math.round(newSpeed * 60), cappedByPlan, planRpm: planRpm() });
+  res.json({ success: true, speed: newSpeed, perMinute: Math.round(newSpeed * 60), cappedByPlan, planRpm: planRpm() } satisfies RespostaAlteracaoVelocidade);
 });
 
 // Endpoint para obter o progresso em tempo real de um lote em execução
@@ -11103,14 +11103,14 @@ app.get('/api/campaign/batches/:batchId/progress', (req, res) => {
 app.post('/api/campaign/batches/:batchId/pause', (req, res) => {
   const ok = pauseBatchProgress(req.params.batchId);
   broadcastSocketEvent('campaign_batch_paused', { batchId: req.params.batchId });
-  res.json({ success: ok, batchId: req.params.batchId });
+  res.json({ success: ok, batchId: req.params.batchId } satisfies RespostaAcaoLote);
 });
 
 // Retomar execução do lote
 app.post('/api/campaign/batches/:batchId/resume', (req, res) => {
   const ok = resumeBatchProgress(req.params.batchId);
   broadcastSocketEvent('campaign_batch_resumed', { batchId: req.params.batchId });
-  res.json({ success: ok, batchId: req.params.batchId });
+  res.json({ success: ok, batchId: req.params.batchId } satisfies RespostaAcaoLote);
 });
 
 // Cancelar execução do lote
@@ -11119,12 +11119,12 @@ app.post('/api/campaign/batches/:batchId/cancel', async (req: any, res) => {
   const ok = cancelBatchProgress(batchId);
   broadcastSocketEvent('campaign_batch_cancelled', { batchId });
   if (!usePostgres || !pgPool) {
-    return res.json({ success: ok, batchId, returned: 0, message: 'Cancelado na fila. Sem Postgres: nada foi revertido no banco.' });
+    return res.json({ success: ok, batchId, returned: 0, message: 'Cancelado na fila. Sem Postgres: nada foi revertido no banco.' } satisfies RespostaCancelamentoLote);
   }
   try {
     // Cancelar agora também devolve para Novos Leads os que a Meta não aceitou (muda no banco, não só na memória)
     const r = await devolverNaoEnviadosDoLote(batchId);
-    return res.json({ success: ok, batchId, returned: r.returned, removedFromQueue: r.removedFromQueue, skippedInvalid: r.skippedInvalid, message: `Disparo cancelado. ${r.message}` });
+    return res.json({ success: ok, batchId, returned: r.returned, removedFromQueue: r.removedFromQueue, skippedInvalid: r.skippedInvalid, message: `Disparo cancelado. ${r.message}` } satisfies RespostaCancelamentoLote);
   } catch (err: any) {
     console.error('[Cancelar] Erro ao devolver leads:', err);
     return res.status(500).json({ success: ok, batchId, error: `Cancelado na fila, mas erro ao devolver leads: ${err.message}` });

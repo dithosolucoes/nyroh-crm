@@ -39,7 +39,7 @@ import {
   CheckCheck
 } from 'lucide-react';
 import { CampaignCopyTemplate, Salesperson, LeadChatMessage } from '@shared/types';
-import type { RespostaInstanciasFluxo } from '@shared/contracts/rotas';
+import type { RespostaInstanciasFluxo, CopiaCampanha } from '@shared/contracts/rotas';
 
 interface MetaTemplateButton {
   type: 'QUICK_REPLY' | 'URL' | 'PHONE_NUMBER' | 'COPY_CODE';
@@ -72,7 +72,7 @@ interface MetaTemplateFull {
 interface AdminDispatchTestSandboxProps {
   salespeople: Salesperson[];
   availableTemplates: any[];
-  copyTemplates: CampaignCopyTemplate[];
+  copyTemplates: CopiaCampanha[];
   onLeadsUpdated?: () => void;
   onNavigateToKanban?: (salespersonId?: string) => void;
   onNavigateToWhatsApp?: (leadId?: string, salespersonId?: string) => void;
