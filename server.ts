@@ -17,7 +17,7 @@ import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regrasDeC
 import { validarInstanciaEscolhida, escolherInstanciaDisparo } from './shared/lib/dispatchInstancia.js';
 import { recuperarFixosDescartados } from './shared/lib/recuperacaoFixos.js';
 import { variaveisFaltando, mensagemFaltando } from './shared/lib/configObrigatoria.js';
-import type { RespostaListaUploads, UploadZipRegistro, RespostaUploadZipOk, RespostaEnviarMensagem, StatusMensagemEnviada, RespostaLoginOk, RespostaSessaoAtual, RespostaSucesso, UsuarioAdmin, RespostaListaUsuarios, RespostaAuditLogs, RespostaLogsServidor, RespostaListaVendedores, RespostaVendedorCriado, RespostaLoteVendedores, RespostaVendedorAtualizado, RespostaSenhaVendedor, RespostaVendedorStatus, RespostaRoletaConfig, RespostaDistribuicaoRoleta, RespostaListaEtiquetas, RespostaEtiquetaSalva, RespostaOk, RespostaListaNotas, RespostaNotaCriada, RespostaResolucao, RespostaAuditoriaSite, RespostaAtualizacaoLead, RespostaResumoLead, RespostaListaLigacoes, RespostaLigacaoRegistrada, RespostaListaLigacoesGerais, RespostaListaLeads, RespostaListaRespostasRapidas, RespostaRespostaRapidaCriada, RespostaRespostaRapidaExcluida } from './shared/contracts/rotas.js';
+import type { RespostaListaUploads, UploadZipRegistro, RespostaUploadZipOk, RespostaEnviarMensagem, StatusMensagemEnviada, RespostaLoginOk, RespostaSessaoAtual, RespostaSucesso, UsuarioAdmin, RespostaListaUsuarios, RespostaAuditLogs, RespostaLogsServidor, RespostaListaVendedores, RespostaVendedorCriado, RespostaLoteVendedores, RespostaVendedorAtualizado, RespostaSenhaVendedor, RespostaVendedorStatus, RespostaRoletaConfig, RespostaDistribuicaoRoleta, RespostaListaEtiquetas, RespostaEtiquetaSalva, RespostaOk, RespostaListaNotas, RespostaNotaCriada, RespostaResolucao, RespostaAuditoriaSite, RespostaAtualizacaoLead, RespostaResumoLead, RespostaListaLigacoes, RespostaLigacaoRegistrada, RespostaListaLigacoesGerais, RespostaListaLeads, RespostaListaRespostasRapidas, RespostaRespostaRapidaCriada, RespostaRespostaRapidaExcluida, RespostaStatusMeta, RespostaContasMeta, RespostaSincronizacaoConta, RespostaSincronizacaoTodas, RespostaMetaRemovida } from './shared/contracts/rotas.js';
 import { registerAutomacoesRoutes, applyAutomacoesMigration, applyAutomacoesEstadoMigration, applyAutomacoesFilaMigration, automacoesPersistenciaOn, iniciarWorkerAutomacoes } from './shared/lib/automacoesRoutes.js';
 import { registrarEventoCliente, registrarEventoGeral, pedidoDePararPelasRegras, pedidoDeAlertaPelasRegras, type ItemFila } from './shared/lib/automacoesExecucao.js';
 import type { EventoV } from './shared/lib/automacoes.js';
@@ -4267,7 +4267,7 @@ app.get('/api/admin/meta/status', (_req: any, res) => {
     webhookReady: Boolean(env.appSecret && verifyToken),
     accounts: reg.accounts.length,
     numbers: reg.numbers.length + (env.accessToken ? 1 : 0)
-  });
+  } satisfies RespostaStatusMeta);
 });
 
 // Lista as contas cadastradas (sem token) e quantos números cada uma tem
@@ -4276,7 +4276,7 @@ app.get('/api/admin/meta/accounts', async (_req: any, res) => {
   return res.json({
     success: true,
     accounts: reg.accounts.map(a => ({ ...a, numbers: reg.numbers.filter(n => n.accountId === a.id).length }))
-  });
+  } satisfies RespostaContasMeta);
 });
 
 // Cadastra uma BM: valida o token na Meta, guarda criptografado e já sincroniza os números
@@ -4309,7 +4309,7 @@ app.post('/api/admin/meta/accounts', async (req: any, res) => {
 app.post('/api/admin/meta/accounts/:id/sync', async (req: any, res) => {
   try {
     const r = await syncMetaAccountIntoDb(String(req.params.id));
-    return res.status(r.success ? 200 : 502).json(r);
+    return res.status(r.success ? 200 : 502).json(r satisfies RespostaSincronizacaoConta);
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err?.message || 'Falha na sincronização.' });
   }
@@ -4379,7 +4379,7 @@ app.post('/api/admin/meta/sync-all', async (_req: any, res) => {
     try { results.push({ id, ...(await syncMetaAccountIntoDb(id)) }); }
     catch (err: any) { results.push({ id, success: false, error: err?.message }); }
   }
-  return res.json({ success: results.every(r => r.success), results });
+  return res.json({ success: results.every(r => r.success), results } satisfies RespostaSincronizacaoTodas);
 });
 
 // Remove a BM do CRM (apaga o token guardado; os números somem junto)
@@ -4387,7 +4387,7 @@ app.delete('/api/admin/meta/accounts/:id', async (req: any, res) => {
   if (!pgPool || !usePostgres) return res.status(503).json({ success: false, error: 'Banco indisponível.' });
   await pgPool.query('DELETE FROM meta_accounts WHERE id = $1', [String(req.params.id)]);
   await loadMetaRegistryFromDb();
-  return res.json({ success: true });
+  return res.json({ success: true } satisfies RespostaMetaRemovida);
 });
 
 // GET /api/admin/meta/sync: lê da Meta os números e os modelos da conta WABA (sem gravar nada)

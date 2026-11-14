@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { RefreshCw, Trash2, Plus, X } from 'lucide-react';
+import type { RespostaContasMeta, RespostaSincronizacaoConta } from '@shared/contracts/rotas';
 
 interface MetaAccount {
   id: string;
@@ -38,7 +39,7 @@ export default function MetaAccountsPanel({ onShowToast, onAccountsChanged, numb
     setLoading(true);
     try {
       const res = await fetch('/api/admin/meta/accounts');
-      const data = await res.json();
+      const data = (await res.json()) as RespostaContasMeta;
       if (res.ok && data.success) setAccounts(data.accounts || []);
     } finally {
       setLoading(false);
@@ -172,7 +173,7 @@ export default function MetaAccountsPanel({ onShowToast, onAccountsChanged, numb
     setBusy(id);
     try {
       const res = await fetch(`/api/admin/meta/accounts/${encodeURIComponent(id)}/sync`, { method: 'POST' });
-      const data = await res.json();
+      const data = (await res.json()) as RespostaSincronizacaoConta;
       onShowToast(data.success ? `Sincronizado: ${data.numbers} número(s), ${data.templates} modelo(s).` : (data.error || 'Falha ao sincronizar.'));
       await load();
       onAccountsChanged?.();

@@ -333,6 +333,55 @@ export interface RespostaRespostaRapidaExcluida {
   id: string;
 }
 
+/** GET /api/admin/meta/status: estado da integração (sem segredos, só se existem) */
+export interface RespostaStatusMeta {
+  provider: 'meta' | 'fluxo';
+  envToken: boolean;
+  envPhoneNumberId: boolean;
+  appSecret: boolean;
+  verifyToken: boolean;
+  webhookReady: boolean;
+  accounts: number;
+  numbers: number;
+}
+
+/** Uma conta (BM/WABA) cadastrada, sem token */
+export interface ContaMeta {
+  id: string;
+  name: string;
+  wabaId: string;
+  businessId: string | null;
+  numbers: number;
+}
+
+/** GET /api/admin/meta/accounts */
+export interface RespostaContasMeta {
+  success: true;
+  accounts: ContaMeta[];
+}
+
+/** Resultado de sincronizar uma conta com a Meta (números e modelos) */
+export interface ResultadoSincronizacaoMeta {
+  success: boolean;
+  error?: string;
+  numbers: number;
+  templates: number;
+}
+
+/** POST /api/admin/meta/accounts/:id/sync (200 ok, 502 falhou) */
+export type RespostaSincronizacaoConta = ResultadoSincronizacaoMeta;
+
+/** POST /api/admin/meta/sync-all */
+export interface RespostaSincronizacaoTodas {
+  success: boolean;
+  results: Array<ResultadoSincronizacaoMeta & { id: string }>;
+}
+
+/** DELETE /api/admin/meta/accounts/:id */
+export interface RespostaMetaRemovida {
+  success: true;
+}
+
 /** Exemplos conferidos pelo compilador. Se um campo mudar de nome, o build quebra aqui. */
 export const EXEMPLO_UPLOAD_ZIP = {
   success: true,

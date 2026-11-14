@@ -1,16 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import type { RespostaStatusMeta, RespostaSincronizacaoTodas } from '@shared/contracts/rotas';
 import { CheckCircle2, AlertTriangle, RefreshCw } from 'lucide-react';
 
-interface MetaStatus {
-  provider: 'meta' | 'fluxo';
-  envToken: boolean;
-  envPhoneNumberId: boolean;
-  appSecret: boolean;
-  verifyToken: boolean;
-  webhookReady: boolean;
-  accounts: number;
-  numbers: number;
-}
 
 interface FluxoStatus {
   provider: 'meta' | 'fluxo';
@@ -28,14 +19,14 @@ interface Props {
 
 /** Faixa do topo: uma linha com o estado real da integração e a próxima ação, se houver. */
 export default function MetaStatusStrip({ onShowToast, onChanged }: Props) {
-  const [status, setStatus] = useState<MetaStatus | null>(null);
+  const [status, setStatus] = useState<RespostaStatusMeta | null>(null);
   const [busy, setBusy] = useState(false);
   const [fluxo, setFluxo] = useState<FluxoStatus | null>(null);
 
   const load = useCallback(async () => {
     try {
       const res = await fetch('/api/admin/meta/status');
-      if (res.ok) setStatus(await res.json());
+      if (res.ok) setStatus((await res.json()) as RespostaStatusMeta);
     } catch { /* faixa é informativa */ }
     try {
       const res = await fetch('/api/admin/fluxo/status');
@@ -49,7 +40,7 @@ export default function MetaStatusStrip({ onShowToast, onChanged }: Props) {
     setBusy(true);
     try {
       const res = await fetch('/api/admin/meta/sync-all', { method: 'POST' });
-      const data = await res.json();
+      const data = (await res.json()) as RespostaSincronizacaoTodas;
       onShowToast(data.success ? 'Contas sincronizadas com a Meta.' : 'Alguma conta não respondeu. Veja a mensagem na lista de contas.');
       await load();
       onChanged?.();
