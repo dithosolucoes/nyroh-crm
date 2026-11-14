@@ -143,9 +143,9 @@ Ordem prática, quando um item não pode andar em paralelo:
     - [x] Fluxo: sincronizar modelos com a Meta, mudar status e excluir modelo
     - [x] Fluxo: criar modelo (enviar para aprovação ou rascunho)
     - [x] Fluxo: listagem de instâncias (GET `instances`, com os dois caminhos: Meta e FluxoAPI), inclusive nos dois consumidores das telas de disparo
+    - [x] Fluxo: criação de instância (POST `instances`), envio de teste de texto e envio de modelo de teste
+    - [x] Meta: cadastro de conta (POST `accounts`), embedded signup (config e complete) e leitura direta da Meta (GET `sync`)
   - Falta:
-    - [ ] Meta: cadastro de conta, embedded signup, leitura da Meta
-    - [ ] Fluxo: criação de instância (POST `instances`), envio de teste
     - [ ] Disparos (`/api/campaign/*`): lotes, cópias, envio, pausa e cancelamento
     - [ ] Automações
     - [ ] Inbox e mensagens (`/api/inbox`, `/api/messages/search`, `/api/leads/:id/messages`)

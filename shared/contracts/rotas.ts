@@ -544,6 +544,74 @@ export interface RespostaSincronizacaoModelos {
   message: string;
 }
 
+/** POST /api/admin/meta/accounts (sucesso): conta cadastrada e resultado da primeira sincronização */
+export interface RespostaCadastroContaOk {
+  success: true;
+  account: { id: string; name: string; wabaId: string; businessId: string | null };
+  sync: ResultadoSincronizacaoMeta;
+}
+
+/** POST /api/admin/meta/accounts: sucesso ou erro (400, 500 ou 503) */
+export type RespostaCadastroConta = RespostaCadastroContaOk | { success: false; error: string };
+
+/** GET /api/admin/meta/embedded-signup/config */
+export interface RespostaConfigEmbeddedSignup {
+  success: true;
+  appId: string;
+  configId: string;
+  ready: boolean;
+}
+
+/** POST /api/admin/meta/embedded-signup/complete (o `success` diz se a conexão terminou de vez) */
+export interface RespostaEmbeddedSignupConcluido {
+  success: boolean;
+  accountId: string;
+  numbers: number;
+  warning: string | null;
+  error?: string | null;
+}
+
+/** GET /api/admin/meta/sync: leitura direta da Meta (sem gravar nada) */
+export interface RespostaLeituraMeta {
+  provider: 'meta' | 'fluxo';
+  configured: { accessToken: boolean; phoneNumberId: boolean; wabaId: boolean; appSecret: boolean };
+  phoneNumbers: unknown[];
+  templates: unknown[];
+  errors: { phoneNumbers: string | null; templates: string | null };
+}
+
+/** POST /api/admin/fluxo/instances (criar instância na FluxoAPI; a Meta não cria por aqui) */
+export interface RespostaCriacaoInstancia {
+  success: boolean;
+  data: unknown;
+  message: string;
+}
+
+/** POST /api/admin/fluxo/send-test-message (sucesso) */
+export interface RespostaEnvioTesteSucesso {
+  success: true;
+  messageId?: string;
+  provider?: 'meta';
+  to?: string;
+  instanceId?: string;
+  /** Só no envio de modelo (send-template-test) */
+  templateName?: string;
+  latencyMs?: number;
+  result?: unknown;
+  message?: string;
+}
+
+/** POST /api/admin/fluxo/send-test-message e send-template-test: sucesso ou falha da FluxoAPI */
+export type RespostaEnvioTeste = RespostaEnvioTesteSucesso | {
+  success: false;
+  status?: number;
+  latencyMs?: number;
+  /** Objeto da FluxoAPI na falha de envio; texto na falta de credenciais (HTTP 400). */
+  error?: { code?: string; message?: string } | string;
+  raw?: unknown;
+  message?: string;
+};
+
 /** Exemplos conferidos pelo compilador. Se um campo mudar de nome, o build quebra aqui. */
 export const EXEMPLO_UPLOAD_ZIP = {
   success: true,

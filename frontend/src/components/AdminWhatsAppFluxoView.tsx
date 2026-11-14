@@ -3,7 +3,7 @@ import { isUiFlagOn } from '@shared/lib/uiFlags';
 const SHOW_LAB = isUiFlagOn(import.meta.env.VITE_MOSTRAR_LAB);
 import { useRuntimeConfig, formatInstancePhone } from '@shared/lib/useRuntimeConfig';
 import { onRealtime } from '@shared/lib/realtime';
-import type { RespostaConfigFluxo, RespostaEventosFluxo, RespostaListaModelosFluxo, RespostaSincronizacaoModelos, RespostaModeloCriado, RespostaErroApi, RespostaInstanciasFluxo } from '@shared/contracts/rotas';
+import type { RespostaConfigFluxo, RespostaEventosFluxo, RespostaListaModelosFluxo, RespostaSincronizacaoModelos, RespostaModeloCriado, RespostaErroApi, RespostaInstanciasFluxo, RespostaEnvioTeste } from '@shared/contracts/rotas';
 import MetaAccountsPanel from './MetaAccountsPanel';
 import MetaStatusStrip from './MetaStatusStrip';
 import {
@@ -796,7 +796,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
         })
       });
 
-      const data = await res.json();
+      const data = (await res.json()) as RespostaEnvioTeste;
       setSendResult({
         ...data,
         sentAt: new Date().toLocaleTimeString('pt-BR')
@@ -815,7 +815,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
           }
         ]);
       } else {
-        onShowToast(data.error?.message || 'Erro ao enviar mensagem.');
+        onShowToast((('error' in data) && typeof data.error === 'object' && data.error?.message) || 'Erro ao enviar mensagem.');
       }
     } catch (err: any) {
       setSendResult({
@@ -852,7 +852,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
         })
       });
 
-      const data = await res.json();
+      const data = (await res.json()) as RespostaEnvioTeste;
       setSendResult({
         ...data,
         sentAt: new Date().toLocaleTimeString('pt-BR')
@@ -871,7 +871,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
           }
         ]);
       } else {
-        onShowToast(data.error?.message || 'Erro ao enviar template.');
+        onShowToast((('error' in data) && typeof data.error === 'object' && data.error?.message) || 'Erro ao enviar template.');
       }
     } catch (err: any) {
       setSendResult({
@@ -913,7 +913,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
           instanceId: inputInstanceId.trim() || config.instanceId || undefined
         })
       });
-      const data = await res.json();
+      const data = (await res.json()) as RespostaEnvioTeste;
       if (data.success) {
         setTestChatMessages((prev) =>
           prev.map((m) => (m.id === newMsg.id ? { ...m, status: 'delivered' } : m))

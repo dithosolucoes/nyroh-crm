@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { RefreshCw, Trash2, Plus, X } from 'lucide-react';
-import type { RespostaContasMeta, RespostaSincronizacaoConta } from '@shared/contracts/rotas';
+import type { RespostaContasMeta, RespostaSincronizacaoConta, RespostaCadastroConta, RespostaEmbeddedSignupConcluido, RespostaConfigEmbeddedSignup } from '@shared/contracts/rotas';
 
 interface MetaAccount {
   id: string;
@@ -58,9 +58,9 @@ export default function MetaAccountsPanel({ onShowToast, onAccountsChanged, numb
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, wabaId, businessId, accessToken: token })
       });
-      const data = await res.json();
+      const data = (await res.json()) as RespostaCadastroConta;
       if (!res.ok || !data.success) {
-        setError(data.error || 'Não foi possível cadastrar a conta.');
+        setError(('error' in data && data.error) || 'Não foi possível cadastrar a conta.');
         return;
       }
       setName(''); setWabaId(''); setBusinessId(''); setToken('');
@@ -91,7 +91,7 @@ export default function MetaAccountsPanel({ onShowToast, onAccountsChanged, numb
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      const data = await res.json();
+      const data = (await res.json()) as RespostaEmbeddedSignupConcluido;
       if (!res.ok || !data.success) {
         onShowToast(data.error || 'Não foi possível concluir a conexão com a Meta.');
         return;
@@ -140,7 +140,7 @@ export default function MetaAccountsPanel({ onShowToast, onAccountsChanged, numb
     setBusy('signup');
     try {
       const cfgRes = await fetch('/api/admin/meta/embedded-signup/config');
-      const cfg = await cfgRes.json();
+      const cfg = (await cfgRes.json()) as RespostaConfigEmbeddedSignup;
       if (!cfg.ready) {
         onShowToast('Falta configurar o login da Meta no servidor (META_APP_ID, META_CONFIG_ID e META_APP_SECRET).');
         return;

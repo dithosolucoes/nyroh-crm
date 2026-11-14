@@ -17,7 +17,7 @@ import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regrasDeC
 import { validarInstanciaEscolhida, escolherInstanciaDisparo } from './shared/lib/dispatchInstancia.js';
 import { recuperarFixosDescartados } from './shared/lib/recuperacaoFixos.js';
 import { variaveisFaltando, mensagemFaltando } from './shared/lib/configObrigatoria.js';
-import type { RespostaListaUploads, UploadZipRegistro, RespostaUploadZipOk, RespostaEnviarMensagem, StatusMensagemEnviada, RespostaLoginOk, RespostaSessaoAtual, RespostaSucesso, UsuarioAdmin, RespostaListaUsuarios, RespostaAuditLogs, RespostaLogsServidor, RespostaListaVendedores, RespostaVendedorCriado, RespostaLoteVendedores, RespostaVendedorAtualizado, RespostaSenhaVendedor, RespostaVendedorStatus, RespostaRoletaConfig, RespostaDistribuicaoRoleta, RespostaListaEtiquetas, RespostaEtiquetaSalva, RespostaOk, RespostaListaNotas, RespostaNotaCriada, RespostaResolucao, RespostaAuditoriaSite, RespostaAtualizacaoLead, RespostaResumoLead, RespostaListaLigacoes, RespostaLigacaoRegistrada, RespostaListaLigacoesGerais, RespostaListaLeads, RespostaListaRespostasRapidas, RespostaRespostaRapidaCriada, RespostaRespostaRapidaExcluida, RespostaStatusMeta, RespostaContasMeta, RespostaSincronizacaoConta, RespostaSincronizacaoTodas, RespostaMetaRemovida, RespostaConfigFluxo, RespostaStatusFluxo, RespostaEventosFluxo, RespostaModoInstancia, RespostaListaModelosFluxo, RespostaSincronizacaoModelos, RespostaModeloCriado, RespostaInstanciasFluxo } from './shared/contracts/rotas.js';
+import type { RespostaListaUploads, UploadZipRegistro, RespostaUploadZipOk, RespostaEnviarMensagem, StatusMensagemEnviada, RespostaLoginOk, RespostaSessaoAtual, RespostaSucesso, UsuarioAdmin, RespostaListaUsuarios, RespostaAuditLogs, RespostaLogsServidor, RespostaListaVendedores, RespostaVendedorCriado, RespostaLoteVendedores, RespostaVendedorAtualizado, RespostaSenhaVendedor, RespostaVendedorStatus, RespostaRoletaConfig, RespostaDistribuicaoRoleta, RespostaListaEtiquetas, RespostaEtiquetaSalva, RespostaOk, RespostaListaNotas, RespostaNotaCriada, RespostaResolucao, RespostaAuditoriaSite, RespostaAtualizacaoLead, RespostaResumoLead, RespostaListaLigacoes, RespostaLigacaoRegistrada, RespostaListaLigacoesGerais, RespostaListaLeads, RespostaListaRespostasRapidas, RespostaRespostaRapidaCriada, RespostaRespostaRapidaExcluida, RespostaStatusMeta, RespostaContasMeta, RespostaSincronizacaoConta, RespostaSincronizacaoTodas, RespostaMetaRemovida, RespostaConfigFluxo, RespostaStatusFluxo, RespostaEventosFluxo, RespostaModoInstancia, RespostaListaModelosFluxo, RespostaSincronizacaoModelos, RespostaModeloCriado, RespostaInstanciasFluxo, RespostaCadastroContaOk, RespostaConfigEmbeddedSignup, RespostaEmbeddedSignupConcluido, RespostaLeituraMeta, RespostaCriacaoInstancia, RespostaEnvioTesteSucesso } from './shared/contracts/rotas.js';
 import { registerAutomacoesRoutes, applyAutomacoesMigration, applyAutomacoesEstadoMigration, applyAutomacoesFilaMigration, automacoesPersistenciaOn, iniciarWorkerAutomacoes } from './shared/lib/automacoesRoutes.js';
 import { registrarEventoCliente, registrarEventoGeral, pedidoDePararPelasRegras, pedidoDeAlertaPelasRegras, type ItemFila } from './shared/lib/automacoesExecucao.js';
 import type { EventoV } from './shared/lib/automacoes.js';
@@ -2749,7 +2749,7 @@ app.post('/api/admin/fluxo/send-test-message', async (req: any, res) => {
   if (getMetaProvider() === 'meta') {
     const direct = await metaSendText(String(to), String(text));
     if (!direct.success) return res.status(502).json({ success: false, error: { code: 'meta_error', message: direct.error } });
-    return res.json({ success: true, messageId: direct.data?.messages?.[0]?.id, provider: 'meta' });
+    return res.json({ success: true, messageId: direct.data?.messages?.[0]?.id, provider: 'meta' } satisfies RespostaEnvioTesteSucesso);
   }
 
   const apiKey = (memoryFluxoConfig.apiKey || process.env.FLUXO_KEY || '').trim();
@@ -2803,7 +2803,7 @@ app.post('/api/admin/fluxo/send-test-message', async (req: any, res) => {
         latencyMs: result.latencyMs,
         result: result.data || result.raw,
         message: 'Mensagem de teste enviada com sucesso para a fila oficial da Meta!'
-      });
+      } satisfies RespostaEnvioTesteSucesso);
     } else {
       return res.status(result.status || 400).json({
         success: false,
@@ -3064,7 +3064,7 @@ app.post('/api/admin/fluxo/instances', async (req: any, res) => {
       success: result.success,
       data: result.data || result.raw,
       message: result.success ? 'Instância criada com sucesso na FluxoAPI!' : (result.error?.message || 'Falha ao criar instância.')
-    });
+    } satisfies RespostaCriacaoInstancia);
   } catch (err: any) {
     return res.status(500).json({ error: `Erro ao criar instância: ${err.message}` });
   }
@@ -3783,7 +3783,7 @@ app.post('/api/admin/fluxo/send-template-test', async (req: any, res) => {
         latencyMs: result.latencyMs,
         result: result.data || result.raw,
         message: 'Template enviado com sucesso para a fila oficial da Meta!'
-      });
+      } satisfies RespostaEnvioTesteSucesso);
     } else {
       return res.status(result.status || 400).json({
         success: false,
@@ -4299,7 +4299,7 @@ app.post('/api/admin/meta/accounts', async (req: any, res) => {
       [id, name, wabaId, businessId, enc]
     );
     const sync = await syncMetaAccountIntoDb(id);
-    return res.json({ success: true, account: { id, name, wabaId, businessId }, sync });
+    return res.json({ success: true, account: { id, name, wabaId, businessId }, sync } satisfies RespostaCadastroContaOk);
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err?.message || 'Falha ao cadastrar a conta.' });
   }
@@ -4318,7 +4318,7 @@ app.post('/api/admin/meta/accounts/:id/sync', async (req: any, res) => {
 // Embedded Signup: configuração pública (App ID / Config ID) para o botão "Conectar número pela Meta"
 app.get('/api/admin/meta/embedded-signup/config', (_req: any, res) => {
   const cfg = getEmbeddedSignupConfig();
-  return res.json({ success: true, appId: cfg.appId, configId: cfg.configId, ready: cfg.ready });
+  return res.json({ success: true, appId: cfg.appId, configId: cfg.configId, ready: cfg.ready } satisfies RespostaConfigEmbeddedSignup);
 });
 
 // Embedded Signup: recebe o código do login + WABA/número escolhidos e conecta a conta sem colar token
@@ -4365,7 +4365,7 @@ app.post('/api/admin/meta/embedded-signup/complete', async (req: any, res) => {
       numbers: sync.numbers,
       warning: sub.success ? null : `Conectou, mas a Meta não confirmou a assinatura dos webhooks: ${sub.error}`,
       error: !sync.success ? sync.error : (!phoneOk ? 'Conectou a conta, mas o número escolhido não apareceu na listagem da Meta.' : null)
-    });
+    } satisfies RespostaEmbeddedSignupConcluido);
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err?.message || 'Falha ao concluir a conexão.' });
   }
@@ -4405,7 +4405,7 @@ app.get('/api/admin/meta/sync', async (_req: any, res) => {
     phoneNumbers: phones.success ? (phones.data?.data || []) : [],
     templates: templates.success ? (templates.data?.data || []) : [],
     errors: { phoneNumbers: phones.error || null, templates: templates.error || null }
-  });
+  } satisfies RespostaLeituraMeta);
 });
 
 app.get('/api/admin/fluxo/events', (req: any, res) => {
