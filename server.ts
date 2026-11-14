@@ -17,7 +17,7 @@ import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regrasDeC
 import { validarInstanciaEscolhida, escolherInstanciaDisparo } from './shared/lib/dispatchInstancia.js';
 import { recuperarFixosDescartados } from './shared/lib/recuperacaoFixos.js';
 import { variaveisFaltando, mensagemFaltando } from './shared/lib/configObrigatoria.js';
-import type { RespostaListaUploads, UploadZipRegistro, RespostaUploadZipOk, RespostaEnviarMensagem, StatusMensagemEnviada, RespostaLoginOk, RespostaSessaoAtual, RespostaSucesso, UsuarioAdmin, RespostaListaUsuarios, RespostaAuditLogs, RespostaLogsServidor, RespostaListaVendedores, RespostaVendedorCriado, RespostaLoteVendedores, RespostaVendedorAtualizado, RespostaSenhaVendedor, RespostaVendedorStatus, RespostaRoletaConfig, RespostaDistribuicaoRoleta, RespostaListaEtiquetas, RespostaEtiquetaSalva, RespostaOk, RespostaListaNotas, RespostaNotaCriada, RespostaResolucao, RespostaAuditoriaSite, RespostaAtualizacaoLead, RespostaResumoLead, RespostaListaLigacoes, RespostaLigacaoRegistrada, RespostaListaLigacoesGerais, RespostaListaLeads, RespostaListaRespostasRapidas, RespostaRespostaRapidaCriada, RespostaRespostaRapidaExcluida, RespostaStatusMeta, RespostaContasMeta, RespostaSincronizacaoConta, RespostaSincronizacaoTodas, RespostaMetaRemovida, RespostaConfigFluxo, RespostaStatusFluxo, RespostaEventosFluxo, RespostaModoInstancia, RespostaListaModelosFluxo, RespostaSincronizacaoModelos, RespostaModeloCriado, RespostaInstanciasFluxo, RespostaCadastroContaOk, RespostaConfigEmbeddedSignup, RespostaEmbeddedSignupConcluido, RespostaLeituraMeta, RespostaCriacaoInstancia, RespostaEnvioTesteSucesso, RespostaDistribuicaoLeads, RespostaEstatisticasVendedor, RespostaTransferenciaLote, RespostaListaCopias, RespostaCopiaSalva, RespostaCopiaRemovida, RespostaListaLotes, RespostaVelocidadeDisparo, RespostaAlteracaoVelocidade, RespostaAcaoLote, RespostaCancelamentoLote, RespostaLiberacaoQuarentena, RespostaDevolucaoLeads, RespostaRetornoQuarentena, RespostaResetSafra } from './shared/contracts/rotas.js';
+import type { RespostaListaUploads, UploadZipRegistro, RespostaUploadZipOk, RespostaEnviarMensagem, StatusMensagemEnviada, RespostaLoginOk, RespostaSessaoAtual, RespostaSucesso, UsuarioAdmin, RespostaListaUsuarios, RespostaAuditLogs, RespostaLogsServidor, RespostaListaVendedores, RespostaVendedorCriado, RespostaLoteVendedores, RespostaVendedorAtualizado, RespostaSenhaVendedor, RespostaVendedorStatus, RespostaRoletaConfig, RespostaDistribuicaoRoleta, RespostaListaEtiquetas, RespostaEtiquetaSalva, RespostaOk, RespostaListaNotas, RespostaNotaCriada, RespostaResolucao, RespostaAuditoriaSite, RespostaAtualizacaoLead, RespostaResumoLead, RespostaListaLigacoes, RespostaLigacaoRegistrada, RespostaListaLigacoesGerais, RespostaListaLeads, RespostaListaRespostasRapidas, RespostaRespostaRapidaCriada, RespostaRespostaRapidaExcluida, RespostaStatusMeta, RespostaContasMeta, RespostaSincronizacaoConta, RespostaSincronizacaoTodas, RespostaMetaRemovida, RespostaConfigFluxo, RespostaStatusFluxo, RespostaEventosFluxo, RespostaModoInstancia, RespostaListaModelosFluxo, RespostaSincronizacaoModelos, RespostaModeloCriado, RespostaInstanciasFluxo, RespostaCadastroContaOk, RespostaConfigEmbeddedSignup, RespostaEmbeddedSignupConcluido, RespostaLeituraMeta, RespostaCriacaoInstancia, RespostaEnvioTesteSucesso, RespostaDistribuicaoLeads, RespostaEstatisticasVendedor, RespostaTransferenciaLote, RespostaListaCopias, RespostaCopiaSalva, RespostaCopiaRemovida, RespostaListaLotes, RespostaVelocidadeDisparo, RespostaAlteracaoVelocidade, RespostaAcaoLote, RespostaCancelamentoLote, RespostaLiberacaoQuarentena, RespostaDevolucaoLeads, RespostaRetornoQuarentena, RespostaResetSafra, LoteCampanha } from './shared/contracts/rotas.js';
 import { registerAutomacoesRoutes, applyAutomacoesMigration, applyAutomacoesEstadoMigration, applyAutomacoesFilaMigration, automacoesPersistenciaOn, iniciarWorkerAutomacoes } from './shared/lib/automacoesRoutes.js';
 import { registrarEventoCliente, registrarEventoGeral, pedidoDePararPelasRegras, pedidoDeAlertaPelasRegras, type ItemFila } from './shared/lib/automacoesExecucao.js';
 import type { EventoV } from './shared/lib/automacoes.js';
@@ -9523,7 +9523,9 @@ app.post('/api/campaign/batches', async (req: any, res) => {
         [batchId, cleanName, templateName, hours]
       );
       await logAudit('CAMPANHA_SAFRA_CRIADA', `Criou safra: ${cleanName}`, req);
-      return res.status(201).json(result.rows[0]);
+      // result.rows é any: este tipo só vale em tempo de compilação, não confere a linha do banco.
+      const loteCriado: LoteCampanha = result.rows[0];
+      return res.status(201).json(loteCriado);
     } else {
       const newBatch: StoredCampaignBatch = {
         id: batchId,
@@ -9546,7 +9548,8 @@ app.post('/api/campaign/batches', async (req: any, res) => {
       };
       memoryCampaignBatchesMap.set(batchId, newBatch);
       await logAudit('CAMPANHA_SAFRA_CRIADA', `Criou safra: ${cleanName}`, req);
-      return res.status(201).json(newBatch);
+      const loteCriado: LoteCampanha = newBatch;
+      return res.status(201).json(loteCriado);
     }
   } catch (err: any) {
     console.error('Erro ao criar safra:', err);
