@@ -1,4 +1,4 @@
-import type { User, AuditLog, Salesperson, CustomTag, Lead, LeadChatMessage, CampaignLead } from '../types';
+import type { User, AuditLog, Salesperson, CustomTag, Lead, LeadChatMessage, CampaignLead, InboxPage } from '../types';
 import type { ConfigEnvio } from '../lib/automacoesEnvio';
 import type { WebsiteAuditReport } from '../types/audit';
 import type { LogEntry } from '../lib/logBuffer';
@@ -914,6 +914,37 @@ export interface RespostaPausaGeral {
 export interface RespostaEnvioAutomacao extends ConfigEnvio {
   persistenciaLigada: boolean;
   envioRealConectado: boolean;
+}
+
+/** GET /api/inbox: uma página da caixa de entrada (mesmo tipo que o front já usa) */
+export type RespostaInbox = InboxPage;
+
+/** GET /api/messages/search: um trecho encontrado numa conversa */
+export interface ResultadoBuscaMensagem {
+  leadId: string;
+  leadName: string;
+  messageId: string;
+  text: string;
+  sender: string;
+  timestamp: string;
+}
+
+/** GET /api/messages/search */
+export interface RespostaBuscaMensagens {
+  results: ResultadoBuscaMensagem[];
+  query: string;
+}
+
+/** GET /api/leads/:leadId/messages: histórico de uma conversa, com janela de 24h */
+export interface RespostaMensagensLead {
+  success: true;
+  leadId: string;
+  total: number;
+  windowExpiresAt: string | null;
+  windowOpen: boolean;
+  hasMoreOlder: boolean;
+  olderCursor: string | null;
+  messages: LeadChatMessage[];
 }
 
 /** GET /api/campaign/leads: leads da campanha (linhas do Postgres com os aliases da rota, ou memória) */

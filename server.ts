@@ -17,7 +17,8 @@ import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regrasDeC
 import { validarInstanciaEscolhida, escolherInstanciaDisparo } from './shared/lib/dispatchInstancia.js';
 import { recuperarFixosDescartados } from './shared/lib/recuperacaoFixos.js';
 import { variaveisFaltando, mensagemFaltando } from './shared/lib/configObrigatoria.js';
-import type { RespostaListaUploads, UploadZipRegistro, RespostaUploadZipOk, RespostaEnviarMensagem, StatusMensagemEnviada, RespostaLoginOk, RespostaSessaoAtual, RespostaSucesso, UsuarioAdmin, RespostaListaUsuarios, RespostaAuditLogs, RespostaLogsServidor, RespostaListaVendedores, RespostaVendedorCriado, RespostaLoteVendedores, RespostaVendedorAtualizado, RespostaSenhaVendedor, RespostaVendedorStatus, RespostaRoletaConfig, RespostaDistribuicaoRoleta, RespostaListaEtiquetas, RespostaEtiquetaSalva, RespostaOk, RespostaListaNotas, RespostaNotaCriada, RespostaResolucao, RespostaAuditoriaSite, RespostaAtualizacaoLead, RespostaResumoLead, RespostaListaLigacoes, RespostaLigacaoRegistrada, RespostaListaLigacoesGerais, RespostaListaLeads, RespostaListaRespostasRapidas, RespostaRespostaRapidaCriada, RespostaRespostaRapidaExcluida, RespostaStatusMeta, RespostaContasMeta, RespostaSincronizacaoConta, RespostaSincronizacaoTodas, RespostaMetaRemovida, RespostaConfigFluxo, RespostaStatusFluxo, RespostaEventosFluxo, RespostaModoInstancia, RespostaListaModelosFluxo, RespostaSincronizacaoModelos, RespostaModeloCriado, RespostaInstanciasFluxo, RespostaCadastroContaOk, RespostaConfigEmbeddedSignup, RespostaEmbeddedSignupConcluido, RespostaLeituraMeta, RespostaCriacaoInstancia, RespostaEnvioTesteSucesso, RespostaDistribuicaoLeads, RespostaEstatisticasVendedor, RespostaTransferenciaLote, RespostaListaCopias, RespostaCopiaSalva, RespostaCopiaRemovida, RespostaListaLotes, RespostaVelocidadeDisparo, RespostaAlteracaoVelocidade, RespostaAcaoLote, RespostaCancelamentoLote, RespostaLiberacaoQuarentena, RespostaDevolucaoLeads, RespostaRetornoQuarentena, RespostaResetSafra, LoteCampanha, ProgressoLote, RespostaDisparo, RespostaTesteDisparo, RespostaStatusTesteDisparo, RespostaSincronizacaoWhatsApp, RespostaListaLeadsCampanha, RespostaCamposLead, RespostaImportacaoIniciada, ProgressoImportacao, RespostaApagarZipsEmLote, RespostaApagarZip } from './shared/contracts/rotas.js';
+import type { RespostaListaUploads, UploadZipRegistro, RespostaUploadZipOk, RespostaEnviarMensagem, StatusMensagemEnviada, RespostaLoginOk, RespostaSessaoAtual, RespostaSucesso, UsuarioAdmin, RespostaListaUsuarios, RespostaAuditLogs, RespostaLogsServidor, RespostaListaVendedores, RespostaVendedorCriado, RespostaLoteVendedores, RespostaVendedorAtualizado, RespostaSenhaVendedor, RespostaVendedorStatus, RespostaRoletaConfig, RespostaDistribuicaoRoleta, RespostaListaEtiquetas, RespostaEtiquetaSalva, RespostaOk, RespostaListaNotas, RespostaNotaCriada, RespostaResolucao, RespostaAuditoriaSite, RespostaAtualizacaoLead, RespostaResumoLead, RespostaListaLigacoes, RespostaLigacaoRegistrada, RespostaListaLigacoesGerais, RespostaListaLeads, RespostaListaRespostasRapidas, RespostaRespostaRapidaCriada, RespostaRespostaRapidaExcluida, RespostaStatusMeta, RespostaContasMeta, RespostaSincronizacaoConta, RespostaSincronizacaoTodas, RespostaMetaRemovida, RespostaConfigFluxo, RespostaStatusFluxo, RespostaEventosFluxo, RespostaModoInstancia, RespostaListaModelosFluxo, RespostaSincronizacaoModelos, RespostaModeloCriado, RespostaInstanciasFluxo, RespostaCadastroContaOk, RespostaConfigEmbeddedSignup, RespostaEmbeddedSignupConcluido, RespostaLeituraMeta, RespostaCriacaoInstancia, RespostaEnvioTesteSucesso, RespostaDistribuicaoLeads, RespostaEstatisticasVendedor, RespostaTransferenciaLote, RespostaListaCopias, RespostaCopiaSalva, RespostaCopiaRemovida, RespostaListaLotes, RespostaVelocidadeDisparo, RespostaAlteracaoVelocidade, RespostaAcaoLote, RespostaCancelamentoLote, RespostaLiberacaoQuarentena, RespostaDevolucaoLeads, RespostaRetornoQuarentena, RespostaResetSafra, LoteCampanha, ProgressoLote, RespostaDisparo, RespostaTesteDisparo, RespostaStatusTesteDisparo, RespostaSincronizacaoWhatsApp, RespostaListaLeadsCampanha, RespostaCamposLead, RespostaImportacaoIniciada, ProgressoImportacao, RespostaApagarZipsEmLote, RespostaApagarZip, RespostaInbox, RespostaBuscaMensagens, RespostaMensagensLead } from './shared/contracts/rotas.js';
+import type { InboxConversation } from './shared/types.js';
 import { registerAutomacoesRoutes, applyAutomacoesMigration, applyAutomacoesEstadoMigration, applyAutomacoesFilaMigration, automacoesPersistenciaOn, iniciarWorkerAutomacoes } from './shared/lib/automacoesRoutes.js';
 import { registrarEventoCliente, registrarEventoGeral, pedidoDePararPelasRegras, pedidoDeAlertaPelasRegras, type ItemFila } from './shared/lib/automacoesExecucao.js';
 import type { EventoV } from './shared/lib/automacoes.js';
@@ -6118,7 +6119,9 @@ app.get('/api/inbox', async (req: any, res) => {
       .filter(l => (memoryLeadMessagesMap.get(l.id) || []).length > 0)
       .filter(l => !ownerFilter || (l as any).salespersonId === ownerFilter)
       .sort((a, b) => String((b as any).lastMessageAt || '').localeCompare(String((a as any).lastMessageAt || '')));
-    return res.json({ conversations: all.slice(0, limit), nextCursor: null, hasMore: all.length > limit });
+    // Lacuna conhecida (modo sem banco): aqui vão Leads sem lastMessageAt/unreadCount, que o InboxConversation pede.
+    // Não mudei o comportamento nesta etapa. Produção usa Postgres, que devolve os campos.
+    return res.json({ conversations: all.slice(0, limit) as InboxConversation[], nextCursor: null, hasMore: all.length > limit } satisfies RespostaInbox);
   }
 
   try {
@@ -6179,7 +6182,7 @@ app.get('/api/inbox', async (req: any, res) => {
       conversations: page,
       nextCursor: hasMore && last?.lastMessageAt ? new Date(last.lastMessageAt).toISOString() : null,
       hasMore
-    });
+    } satisfies RespostaInbox);
   } catch (err: any) {
     console.error('[Inbox] Erro ao montar a caixa de entrada:', err?.message || err);
     return res.status(500).json({ error: 'Erro ao carregar a caixa de entrada.' });
@@ -6209,7 +6212,7 @@ app.get('/api/messages/search', async (req: any, res) => {
       }
       if (results.length >= limit) break;
     }
-    return res.json({ results, query: q });
+    return res.json({ results, query: q } satisfies RespostaBuscaMensagens);
   }
 
   const params: any[] = [`%${q}%`];
@@ -6234,7 +6237,7 @@ app.get('/api/messages/search', async (req: any, res) => {
         LIMIT $${params.length}`,
       params
     );
-    return res.json({ results: r.rows, query: q });
+    return res.json({ results: r.rows, query: q } satisfies RespostaBuscaMensagens);
   } catch (err: any) {
     console.error('[Busca] Erro ao procurar nas mensagens:', err?.message || err);
     return res.status(500).json({ error: 'Erro ao buscar nas mensagens.' });
@@ -12140,7 +12143,7 @@ app.get('/api/leads/:leadId/messages', async (req: any, res) => {
     hasMoreOlder,
     olderCursor: hasMoreOlder && messages.length > 0 ? messages[0].timestamp : null,
     messages
-  });
+  } satisfies RespostaMensagensLead);
 });
 
 // GET /api/leads/:leadId/window (a interface usa para avisar "janela fechada — use um modelo")
