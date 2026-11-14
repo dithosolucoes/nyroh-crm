@@ -802,6 +802,39 @@ export interface RespostaStatusTesteDisparo {
   message?: string;
 }
 
+/** POST /api/campaign/import-progress/init (sucesso): job de importação criado */
+export interface RespostaImportacaoIniciada {
+  success: true;
+  jobId: string;
+}
+
+/** GET /api/campaign/import-progress/:jobId: andamento da importação do ZIP (memória do servidor) */
+export interface ProgressoImportacao {
+  jobId: string;
+  batchId?: string;
+  batchName?: string;
+  fileName?: string;
+  fileSizeBytes?: number;
+  stage: 'uploading' | 'extracting' | 'parsing' | 'validating' | 'saving_db' | 'completed' | 'error';
+  percent: number;
+  statusText: string;
+  processedFiles: number;
+  totalFiles: number;
+  totalLeadsFound: number;
+  savedLeads: number;
+  validMobiles: number;
+  landlines: number;
+  withNyrohUrl: number;
+  withWebsite: number;
+  currentBatchIndex?: number;
+  totalBatches?: number;
+  error?: string;
+  logs: Array<{ timestamp: string; text: string; type: 'info' | 'success' | 'warn' | 'error' }>;
+  startedAt: number;
+  updatedAt: number;
+  completedAt?: number;
+}
+
 /** GET /api/campaign/leads: leads da campanha (linhas do Postgres com os aliases da rota, ou memória) */
 export type RespostaListaLeadsCampanha = CampaignLead[];
 
