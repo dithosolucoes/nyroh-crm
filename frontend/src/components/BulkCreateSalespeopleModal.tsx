@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { X, Code2, Sparkles, CheckCircle2, AlertCircle, RefreshCw, Copy, Check } from 'lucide-react';
+import type { RespostaLoteVendedores, RespostaErroApi } from '@shared/contracts/rotas';
 
 interface BulkCreateSalespeopleModalProps {
   isOpen: boolean;
@@ -112,9 +113,9 @@ export const BulkCreateSalespeopleModal: React.FC<BulkCreateSalespeopleModalProp
         body: JSON.stringify(parseResult.items)
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Erro ao cadastrar lote de vendedores.');
+      const data = (await res.json()) as RespostaLoteVendedores | RespostaErroApi;
+      if (!res.ok || !('count' in data)) {
+        throw new Error(('error' in data && data.error) || 'Erro ao cadastrar lote de vendedores.');
       }
 
       onShowToast(data.message || `${parseResult.items.length} vendedores cadastrados com sucesso!`);

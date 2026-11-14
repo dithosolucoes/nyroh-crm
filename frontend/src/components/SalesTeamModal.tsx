@@ -8,7 +8,7 @@ import {
 import { getSalespersonAppUrl, getSalespersonSlug } from '@shared/lib/salesperson';
 import { openWhatsApp, WhatsAppAppType } from '@shared/lib/phone';
 import { BulkCreateSalespeopleModal } from './BulkCreateSalespeopleModal';
-import type { RespostaDistribuicaoRoleta, RespostaErroApi } from '@shared/contracts/rotas';
+import type { RespostaDistribuicaoRoleta, RespostaErroApi, RespostaVendedorCriado, RespostaDistribuicaoLeads } from '@shared/contracts/rotas';
 
 interface SalesTeamModalProps {
   isOpen: boolean;
@@ -211,11 +211,11 @@ export const SalesTeamModal: React.FC<SalesTeamModalProps> = ({
       });
 
       if (!res.ok) {
-        const data = await res.json();
+        const data = (await res.json()) as RespostaErroApi;
         throw new Error(data.error || 'Erro ao cadastrar vendedor.');
       }
 
-      const created = await res.json();
+      const created = (await res.json()) as RespostaVendedorCriado;
       onShowToast(`Vendedor(a) "${created.name}" cadastrado(a) com sucesso!`);
       setName('');
       setEmail('');
@@ -244,7 +244,7 @@ export const SalesTeamModal: React.FC<SalesTeamModalProps> = ({
     try {
       const res = await fetch(`/api/salespeople/${seller.id}`, { method: 'DELETE' });
       if (!res.ok) {
-        const data = await res.json();
+        const data = (await res.json()) as RespostaErroApi;
         throw new Error(data.error || 'Erro ao remover vendedor.');
       }
       onShowToast(`Vendedor "${seller.name}" removido. Leads atribuídos a Thomas.`);
@@ -289,9 +289,9 @@ export const SalesTeamModal: React.FC<SalesTeamModalProps> = ({
         })
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Erro ao distribuir leads.');
+      const data = (await res.json()) as RespostaDistribuicaoLeads | RespostaErroApi;
+      if (!res.ok || !('transferredCount' in data)) {
+        throw new Error(('error' in data && data.error) || 'Erro ao distribuir leads.');
       }
 
       onShowToast(`🎉 ${data.transferredCount} novos leads foram transferidos para "${data.targetSalespersonName}"!`);

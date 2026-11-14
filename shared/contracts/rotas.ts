@@ -218,7 +218,21 @@ export type RespostaAuditoriaSite = WebsiteAuditReport;
  */
 export interface RespostaAtualizacaoLead {
   success: true;
-  lead: unknown;
+  lead: LeadAtualizado;
+}
+
+/** Lead devolvido depois de atribuir, mudar status ou editar (campos com o nome do Lead do front) */
+export interface LeadAtualizado {
+  id: string;
+  name: string;
+  phoneNumber?: string | null;
+  columnStatus: string;
+  subStatus?: string | null;
+  lossReason?: string | null;
+  salespersonId?: string | null;
+  salespersonName?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
 }
 
 /**
@@ -611,6 +625,41 @@ export type RespostaEnvioTeste = RespostaEnvioTesteSucesso | {
   raw?: unknown;
   message?: string;
 };
+
+/** POST /api/leads/distribute (distribuição manual de carteira; sucesso) */
+export interface RespostaDistribuicaoLeads {
+  success: true;
+  transferredCount: number;
+  targetSalespersonName: string;
+  totalEligibleBefore: number;
+  remainingEligible: number;
+}
+
+/** Ligação recente do vendedor, como sai de GET /api/admin/salesperson/:id/stats (nomes de coluna do banco) */
+export interface LigacaoRecenteVendedor {
+  id: string;
+  leadId: string;
+  lead_name: string | null;
+  lead_phone: string | null;
+  tag: string | null;
+  comment: string | null;
+  duration: number | null;
+  followUpAt?: string | null;
+  created_at: string | null;
+}
+
+/** GET /api/admin/salesperson/:id/stats */
+export interface RespostaEstatisticasVendedor {
+  salespersonId: string;
+  recentCalls: LigacaoRecenteVendedor[];
+}
+
+/** POST /api/leads/batch-assign (transferência em lote; sucesso) */
+export interface RespostaTransferenciaLote {
+  success: true;
+  count: number;
+  message: string;
+}
 
 /** Exemplos conferidos pelo compilador. Se um campo mudar de nome, o build quebra aqui. */
 export const EXEMPLO_UPLOAD_ZIP = {

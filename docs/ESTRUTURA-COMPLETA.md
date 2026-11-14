@@ -145,14 +145,14 @@ Ordem prática, quando um item não pode andar em paralelo:
     - [x] Fluxo: listagem de instâncias (GET `instances`, com os dois caminhos: Meta e FluxoAPI), inclusive nos dois consumidores das telas de disparo
     - [x] Fluxo: criação de instância (POST `instances`), envio de teste de texto e envio de modelo de teste
     - [x] Meta: cadastro de conta (POST `accounts`), embedded signup (config e complete) e leitura direta da Meta (GET `sync`)
+    - [x] Front dos vendedores: `SalesTeamModal`, `AdminSellerInspectionView`, `BulkCreateSalespeopleModal` (criar, lote, editar, senha, excluir, estatísticas, transferência em lote, distribuição)
   - Falta:
     - [ ] Disparos (`/api/campaign/*`): lotes, cópias, envio, pausa e cancelamento
     - [ ] Automações
     - [ ] Inbox e mensagens (`/api/inbox`, `/api/messages/search`, `/api/leads/:id/messages`)
-    - [ ] Front dos vendedores: `SalesTeamModal`, `AdminSellerInspectionView`, `BulkCreateSalespeopleModal`
     - [ ] Resto das rotas (~20), entre elas leads em lote e recuperação
   - Pendências conhecidas (já tipadas, mas com ressalva):
-    - [ ] `lead` de atribuição e status fica `unknown`: alinhar o SELECT do Postgres ao tipo `Lead`
+    - [x] `lead` de atribuição, status e edição: o Postgres agora devolve os campos com o nome do `Lead` (`LeadAtualizado`)
     - [ ] Resumo de lead é `Partial<Lead>` e entra na lista como `Lead` por cast (`App.tsx`)
     - [ ] Listagem de leads entra no estado como `Lead` por cast (`App.tsx`); o estado ainda não é `LeadListado`
     - [ ] Roleta em lote: o servidor lê `maxCount`, o front envia `count` (bug de comportamento, fora da C1)

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { countSellerLeads } from '@shared/lib/sellerCounts';
+import type { RespostaErroApi, RespostaEstatisticasVendedor, RespostaTransferenciaLote } from '@shared/contracts/rotas';
 import { Salesperson, Lead } from '@shared/types';
 import { getSalespersonSlug, matchSalespersonFromRoute } from '@shared/lib/salesperson';
 import {
@@ -128,7 +129,7 @@ export const AdminSellerInspectionView: React.FC<AdminSellerInspectionViewProps>
     try {
       const res = await fetch(`/api/admin/salesperson/${salespersonId}/stats`);
       if (res.ok) {
-        const data = await res.json();
+        const data = (await res.json()) as RespostaEstatisticasVendedor;
         setStatsData(data);
       }
     } catch (err) {
@@ -216,7 +217,7 @@ export const AdminSellerInspectionView: React.FC<AdminSellerInspectionViewProps>
         })
       });
       if (res.ok) {
-        const data = await res.json();
+        const data = (await res.json()) as RespostaTransferenciaLote;
         onShowToast(data.message || 'Leads transferidos com sucesso!');
         setSelectedLeadIds([]);
         if (onRefreshData) onRefreshData();
@@ -287,7 +288,7 @@ export const AdminSellerInspectionView: React.FC<AdminSellerInspectionViewProps>
         onShowToast(`Perfil de ${editName.trim()} atualizado com sucesso!`);
         if (onRefreshData) onRefreshData();
       } else {
-        const data = await res.json();
+        const data = (await res.json()) as RespostaErroApi;
         onShowToast(data.error || 'Erro ao salvar alterações do vendedor.');
       }
     } catch (err) {
@@ -314,12 +315,11 @@ export const AdminSellerInspectionView: React.FC<AdminSellerInspectionViewProps>
         body: JSON.stringify({ newPassword: newPassword.trim() })
       });
       if (res.ok) {
-        const data = await res.json();
         onShowToast(`Senha de ${currentSeller.name} definida com sucesso!`);
         setNewPassword('');
         if (onRefreshData) onRefreshData();
       } else {
-        const data = await res.json();
+        const data = (await res.json()) as RespostaErroApi;
         onShowToast(data.error || 'Erro ao redefinir senha do vendedor.');
       }
     } catch (err) {

@@ -17,7 +17,7 @@ import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regrasDeC
 import { validarInstanciaEscolhida, escolherInstanciaDisparo } from './shared/lib/dispatchInstancia.js';
 import { recuperarFixosDescartados } from './shared/lib/recuperacaoFixos.js';
 import { variaveisFaltando, mensagemFaltando } from './shared/lib/configObrigatoria.js';
-import type { RespostaListaUploads, UploadZipRegistro, RespostaUploadZipOk, RespostaEnviarMensagem, StatusMensagemEnviada, RespostaLoginOk, RespostaSessaoAtual, RespostaSucesso, UsuarioAdmin, RespostaListaUsuarios, RespostaAuditLogs, RespostaLogsServidor, RespostaListaVendedores, RespostaVendedorCriado, RespostaLoteVendedores, RespostaVendedorAtualizado, RespostaSenhaVendedor, RespostaVendedorStatus, RespostaRoletaConfig, RespostaDistribuicaoRoleta, RespostaListaEtiquetas, RespostaEtiquetaSalva, RespostaOk, RespostaListaNotas, RespostaNotaCriada, RespostaResolucao, RespostaAuditoriaSite, RespostaAtualizacaoLead, RespostaResumoLead, RespostaListaLigacoes, RespostaLigacaoRegistrada, RespostaListaLigacoesGerais, RespostaListaLeads, RespostaListaRespostasRapidas, RespostaRespostaRapidaCriada, RespostaRespostaRapidaExcluida, RespostaStatusMeta, RespostaContasMeta, RespostaSincronizacaoConta, RespostaSincronizacaoTodas, RespostaMetaRemovida, RespostaConfigFluxo, RespostaStatusFluxo, RespostaEventosFluxo, RespostaModoInstancia, RespostaListaModelosFluxo, RespostaSincronizacaoModelos, RespostaModeloCriado, RespostaInstanciasFluxo, RespostaCadastroContaOk, RespostaConfigEmbeddedSignup, RespostaEmbeddedSignupConcluido, RespostaLeituraMeta, RespostaCriacaoInstancia, RespostaEnvioTesteSucesso } from './shared/contracts/rotas.js';
+import type { RespostaListaUploads, UploadZipRegistro, RespostaUploadZipOk, RespostaEnviarMensagem, StatusMensagemEnviada, RespostaLoginOk, RespostaSessaoAtual, RespostaSucesso, UsuarioAdmin, RespostaListaUsuarios, RespostaAuditLogs, RespostaLogsServidor, RespostaListaVendedores, RespostaVendedorCriado, RespostaLoteVendedores, RespostaVendedorAtualizado, RespostaSenhaVendedor, RespostaVendedorStatus, RespostaRoletaConfig, RespostaDistribuicaoRoleta, RespostaListaEtiquetas, RespostaEtiquetaSalva, RespostaOk, RespostaListaNotas, RespostaNotaCriada, RespostaResolucao, RespostaAuditoriaSite, RespostaAtualizacaoLead, RespostaResumoLead, RespostaListaLigacoes, RespostaLigacaoRegistrada, RespostaListaLigacoesGerais, RespostaListaLeads, RespostaListaRespostasRapidas, RespostaRespostaRapidaCriada, RespostaRespostaRapidaExcluida, RespostaStatusMeta, RespostaContasMeta, RespostaSincronizacaoConta, RespostaSincronizacaoTodas, RespostaMetaRemovida, RespostaConfigFluxo, RespostaStatusFluxo, RespostaEventosFluxo, RespostaModoInstancia, RespostaListaModelosFluxo, RespostaSincronizacaoModelos, RespostaModeloCriado, RespostaInstanciasFluxo, RespostaCadastroContaOk, RespostaConfigEmbeddedSignup, RespostaEmbeddedSignupConcluido, RespostaLeituraMeta, RespostaCriacaoInstancia, RespostaEnvioTesteSucesso, RespostaDistribuicaoLeads, RespostaEstatisticasVendedor, RespostaTransferenciaLote } from './shared/contracts/rotas.js';
 import { registerAutomacoesRoutes, applyAutomacoesMigration, applyAutomacoesEstadoMigration, applyAutomacoesFilaMigration, automacoesPersistenciaOn, iniciarWorkerAutomacoes } from './shared/lib/automacoesRoutes.js';
 import { registrarEventoCliente, registrarEventoGeral, pedidoDePararPelasRegras, pedidoDeAlertaPelasRegras, type ItemFila } from './shared/lib/automacoesExecucao.js';
 import type { EventoV } from './shared/lib/automacoes.js';
@@ -6066,7 +6066,7 @@ app.get('/api/admin/salesperson/:id/stats', async (req: any, res) => {
       return res.json({
         salespersonId: id,
         recentCalls: result.rows
-      });
+      } satisfies RespostaEstatisticasVendedor);
     } else {
       const allCalls: any[] = [];
       for (const [leadId, calls] of memoryCallLogsMap.entries()) {
@@ -6098,7 +6098,7 @@ app.get('/api/admin/salesperson/:id/stats', async (req: any, res) => {
       return res.json({
         salespersonId: id,
         recentCalls: allCalls.slice(0, 100)
-      });
+      } satisfies RespostaEstatisticasVendedor);
     }
   } catch (err: any) {
     console.error('Erro ao buscar stats do vendedor:', err);
@@ -7226,7 +7226,7 @@ app.post('/api/leads/batch-assign', async (req: any, res) => {
         success: true,
         count: leadIds.length,
         message: `${leadIds.length} lead(s) transferido(s) para ${resolvedName} com sucesso!`
-      });
+      } satisfies RespostaTransferenciaLote);
     } else {
       let count = 0;
       for (const id of leadIds) {
@@ -7242,7 +7242,7 @@ app.post('/api/leads/batch-assign', async (req: any, res) => {
         success: true,
         count,
         message: `${count} lead(s) transferido(s) para ${resolvedName} com sucesso!`
-      });
+      } satisfies RespostaTransferenciaLote);
     }
   } catch (err: any) {
     console.error('Erro ao transferir leads em lote:', err);
@@ -7328,7 +7328,7 @@ app.put('/api/leads/:id/assign', async (req: any, res) => {
 
     if (usePostgres && pgPool) {
       const result = await pgPool.query(
-        `UPDATE leads SET salesperson_id = $1, salesperson_name = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *`,
+        `UPDATE leads SET salesperson_id = $1, salesperson_name = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING id, name, phone_number AS "phoneNumber", column_status AS "columnStatus", sub_status AS "subStatus", loss_reason AS "lossReason", salesperson_id AS "salespersonId", salesperson_name AS "salespersonName", created_at AS "createdAt", updated_at AS "updatedAt"`,
         [salespersonId, resolvedName, id]
       );
       if (result.rowCount === 0) {
@@ -7477,7 +7477,7 @@ app.post('/api/leads/distribute', async (req: any, res) => {
       targetSalespersonName: targetSalesperson.name,
       totalEligibleBefore: eligibleLeadIds.length,
       remainingEligible: eligibleLeadIds.length - idsToTransfer.length
-    });
+    } satisfies RespostaDistribuicaoLeads);
   } catch (error: any) {
     console.error('Error distributing leads:', error);
     res.status(500).json({ error: `Erro ao distribuir leads: ${error.message}` });
@@ -8935,7 +8935,7 @@ app.put('/api/leads/:id/status', async (req, res) => {
              sub_status = COALESCE($2, sub_status),
              loss_reason = COALESCE($3, loss_reason),
              updated_at = CURRENT_TIMESTAMP 
-         WHERE id = $4 RETURNING *`,
+         WHERE id = $4 RETURNING id, name, phone_number AS "phoneNumber", column_status AS "columnStatus", sub_status AS "subStatus", loss_reason AS "lossReason", salesperson_id AS "salespersonId", salesperson_name AS "salespersonName", created_at AS "createdAt", updated_at AS "updatedAt"`,
         [columnStatus || null, subStatus || null, lossReason || null, id]
       );
       if (result.rowCount === 0) {
@@ -8975,13 +8975,13 @@ app.put('/api/leads/:id', async (req, res) => {
              public_url = COALESCE($3, public_url),
              website = COALESCE($4, website),
              updated_at = CURRENT_TIMESTAMP 
-         WHERE id = $5 RETURNING *`,
+         WHERE id = $5 RETURNING id, name, phone_number AS "phoneNumber", column_status AS "columnStatus", sub_status AS "subStatus", loss_reason AS "lossReason", salesperson_id AS "salespersonId", salesperson_name AS "salespersonName", created_at AS "createdAt", updated_at AS "updatedAt"`,
         [name || null, phoneNumber || null, publicUrl || null, website || null, id]
       );
       if (result.rowCount === 0) {
         return res.status(404).json({ error: 'Lead não encontrado.' });
       }
-      return res.json({ success: true, lead: result.rows[0] });
+      return res.json({ success: true, lead: result.rows[0] } satisfies RespostaAtualizacaoLead);
     } else {
       const lead = memoryLeadsMap.get(id);
       if (!lead) {
@@ -8993,7 +8993,7 @@ app.put('/api/leads/:id', async (req, res) => {
       if (website !== undefined) lead.website = website;
       lead.updatedAt = new Date().toISOString();
       memoryLeadsMap.set(id, lead);
-      return res.json({ success: true, lead });
+      return res.json({ success: true, lead } satisfies RespostaAtualizacaoLead);
     }
   } catch (error: any) {
     console.error('Error updating lead:', error);
