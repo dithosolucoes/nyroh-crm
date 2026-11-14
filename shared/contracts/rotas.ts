@@ -778,6 +778,25 @@ export interface RespostaDevolucaoLeads {
   message: string;
 }
 
+/** POST /api/campaign/dispatch (sucesso): leads da safra entraram na fila de envio */
+export interface RespostaDisparo {
+  success: true;
+  queued: true;
+  dispatchedCount: number;
+  enqueuedCount: number;
+  speedPerSecond: number;
+  estimatedDurationSeconds: number;
+  templateName: string;
+  quarantineHours: number;
+  quarantineEndsAt: string;
+  sellersUsed: string[];
+  batchId: string;
+  speedPerMinute: number;
+  cappedByPlan?: boolean;
+  planRpm?: number;
+  message?: string;
+}
+
 /** GET /api/campaign/batches/:id/progress: andamento do lote na esteira de envio (memória do servidor) */
 export interface ProgressoLote {
   batchId: string;

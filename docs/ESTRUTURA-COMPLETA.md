@@ -148,7 +148,7 @@ Ordem prática, quando um item não pode andar em paralelo:
     - [x] Front dos vendedores: `SalesTeamModal`, `AdminSellerInspectionView`, `BulkCreateSalespeopleModal` (criar, lote, editar, senha, excluir, estatísticas, transferência em lote, distribuição)
     - [x] Disparos (parte 1): cópias de mensagem (listar, criar, editar, excluir), lotes (listar), velocidade (ler e alterar), pausar, retomar e cancelar lote
   - Falta:
-    - [ ] Disparos (parte 2) (em andamento). Feito e tipado: liberar quarentena, devolver não enviados, devolver quarentena (`return-quarantine`), reset da safra (`reset-staging`), configuração de quarentena (`quarantine-config`), criar lote (`POST batches`; a linha do banco só é checada em compilação, como já dito na auditoria), progresso do lote (`ProgressoLote`, tipo movido de `server/redisQueue.ts` para o contrato). Falta: envio (`dispatch`, `test-dispatch`), reset de fila, sincronização do WhatsApp Web, leads e campos, importação e apagar uploads
+    - [ ] Disparos (parte 2) (em andamento). Feito e tipado: liberar quarentena, devolver não enviados, devolver quarentena (`return-quarantine`), reset da safra (`reset-staging`), configuração de quarentena (`quarantine-config`), criar lote (`POST batches`; a linha do banco só é checada em compilação, como já dito na auditoria), progresso do lote (`ProgressoLote`, tipo movido de `server/redisQueue.ts` para o contrato), envio (`dispatch`, sucesso tipado com `RespostaDisparo`). Falta: `test-dispatch`, reset de fila, sincronização do WhatsApp Web, leads e campos, importação e apagar uploads
     - [ ] Automações
     - [ ] Inbox e mensagens (`/api/inbox`, `/api/messages/search`, `/api/leads/:id/messages`)
     - [ ] Resto das rotas (~20), entre elas leads em lote e recuperação
