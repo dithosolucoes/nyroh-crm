@@ -493,6 +493,14 @@ export interface RespostaListaModelosFluxo {
   metaConnected?: boolean;
 }
 
+/** POST /api/admin/fluxo/templates/sync-meta (sucesso) */
+export interface RespostaSincronizacaoModelos {
+  success: true;
+  count: number;
+  templates: ModeloFluxo[];
+  message: string;
+}
+
 /** Exemplos conferidos pelo compilador. Se um campo mudar de nome, o build quebra aqui. */
 export const EXEMPLO_UPLOAD_ZIP = {
   success: true,

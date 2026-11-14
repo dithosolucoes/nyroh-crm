@@ -3,7 +3,7 @@ import { isUiFlagOn } from '@shared/lib/uiFlags';
 const SHOW_LAB = isUiFlagOn(import.meta.env.VITE_MOSTRAR_LAB);
 import { useRuntimeConfig, formatInstancePhone } from '@shared/lib/useRuntimeConfig';
 import { onRealtime } from '@shared/lib/realtime';
-import type { RespostaConfigFluxo, RespostaEventosFluxo, RespostaListaModelosFluxo } from '@shared/contracts/rotas';
+import type { RespostaConfigFluxo, RespostaEventosFluxo, RespostaListaModelosFluxo, RespostaSincronizacaoModelos, RespostaErroApi } from '@shared/contracts/rotas';
 import MetaAccountsPanel from './MetaAccountsPanel';
 import MetaStatusStrip from './MetaStatusStrip';
 import {
@@ -277,14 +277,14 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
-      const data = await res.json();
-      if (res.ok && data.success) {
+      const data = (await res.json()) as RespostaSincronizacaoModelos | RespostaErroApi;
+      if (res.ok && 'count' in data) {
         setMetaSyncNotice(data.message || `${data.count} modelos sincronizados diretamente da Meta!`);
         onShowToast(data.message || `${data.count} modelos sincronizados com a Meta!`);
         await fetchTemplates();
       } else {
         await fetchTemplates();
-        const msg = data.error || 'Não foi possível sincronizar direto com a Meta. Carregando templates locais.';
+        const msg = ('error' in data && data.error) || 'Não foi possível sincronizar direto com a Meta. Carregando templates locais.';
         setMetaSyncNotice(msg);
         onShowToast(msg);
       }
