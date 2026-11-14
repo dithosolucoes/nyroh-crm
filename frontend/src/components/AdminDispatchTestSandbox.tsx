@@ -39,6 +39,7 @@ import {
   CheckCheck
 } from 'lucide-react';
 import { CampaignCopyTemplate, Salesperson, LeadChatMessage } from '@shared/types';
+import type { RespostaInstanciasFluxo } from '@shared/contracts/rotas';
 
 interface MetaTemplateButton {
   type: 'QUICK_REPLY' | 'URL' | 'PHONE_NUMBER' | 'COPY_CODE';
@@ -153,7 +154,7 @@ export const AdminDispatchTestSandbox: React.FC<AdminDispatchTestSandboxProps> =
   const [selectedPhoneNumberId, setSelectedPhoneNumberId] = useState<string>('');
   useEffect(() => {
     fetch('/api/admin/fluxo/instances')
-      .then(r => r.json())
+      .then(r => r.json() as Promise<RespostaInstanciasFluxo>)
       .then(d => { if (d?.success && Array.isArray(d.instances)) setSendingNumbers(d.instances); })
       .catch(() => { /* seletor é opcional */ });
   }, []);

@@ -74,7 +74,7 @@ import { AdminDispatchTestSandbox } from './AdminDispatchTestSandbox';
 import { ZipImportProgressModal, ImportProgressData } from './ZipImportProgressModal';
 import { PaginaSubirZip, ZipUploadRegistro } from './PaginaSubirZip';
 import { isUiFlagOn } from '@shared/lib/uiFlags';
-import type { RespostaListaUploads, RespostaListaModelosFluxo } from '@shared/contracts/rotas';
+import type { RespostaListaUploads, RespostaListaModelosFluxo, RespostaInstanciasFluxo } from '@shared/contracts/rotas';
 
 const SHOW_SIMULATE = isUiFlagOn(import.meta.env.VITE_MOSTRAR_SIMULAR);
 /** Estado real do disparo: falhou (com motivo), lido/respondeu, ou ainda sem confirmação de entrega. */
@@ -215,7 +215,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   const [dispatchNumbers, setDispatchNumbers] = useState<Array<{ id: string; name: string; phone: string }>>([]);
   useEffect(() => {
     fetch('/api/admin/fluxo/instances')
-      .then(r => r.json())
+      .then(r => r.json() as Promise<RespostaInstanciasFluxo>)
       .then(d => { if (d?.success && Array.isArray(d.instances)) setDispatchNumbers(d.instances); })
       .catch(() => { /* seletor é opcional */ });
   }, []);

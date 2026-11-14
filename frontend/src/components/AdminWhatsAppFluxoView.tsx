@@ -3,7 +3,7 @@ import { isUiFlagOn } from '@shared/lib/uiFlags';
 const SHOW_LAB = isUiFlagOn(import.meta.env.VITE_MOSTRAR_LAB);
 import { useRuntimeConfig, formatInstancePhone } from '@shared/lib/useRuntimeConfig';
 import { onRealtime } from '@shared/lib/realtime';
-import type { RespostaConfigFluxo, RespostaEventosFluxo, RespostaListaModelosFluxo, RespostaSincronizacaoModelos, RespostaModeloCriado, RespostaErroApi } from '@shared/contracts/rotas';
+import type { RespostaConfigFluxo, RespostaEventosFluxo, RespostaListaModelosFluxo, RespostaSincronizacaoModelos, RespostaModeloCriado, RespostaErroApi, RespostaInstanciasFluxo } from '@shared/contracts/rotas';
 import MetaAccountsPanel from './MetaAccountsPanel';
 import MetaStatusStrip from './MetaStatusStrip';
 import {
@@ -338,7 +338,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
     try {
       const res = await fetch('/api/admin/fluxo/instances');
       if (res.ok) {
-        const data = await res.json();
+        const data = (await res.json()) as RespostaInstanciasFluxo;
         setInstances(Array.isArray(data.instances) ? data.instances : []);
         setInstancesError(data.success === false ? (data.error || { message: 'Não foi possível ler as instâncias da FluxoAPI.' }) : null);
       } else {

@@ -494,6 +494,38 @@ export interface RespostaListaModelosFluxo {
 }
 
 /**
+ * Número (instância) de WhatsApp como sai de GET /api/admin/fluxo/instances.
+ * Vem de dois caminhos: Meta direta (com coexistência e BM) e FluxoAPI (com limites).
+ * Cada campo que só um caminho traz fica opcional.
+ */
+export interface InstanciaWhatsApp {
+  id: string;
+  name: string;
+  phone: string | null;
+  status: string;
+  quality?: string | null;
+  mode?: string;
+  coexistence: boolean | null;
+  coexistenceSeenAt?: string | null;
+  messagingLimit?: null;
+  messagingLimit24h?: number | null;
+  throughputMps?: number | null;
+  conversations24h?: number | null;
+  messages24h?: number | null;
+  accountId?: string;
+}
+
+/** GET /api/admin/fluxo/instances (sucesso ou erro; `success` diz qual) */
+export interface RespostaInstanciasFluxo {
+  success: boolean;
+  configured?: boolean;
+  selectedInstanceId?: string | null;
+  instances: InstanciaWhatsApp[];
+  accounts?: Array<{ id: string; name: string; wabaId: string; businessId: string | null }>;
+  error?: { message: string; action?: string; code?: string };
+}
+
+/**
  * POST /api/admin/fluxo/templates (criar, enviar para aprovação ou salvar rascunho; sucesso).
  * O modelo recém-criado ainda não tem rejectedReason no servidor, por isso é opcional aqui.
  */
