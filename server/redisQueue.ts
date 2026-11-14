@@ -12,6 +12,7 @@ import {
   estimateSeconds,
   FluxoRateLimitedError
 } from '../shared/lib/dispatchRate.js';
+import type { ProgressoLote } from '../shared/contracts/rotas.js';
 
 // ============================================================================
 // REDIS CONNECTION & CLIENT FACTORY
@@ -230,27 +231,8 @@ export interface DispatchContext {
   maxAttempts: number;
 }
 
-export interface CampaignBatchProgress {
-  batchId: string;
-  total: number;
-  enqueued: number;
-  sent: number;
-  failed: number;
-  speedPerSecond: number;
-  status: 'idle' | 'running' | 'paused' | 'completed' | 'cancelled';
-  startedAt: string;
-  completedAt?: string;
-  lastError?: string;
-  recentLogs: Array<{
-    id: string;
-    leadId: string;
-    phone: string;
-    leadName?: string;
-    status: 'sent' | 'failed';
-    error?: string;
-    timestamp: string;
-  }>;
-}
+// O formato do progresso mora em shared/contracts/rotas.ts (ProgressoLote), usado pelo servidor e pelo front.
+export type CampaignBatchProgress = ProgressoLote;
 
 // In-Memory state for batch tracking and speed control
 const batchProgressMap = new Map<string, CampaignBatchProgress>();

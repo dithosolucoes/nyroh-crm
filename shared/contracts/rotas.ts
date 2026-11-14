@@ -778,6 +778,29 @@ export interface RespostaDevolucaoLeads {
   message: string;
 }
 
+/** GET /api/campaign/batches/:id/progress: andamento do lote na esteira de envio (memória do servidor) */
+export interface ProgressoLote {
+  batchId: string;
+  total: number;
+  enqueued: number;
+  sent: number;
+  failed: number;
+  speedPerSecond: number;
+  status: 'idle' | 'running' | 'paused' | 'completed' | 'cancelled';
+  startedAt: string;
+  completedAt?: string;
+  lastError?: string;
+  recentLogs: Array<{
+    id: string;
+    leadId: string;
+    phone: string;
+    leadName?: string;
+    status: 'sent' | 'failed';
+    error?: string;
+    timestamp: string;
+  }>;
+}
+
 /** POST /api/campaign/batches/:id/return-quarantine (sucesso): leads em Em Espera voltam para Novos */
 export interface RespostaRetornoQuarentena {
   success: true;
