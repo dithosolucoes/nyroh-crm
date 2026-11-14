@@ -260,6 +260,46 @@ export interface LigacaoComLead extends LigacaoLead {
 /** GET /api/calls (ligações da equipe, ou só do vendedor) */
 export type RespostaListaLigacoesGerais = LigacaoComLead[];
 
+/**
+ * Item de GET /api/leads, como sai do servidor.
+ *
+ * Não é o `Lead` de shared/types: o Postgres devolve `null` onde o Lead diz "opcional"
+ * (ex.: lossReason, nextFollowUpAt, lastCallAt), e a memória devolve o Lead espalhado,
+ * com alguns campos ausentes. Por isso, só id, name, columnStatus, salesperson,
+ * whatsapp e callCount são obrigatórios (os dois lados preenchem esses).
+ */
+export interface LeadListado {
+  id: string;
+  name: string;
+  phoneNumber?: string | null;
+  publicUrl?: string | null;
+  website?: string | null;
+  columnStatus: string;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  salespersonId: string;
+  salespersonName: string;
+  niche?: string | null;
+  categories?: string | string[] | null;
+  subStatus?: string | null;
+  lossReason?: string | null;
+  nextFollowUpAt?: string | null;
+  hasWhatsAppReply: boolean;
+  whatsappReplied: boolean;
+  respondedAt?: string | null;
+  lastWhatsAppMessage?: string | null;
+  callCount: number;
+  lastCallAt?: string | null;
+  lastCallTag?: string | null;
+  /** Só vem do Postgres (disparos de hoje para este telefone). */
+  contatosHoje?: number;
+  /** Só vem do Postgres (marcas que já abordaram este telefone). */
+  marcas?: Array<{ id: string; name: string; lastAt?: string | null }>;
+}
+
+/** GET /api/leads (base de leads, filtrada pela carteira de quem pede) */
+export type RespostaListaLeads = LeadListado[];
+
 /** Exemplos conferidos pelo compilador. Se um campo mudar de nome, o build quebra aqui. */
 export const EXEMPLO_UPLOAD_ZIP = {
   success: true,
