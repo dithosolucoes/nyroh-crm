@@ -778,6 +778,21 @@ export interface RespostaDevolucaoLeads {
   message: string;
 }
 
+/** POST /api/campaign/batches/:id/return-quarantine (sucesso): leads em Em Espera voltam para Novos */
+export interface RespostaRetornoQuarentena {
+  success: true;
+  returned: number;
+  removedFromQueue: number;
+  message: string;
+}
+
+/** POST /api/campaign/batches/:id/reset-staging (sucesso): safra volta ao rascunho com os leads em STAGING */
+export interface RespostaResetSafra {
+  success: true;
+  resetCount: number;
+  message: string;
+}
+
 /** Exemplos conferidos pelo compilador. Se um campo mudar de nome, o build quebra aqui. */
 export const EXEMPLO_UPLOAD_ZIP = {
   success: true,
