@@ -802,6 +802,20 @@ export interface RespostaStatusTesteDisparo {
   message?: string;
 }
 
+/** POST /api/campaign/batches/:id/sync-whatsapp-web (sucesso): safra conferida com a lista do WhatsApp Web */
+export interface RespostaSincronizacaoWhatsApp {
+  success: true;
+  stats: {
+    totalBatchLeads: number;
+    whatsappChatsProvided: number;
+    confirmedDispatched: number;
+    recycledToStaging: number;
+    movedToLandlines: number;
+    alreadyResponded: number;
+  };
+  message: string;
+}
+
 /** POST /api/campaign/dispatch (sucesso): leads da safra entraram na fila de envio */
 export interface RespostaDisparo {
   success: true;
