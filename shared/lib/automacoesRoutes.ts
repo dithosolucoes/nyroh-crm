@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import type { RespostaListaAutomacoes, RespostaAutomacaoSalva, RespostaExecucoesAutomacao, RespostaFilaAutomacao, RespostaRevisaoAutomacao, RespostaConfiguracaoAutomacao, RespostaPausaGeral, RespostaEnvioAutomacao, RespostaRemocaoAutomacao } from '../contracts/rotas.js';
 /**
  * Rotas de persistência das automações de resposta (só admin).
  *
@@ -136,7 +137,8 @@ export function registerAutomacoesRoutes(app: Express, deps: AutomacoesDeps): vo
     if (!pool) return;
     try {
       const r = await pool.query(`SELECT id, status, definicao FROM automacoes_respostas ORDER BY criado_em, id`);
-      res.json(r.rows.map((x: any) => ({ id: x.id, status: x.status, def: x.definicao })));
+      const lista: RespostaListaAutomacoes = r.rows.map((x: any) => ({ id: x.id, status: x.status, def: x.definicao }));
+      res.json(lista);
     } catch {
       res.status(500).json({ error: 'Erro ao carregar automações.' });
     }
@@ -170,7 +172,7 @@ export function registerAutomacoesRoutes(app: Express, deps: AutomacoesDeps): vo
          ON CONFLICT (id) DO UPDATE SET status = EXCLUDED.status, definicao = EXCLUDED.definicao, atualizado_em = CURRENT_TIMESTAMP`,
         [id, status, JSON.stringify(comVersao)]
       );
-      res.json({ ok: true, id, status, versao: comVersao.versao });
+      res.json({ ok: true, id, status, versao: comVersao.versao } satisfies RespostaAutomacaoSalva);
     } catch {
       res.status(500).json({ error: 'Erro ao salvar automação.' });
     }
@@ -185,7 +187,8 @@ export function registerAutomacoesRoutes(app: Express, deps: AutomacoesDeps): vo
       const r = await pool.query(
         `SELECT quando, decisao, motivo, lead_id, regra_id, versao FROM automacoes_auditoria ORDER BY quando DESC LIMIT 100`
       );
-      res.json(r.rows.map((x: any) => ({ quando: x.quando, decisao: x.decisao, motivo: x.motivo, leadId: x.lead_id, regraId: x.regra_id, versao: x.versao })));
+      const execucoes: RespostaExecucoesAutomacao = r.rows.map((x: any) => ({ quando: x.quando, decisao: x.decisao, motivo: x.motivo, leadId: x.lead_id, regraId: x.regra_id, versao: x.versao }));
+      res.json(execucoes);
     } catch {
       res.status(500).json({ error: 'Erro ao carregar execuções.' });
     }
@@ -201,10 +204,11 @@ export function registerAutomacoesRoutes(app: Express, deps: AutomacoesDeps): vo
         `SELECT id, automacao_id, lead_id, passo_ordem, acao, status, executar_em, resultado
          FROM automacoes_fila ORDER BY executar_em DESC LIMIT 100`
       );
-      res.json(r.rows.map((x: any) => ({
+      const fila: RespostaFilaAutomacao = r.rows.map((x: any) => ({
         id: x.id, automacaoId: x.automacao_id, leadId: x.lead_id, passoOrdem: x.passo_ordem,
         acao: x.acao, status: x.status, executarEm: x.executar_em, resultado: x.resultado,
-      })));
+      }));
+      res.json(fila);
     } catch {
       res.status(500).json({ error: 'Erro ao carregar a fila.' });
     }
@@ -220,7 +224,8 @@ export function registerAutomacoesRoutes(app: Express, deps: AutomacoesDeps): vo
         `SELECT lead_id, ultimo_comando, ultimo_comando_em FROM leads_estado
          WHERE status_geral = 'revisao' ORDER BY ultimo_comando_em DESC NULLS LAST LIMIT 100`
       );
-      res.json(r.rows.map((x: any) => ({ leadId: x.lead_id, ultimoComando: x.ultimo_comando, em: x.ultimo_comando_em })));
+      const revisao: RespostaRevisaoAutomacao = r.rows.map((x: any) => ({ leadId: x.lead_id, ultimoComando: x.ultimo_comando, em: x.ultimo_comando_em }));
+      res.json(revisao);
     } catch {
       res.status(500).json({ error: 'Erro ao carregar a revisão.' });
     }
@@ -236,7 +241,7 @@ export function registerAutomacoesRoutes(app: Express, deps: AutomacoesDeps): vo
       pausaGeral: await lerPausaGeral(deps.getPool()).catch(() => pausaGeralAtiva()),
       // Limites não são mais globais: vêm do JSON de cada automação.
       limites: null,
-    }]);
+    }] satisfies RespostaConfiguracaoAutomacao);
   });
 
   // Liga ou desliga a pausa geral (dado no banco). Exige a migração de configuração.
@@ -254,14 +259,14 @@ export function registerAutomacoesRoutes(app: Express, deps: AutomacoesDeps): vo
        ON CONFLICT (chave) DO UPDATE SET valor = EXCLUDED.valor, atualizado_em = CURRENT_TIMESTAMP`,
       [String(pausaGeral)]
     );
-    res.json({ pausaGeral });
+    res.json({ pausaGeral } satisfies RespostaPausaGeral);
   });
 
   // Fase H: controle do envio real, decidido na tela. Padrão: desligado.
   app.get('/api/admin/automacoes/envio', async (req: Request, res: Response) => {
     if (!soAdmin(req, res)) return;
     const cfg = await lerEnvioConfig(deps.getPool()).catch(() => ({ ...ENVIO_PADRAO, automacoesLiberadas: [] }));
-    res.json({ ...cfg, persistenciaLigada: automacoesPersistenciaOn(), envioRealConectado: ENVIO_REAL_CONECTADO });
+    res.json({ ...cfg, persistenciaLigada: automacoesPersistenciaOn(), envioRealConectado: ENVIO_REAL_CONECTADO } satisfies RespostaEnvioAutomacao);
   });
 
   app.put('/api/admin/automacoes/envio', async (req: Request, res: Response) => {
@@ -293,7 +298,7 @@ export function registerAutomacoesRoutes(app: Express, deps: AutomacoesDeps): vo
        ON CONFLICT (chave) DO UPDATE SET valor = EXCLUDED.valor, atualizado_em = CURRENT_TIMESTAMP`,
       [JSON.stringify(cfg)]
     );
-    res.json({ ...cfg, persistenciaLigada: true, envioRealConectado: ENVIO_REAL_CONECTADO });
+    res.json({ ...cfg, persistenciaLigada: true, envioRealConectado: ENVIO_REAL_CONECTADO } satisfies RespostaEnvioAutomacao);
   });
 
   app.delete('/api/admin/automacoes/:id', async (req: Request, res: Response) => {
@@ -304,7 +309,7 @@ export function registerAutomacoesRoutes(app: Express, deps: AutomacoesDeps): vo
     if (!ID_VALIDO.test(id)) return res.status(400).json({ error: 'Identificador inválido.' });
     try {
       await pool.query(`DELETE FROM automacoes_respostas WHERE id = $1`, [id]);
-      res.json({ ok: true });
+      res.json({ ok: true } satisfies RespostaRemocaoAutomacao);
     } catch {
       res.status(500).json({ error: 'Erro ao excluir automação.' });
     }

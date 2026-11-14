@@ -54,7 +54,7 @@ export function aplicarVersao(
   anteriorDb: Record<string, unknown> | null | undefined,
   nova: Record<string, unknown>,
   agora: Date
-): Record<string, unknown> {
+): Record<string, unknown> & { versao: number; historico: unknown[] } {
   const versaoAnterior = typeof anteriorDb?.versao === 'number' ? (anteriorDb.versao as number) : undefined;
   const historico: unknown[] = Array.isArray(anteriorDb?.historico) ? [...(anteriorDb!.historico as unknown[])] : [];
   if (anteriorDb && versaoAnterior !== undefined) {

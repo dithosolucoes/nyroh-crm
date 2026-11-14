@@ -1,4 +1,5 @@
 import type { User, AuditLog, Salesperson, CustomTag, Lead, LeadChatMessage, CampaignLead } from '../types';
+import type { ConfigEnvio } from '../lib/automacoesEnvio';
 import type { WebsiteAuditReport } from '../types/audit';
 import type { LogEntry } from '../lib/logBuffer';
 
@@ -849,6 +850,70 @@ export interface RespostaApagarZipsEmLote {
 export interface RespostaApagarZip {
   success: true;
   message: string;
+}
+
+/** GET /api/admin/automacoes: regras salvas (definição é JSON da própria automação) */
+export type RespostaListaAutomacoes = Array<{ id: string; status: string; def: unknown }>;
+
+/** PUT /api/admin/automacoes/:id (salva): versão nova da regra */
+export interface RespostaAutomacaoSalva {
+  ok: true;
+  id: string;
+  status: string;
+  versao: number;
+}
+
+/** DELETE /api/admin/automacoes/:id */
+export interface RespostaRemocaoAutomacao {
+  ok: true;
+}
+
+/** GET /api/admin/automacoes/execucoes: últimas decisões registradas */
+export type RespostaExecucoesAutomacao = Array<{
+  quando: string;
+  decisao: string;
+  motivo: string | null;
+  leadId: string | null;
+  regraId: string | null;
+  versao: number | null;
+}>;
+
+/** GET /api/admin/automacoes/fila: passos agendados */
+export type RespostaFilaAutomacao = Array<{
+  id: unknown;
+  automacaoId: string;
+  leadId: string;
+  passoOrdem: number;
+  acao: string;
+  status: string;
+  executarEm: string;
+  resultado: unknown;
+}>;
+
+/** GET /api/admin/automacoes/revisao: leads que pediram revisão */
+export type RespostaRevisaoAutomacao = Array<{
+  leadId: string;
+  ultimoComando: string | null;
+  em: string | null;
+}>;
+
+/** GET /api/admin/automacoes/configuracoes (lista de um item, como as outras leituras da tela) */
+export type RespostaConfiguracaoAutomacao = Array<{
+  persistenciaLigada: boolean;
+  execucaoLigada: boolean;
+  pausaGeral: boolean;
+  limites: null;
+}>;
+
+/** PUT /api/admin/automacoes/configuracoes */
+export interface RespostaPausaGeral {
+  pausaGeral: boolean;
+}
+
+/** GET e PUT /api/admin/automacoes/envio: controle do envio real */
+export interface RespostaEnvioAutomacao extends ConfigEnvio {
+  persistenciaLigada: boolean;
+  envioRealConectado: boolean;
 }
 
 /** GET /api/campaign/leads: leads da campanha (linhas do Postgres com os aliases da rota, ou memória) */
