@@ -22,6 +22,7 @@ import {
 import { openWhatsApp } from '@shared/lib/phone';
 import { getFollowUpInfo } from '@shared/lib/followUp';
 import { getLeadNiche } from '@shared/lib/niche';
+import type { RespostaListaLigacoesGerais } from '@shared/contracts/rotas';
 
 interface CallLogItem {
   id: string;
@@ -34,7 +35,7 @@ interface CallLogItem {
   tag: string;
   comment: string;
   durationSeconds?: number;
-  followUpAt?: string;
+  followUpAt?: string | null;
   createdAt: string;
 }
 
@@ -72,7 +73,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
         : '/api/calls';
       const res = await fetch(url);
       if (res.ok) {
-        const data = await res.json();
+        const data = (await res.json()) as RespostaListaLigacoesGerais;
         setCalls(data);
       }
     } catch (err) {

@@ -17,7 +17,7 @@ import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regrasDeC
 import { validarInstanciaEscolhida, escolherInstanciaDisparo } from './shared/lib/dispatchInstancia.js';
 import { recuperarFixosDescartados } from './shared/lib/recuperacaoFixos.js';
 import { variaveisFaltando, mensagemFaltando } from './shared/lib/configObrigatoria.js';
-import type { RespostaListaUploads, UploadZipRegistro, RespostaUploadZipOk, RespostaEnviarMensagem, StatusMensagemEnviada, RespostaLoginOk, RespostaSessaoAtual, RespostaSucesso, UsuarioAdmin, RespostaListaUsuarios, RespostaAuditLogs, RespostaLogsServidor, RespostaListaVendedores, RespostaVendedorCriado, RespostaLoteVendedores, RespostaVendedorAtualizado, RespostaSenhaVendedor, RespostaVendedorStatus, RespostaRoletaConfig, RespostaDistribuicaoRoleta, RespostaListaEtiquetas, RespostaEtiquetaSalva, RespostaOk, RespostaListaNotas, RespostaNotaCriada, RespostaResolucao, RespostaAuditoriaSite, RespostaAtualizacaoLead } from './shared/contracts/rotas.js';
+import type { RespostaListaUploads, UploadZipRegistro, RespostaUploadZipOk, RespostaEnviarMensagem, StatusMensagemEnviada, RespostaLoginOk, RespostaSessaoAtual, RespostaSucesso, UsuarioAdmin, RespostaListaUsuarios, RespostaAuditLogs, RespostaLogsServidor, RespostaListaVendedores, RespostaVendedorCriado, RespostaLoteVendedores, RespostaVendedorAtualizado, RespostaSenhaVendedor, RespostaVendedorStatus, RespostaRoletaConfig, RespostaDistribuicaoRoleta, RespostaListaEtiquetas, RespostaEtiquetaSalva, RespostaOk, RespostaListaNotas, RespostaNotaCriada, RespostaResolucao, RespostaAuditoriaSite, RespostaAtualizacaoLead, RespostaResumoLead, RespostaListaLigacoes, RespostaLigacaoRegistrada, RespostaListaLigacoesGerais } from './shared/contracts/rotas.js';
 import { registerAutomacoesRoutes, applyAutomacoesMigration, applyAutomacoesEstadoMigration, applyAutomacoesFilaMigration, automacoesPersistenciaOn, iniciarWorkerAutomacoes } from './shared/lib/automacoesRoutes.js';
 import { registrarEventoCliente, registrarEventoGeral, pedidoDePararPelasRegras, pedidoDeAlertaPelasRegras, type ItemFila } from './shared/lib/automacoesExecucao.js';
 import type { EventoV } from './shared/lib/automacoes.js';
@@ -6322,7 +6322,7 @@ app.get('/api/leads/:id/summary', async (req: any, res) => {
   const { id } = req.params;
   if (!usePostgres || !pgPool) {
     const lead = memoryLeadsMap.get(id);
-    return lead ? res.json(lead) : res.status(404).json({ error: 'Lead não encontrado.' });
+    return lead ? res.json(lead satisfies RespostaResumoLead) : res.status(404).json({ error: 'Lead não encontrado.' });
   }
   try {
     const r = await pgPool.query(
@@ -6341,7 +6341,7 @@ app.get('/api/leads/:id/summary', async (req: any, res) => {
       [id]
     );
     if (r.rowCount === 0) return res.status(404).json({ error: 'Lead não encontrado.' });
-    return res.json(r.rows[0]);
+    return res.json(r.rows[0] satisfies RespostaResumoLead);
   } catch (err: any) {
     return res.status(500).json({ error: 'Erro ao carregar o lead.' });
   }
@@ -9014,10 +9014,10 @@ app.get('/api/leads/:id/calls', async (req, res) => {
          ORDER BY created_at DESC`,
         [id]
       );
-      return res.json(result.rows);
+      return res.json(result.rows satisfies RespostaListaLigacoes);
     } else {
       const calls = memoryCallLogsMap.get(id) || [];
-      return res.json(calls.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+      return res.json(calls.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()) satisfies RespostaListaLigacoes);
     }
   } catch (error) {
     console.error('Error fetching call logs:', error);
@@ -9064,7 +9064,7 @@ app.post('/api/leads/:id/calls', async (req, res) => {
         durationSeconds: duration,
         followUpAt: followUp || undefined,
         createdAt
-      });
+      } satisfies RespostaLigacaoRegistrada);
     } else {
       const lead = memoryLeadsMap.get(id);
       if (!lead) {
@@ -9094,7 +9094,7 @@ app.post('/api/leads/:id/calls', async (req, res) => {
       lead.updatedAt = createdAt;
       memoryLeadsMap.set(id, lead);
 
-      return res.json(newCallLog);
+      return res.json(newCallLog satisfies RespostaLigacaoRegistrada);
     }
   } catch (error) {
     console.error('Error adding call log:', error);
@@ -9177,7 +9177,7 @@ app.get('/api/calls', async (req: any, res) => {
       query += ` ORDER BY c.created_at DESC`;
 
       const result = await pgPool.query(query, params);
-      return res.json(result.rows);
+      return res.json(result.rows satisfies RespostaListaLigacoesGerais);
     } else {
       const allCalls: any[] = [];
       memoryCallLogsMap.forEach((calls, leadId) => {
@@ -9199,7 +9199,7 @@ app.get('/api/calls', async (req: any, res) => {
         }
       });
       allCalls.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      return res.json(allCalls);
+      return res.json(allCalls satisfies RespostaListaLigacoesGerais);
     }
   } catch (error) {
     console.error('Error fetching all calls:', error);

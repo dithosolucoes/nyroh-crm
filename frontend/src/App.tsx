@@ -293,7 +293,8 @@ export default function App() {
       for (const id of ids.slice(0, 20)) {
         try {
           const r = await fetch(`/api/leads/${encodeURIComponent(id)}/summary`);
-          if (r.ok) novos.push(await r.json());
+          // O resumo é parcial (só campos da conversa). Até a base ser tipada, entra na lista como Lead.
+          if (r.ok) novos.push((await r.json()) as Lead);
         } catch {
           /* ignora: a rede de segurança de 30s cobre */
         }

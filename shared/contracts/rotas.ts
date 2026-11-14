@@ -1,4 +1,4 @@
-import type { User, AuditLog, Salesperson, CustomTag } from '../types';
+import type { User, AuditLog, Salesperson, CustomTag, Lead } from '../types';
 import type { WebsiteAuditReport } from '../types/audit';
 import type { LogEntry } from '../lib/logBuffer';
 
@@ -220,6 +220,45 @@ export interface RespostaAtualizacaoLead {
   success: true;
   lead: unknown;
 }
+
+/**
+ * GET /api/leads/:id/summary: um lead só, com os campos da conversa.
+ * Não é o Lead inteiro: o SELECT do Postgres traz um subconjunto (e no fallback de
+ * memória devolve o Lead completo). Por isso é Partial.
+ */
+export type RespostaResumoLead = Partial<Lead>;
+
+/**
+ * Ligação registrada num lead, como sai do servidor. `followUpAt` vem null do
+ * Postgres quando não há retorno agendado, e some do JSON na memória (undefined).
+ */
+export interface LigacaoLead {
+  id: string;
+  leadId: string;
+  tag: string;
+  comment: string;
+  durationSeconds?: number;
+  followUpAt?: string | null;
+  createdAt: string;
+}
+
+/** GET /api/leads/:id/calls (lista, mais recente primeiro) */
+export type RespostaListaLigacoes = LigacaoLead[];
+
+/** POST /api/leads/:id/calls (sucesso) */
+export type RespostaLigacaoRegistrada = LigacaoLead;
+
+/** Ligação com os dados do lead, como vem de GET /api/calls */
+export interface LigacaoComLead extends LigacaoLead {
+  leadName: string;
+  phoneNumber: string;
+  columnStatus: string;
+  salespersonId: string;
+  salespersonName: string;
+}
+
+/** GET /api/calls (ligações da equipe, ou só do vendedor) */
+export type RespostaListaLigacoesGerais = LigacaoComLead[];
 
 /** Exemplos conferidos pelo compilador. Se um campo mudar de nome, o build quebra aqui. */
 export const EXEMPLO_UPLOAD_ZIP = {
