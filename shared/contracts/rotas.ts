@@ -835,6 +835,22 @@ export interface ProgressoImportacao {
   completedAt?: number;
 }
 
+/** POST /api/campaign/uploads/apagar-todos (dryRun ou apagado): resumo do que sai ou saiu */
+export interface RespostaApagarZipsEmLote {
+  dryRun: boolean;
+  safras: number;
+  zips: number;
+  leads: number;
+  bloqueadas: number;
+  leadsBloqueados: number;
+}
+
+/** DELETE /api/campaign/uploads/:uploadId (sucesso) */
+export interface RespostaApagarZip {
+  success: true;
+  message: string;
+}
+
 /** GET /api/campaign/leads: leads da campanha (linhas do Postgres com os aliases da rota, ou memória) */
 export type RespostaListaLeadsCampanha = CampaignLead[];
 
