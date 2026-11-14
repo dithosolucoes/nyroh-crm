@@ -3,7 +3,7 @@ import { isUiFlagOn } from '@shared/lib/uiFlags';
 const SHOW_LAB = isUiFlagOn(import.meta.env.VITE_MOSTRAR_LAB);
 import { useRuntimeConfig, formatInstancePhone } from '@shared/lib/useRuntimeConfig';
 import { onRealtime } from '@shared/lib/realtime';
-import type { RespostaConfigFluxo, RespostaEventosFluxo } from '@shared/contracts/rotas';
+import type { RespostaConfigFluxo, RespostaEventosFluxo, RespostaListaModelosFluxo } from '@shared/contracts/rotas';
 import MetaAccountsPanel from './MetaAccountsPanel';
 import MetaStatusStrip from './MetaStatusStrip';
 import {
@@ -60,13 +60,15 @@ interface MetaTemplateItem {
   name: string;
   accountId?: string;
   accountName?: string;
-  category: 'MARKETING' | 'UTILITY';
+  /** Vem da Meta como texto (MARKETING, UTILITY, AUTHENTICATION...). Não é só as duas do CRM. */
+  category: string;
   language: string;
-  status: 'DRAFT' | 'APPROVED' | 'PENDING' | 'REJECTED';
+  /** Estados da Meta além dos quatro do CRM (PAUSED, DISABLED...): texto livre. */
+  status: string;
   components: any[];
   usageCount?: number;
-  qualityScore?: 'GREEN' | 'YELLOW' | 'RED' | 'UNKNOWN';
-  rejectedReason?: string;
+  qualityScore?: string;
+  rejectedReason?: string | null;
   createdAt?: string;
   submittedToMeta?: boolean;
 }
@@ -355,7 +357,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
     try {
       const res = await fetch('/api/admin/fluxo/templates');
       if (res.ok) {
-        const data = await res.json();
+        const data = (await res.json()) as RespostaListaModelosFluxo;
         if (data.templates && Array.isArray(data.templates)) {
           setTemplates(data.templates);
           if (data.templates.length > 0 && !selectedTemplateForTest) {
@@ -655,7 +657,8 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
   // Load existing template into creator
   const handleLoadTemplateIntoCreator = (tpl: MetaTemplateItem) => {
     setTplName(tpl.name);
-    setTplCategory(tpl.category);
+    // O criador só suporta MARKETING e UTILITY. Outras categorias da Meta (ex.: AUTHENTICATION) caem em UTILITY.
+    setTplCategory(tpl.category === 'MARKETING' ? 'MARKETING' : 'UTILITY');
     const headerComp = tpl.components?.find((c) => c.type === 'HEADER');
     const bodyComp = tpl.components?.find((c) => c.type === 'BODY');
     const footerComp = tpl.components?.find((c) => c.type === 'FOOTER');

@@ -74,7 +74,7 @@ import { AdminDispatchTestSandbox } from './AdminDispatchTestSandbox';
 import { ZipImportProgressModal, ImportProgressData } from './ZipImportProgressModal';
 import { PaginaSubirZip, ZipUploadRegistro } from './PaginaSubirZip';
 import { isUiFlagOn } from '@shared/lib/uiFlags';
-import type { RespostaListaUploads } from '@shared/contracts/rotas';
+import type { RespostaListaUploads, RespostaListaModelosFluxo } from '@shared/contracts/rotas';
 
 const SHOW_SIMULATE = isUiFlagOn(import.meta.env.VITE_MOSTRAR_SIMULAR);
 /** Estado real do disparo: falhou (com motivo), lido/respondeu, ou ainda sem confirmação de entrega. */
@@ -488,7 +488,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
       setLoadingTemplates(true);
       const res = await fetch('/api/admin/fluxo/templates');
       if (res.ok) {
-        const data = await res.json();
+        const data = (await res.json()) as RespostaListaModelosFluxo;
         if (data.templates && Array.isArray(data.templates)) {
           const approved = data.templates.filter((t: any) => t.status === 'APPROVED' || t.status === 'active');
           const list = approved.length > 0 ? approved : data.templates;

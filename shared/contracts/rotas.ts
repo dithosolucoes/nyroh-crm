@@ -436,6 +436,63 @@ export interface RespostaEventosFluxo {
   events: EventoWebhookFluxo[];
 }
 
+/** GET /api/admin/fluxo/instance-mode (sucesso; os erros têm outro formato) */
+export interface RespostaModoInstancia {
+  configured: true;
+  instanceId: string;
+  mode: string;
+  status: string;
+  quality: string;
+  throughputMps: number;
+  messagingLimit24h: number;
+  isCoexistenceReady: boolean;
+  coexistenceNotice: string;
+  raw: unknown;
+}
+
+/**
+ * Modelo de mensagem (template) como sai de GET /api/admin/fluxo/templates.
+ * Os dois caminhos do servidor (Meta direto e FluxoAPI) devolvem formatos diferentes:
+ * o que só um deles traz fica opcional.
+ */
+export interface ModeloFluxo {
+  id: string;
+  name: string;
+  category: string;
+  language: string;
+  status: string;
+  components: unknown[];
+  usageCount: number;
+  qualityScore: string;
+  rejectedReason: string | null;
+  submittedToMeta: boolean;
+  /** Só no caminho da Meta direta (multi-BM) */
+  accountId?: string;
+  accountName?: string;
+  /** Só no caminho da FluxoAPI */
+  headerText?: string;
+  bodyText?: string;
+  footerText?: string;
+  buttons?: unknown[];
+  createdAt?: string;
+  sendable?: boolean;
+  blockedReason?: string | null;
+  fields?: unknown[];
+}
+
+/** GET /api/admin/fluxo/templates (sucesso ou erro; o campo `success` diz qual) */
+export interface RespostaListaModelosFluxo {
+  success: boolean;
+  templates: ModeloFluxo[];
+  error?: { message: string };
+  errors?: Array<{ accountId: string; accountName?: string; message: string }>;
+  remoteMetaCount?: number;
+  remoteFluxoCount?: number;
+  remoteCount?: number;
+  remoteError?: string | null;
+  metaConnected?: boolean;
+}
+
 /** Exemplos conferidos pelo compilador. Se um campo mudar de nome, o build quebra aqui. */
 export const EXEMPLO_UPLOAD_ZIP = {
   success: true,
