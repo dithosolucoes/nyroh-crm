@@ -947,6 +947,36 @@ export interface RespostaMensagensLead {
   messages: LeadChatMessage[];
 }
 
+/** POST /api/leads/recover-phones e /recover-websites (sucesso): quantos leads foram recuperados */
+export interface RespostaRecuperacao {
+  success: true;
+  recoveredCount: number;
+  message: string;
+}
+
+/** POST /api/leads/batch-update (sucesso): resultado da atualização em lote por JSON */
+export interface RespostaAtualizacaoLoteLeads {
+  totalProcessed: number;
+  updatedCount: number;
+  notFoundCount: number;
+  updatedLeads: Array<{ id: string; name: string; oldStatus: string; newStatus: string }>;
+  notFoundIdentifiers: string[];
+}
+
+/** POST /api/leads/batch (sucesso): resultado da importação em lote de leads por JSON */
+export interface RespostaLoteLeads {
+  totalProcessed: number;
+  insertedCount: number;
+  skippedDuplicates: number;
+}
+
+/** POST /api/leads/bulk-delete (sucesso) */
+export interface RespostaExclusaoLote {
+  success: true;
+  count: number;
+  message: string;
+}
+
 /** GET /api/campaign/leads: leads da campanha (linhas do Postgres com os aliases da rota, ou memória) */
 export type RespostaListaLeadsCampanha = CampaignLead[];
 

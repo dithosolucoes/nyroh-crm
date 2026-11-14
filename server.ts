@@ -17,7 +17,7 @@ import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regrasDeC
 import { validarInstanciaEscolhida, escolherInstanciaDisparo } from './shared/lib/dispatchInstancia.js';
 import { recuperarFixosDescartados } from './shared/lib/recuperacaoFixos.js';
 import { variaveisFaltando, mensagemFaltando } from './shared/lib/configObrigatoria.js';
-import type { RespostaListaUploads, UploadZipRegistro, RespostaUploadZipOk, RespostaEnviarMensagem, StatusMensagemEnviada, RespostaLoginOk, RespostaSessaoAtual, RespostaSucesso, UsuarioAdmin, RespostaListaUsuarios, RespostaAuditLogs, RespostaLogsServidor, RespostaListaVendedores, RespostaVendedorCriado, RespostaLoteVendedores, RespostaVendedorAtualizado, RespostaSenhaVendedor, RespostaVendedorStatus, RespostaRoletaConfig, RespostaDistribuicaoRoleta, RespostaListaEtiquetas, RespostaEtiquetaSalva, RespostaOk, RespostaListaNotas, RespostaNotaCriada, RespostaResolucao, RespostaAuditoriaSite, RespostaAtualizacaoLead, RespostaResumoLead, RespostaListaLigacoes, RespostaLigacaoRegistrada, RespostaListaLigacoesGerais, RespostaListaLeads, RespostaListaRespostasRapidas, RespostaRespostaRapidaCriada, RespostaRespostaRapidaExcluida, RespostaStatusMeta, RespostaContasMeta, RespostaSincronizacaoConta, RespostaSincronizacaoTodas, RespostaMetaRemovida, RespostaConfigFluxo, RespostaStatusFluxo, RespostaEventosFluxo, RespostaModoInstancia, RespostaListaModelosFluxo, RespostaSincronizacaoModelos, RespostaModeloCriado, RespostaInstanciasFluxo, RespostaCadastroContaOk, RespostaConfigEmbeddedSignup, RespostaEmbeddedSignupConcluido, RespostaLeituraMeta, RespostaCriacaoInstancia, RespostaEnvioTesteSucesso, RespostaDistribuicaoLeads, RespostaEstatisticasVendedor, RespostaTransferenciaLote, RespostaListaCopias, RespostaCopiaSalva, RespostaCopiaRemovida, RespostaListaLotes, RespostaVelocidadeDisparo, RespostaAlteracaoVelocidade, RespostaAcaoLote, RespostaCancelamentoLote, RespostaLiberacaoQuarentena, RespostaDevolucaoLeads, RespostaRetornoQuarentena, RespostaResetSafra, LoteCampanha, ProgressoLote, RespostaDisparo, RespostaTesteDisparo, RespostaStatusTesteDisparo, RespostaSincronizacaoWhatsApp, RespostaListaLeadsCampanha, RespostaCamposLead, RespostaImportacaoIniciada, ProgressoImportacao, RespostaApagarZipsEmLote, RespostaApagarZip, RespostaInbox, RespostaBuscaMensagens, RespostaMensagensLead } from './shared/contracts/rotas.js';
+import type { RespostaListaUploads, UploadZipRegistro, RespostaUploadZipOk, RespostaEnviarMensagem, StatusMensagemEnviada, RespostaLoginOk, RespostaSessaoAtual, RespostaSucesso, UsuarioAdmin, RespostaListaUsuarios, RespostaAuditLogs, RespostaLogsServidor, RespostaListaVendedores, RespostaVendedorCriado, RespostaLoteVendedores, RespostaVendedorAtualizado, RespostaSenhaVendedor, RespostaVendedorStatus, RespostaRoletaConfig, RespostaDistribuicaoRoleta, RespostaListaEtiquetas, RespostaEtiquetaSalva, RespostaOk, RespostaListaNotas, RespostaNotaCriada, RespostaResolucao, RespostaAuditoriaSite, RespostaAtualizacaoLead, RespostaResumoLead, RespostaListaLigacoes, RespostaLigacaoRegistrada, RespostaListaLigacoesGerais, RespostaListaLeads, RespostaListaRespostasRapidas, RespostaRespostaRapidaCriada, RespostaRespostaRapidaExcluida, RespostaStatusMeta, RespostaContasMeta, RespostaSincronizacaoConta, RespostaSincronizacaoTodas, RespostaMetaRemovida, RespostaConfigFluxo, RespostaStatusFluxo, RespostaEventosFluxo, RespostaModoInstancia, RespostaListaModelosFluxo, RespostaSincronizacaoModelos, RespostaModeloCriado, RespostaInstanciasFluxo, RespostaCadastroContaOk, RespostaConfigEmbeddedSignup, RespostaEmbeddedSignupConcluido, RespostaLeituraMeta, RespostaCriacaoInstancia, RespostaEnvioTesteSucesso, RespostaDistribuicaoLeads, RespostaEstatisticasVendedor, RespostaTransferenciaLote, RespostaListaCopias, RespostaCopiaSalva, RespostaCopiaRemovida, RespostaListaLotes, RespostaVelocidadeDisparo, RespostaAlteracaoVelocidade, RespostaAcaoLote, RespostaCancelamentoLote, RespostaLiberacaoQuarentena, RespostaDevolucaoLeads, RespostaRetornoQuarentena, RespostaResetSafra, LoteCampanha, ProgressoLote, RespostaDisparo, RespostaTesteDisparo, RespostaStatusTesteDisparo, RespostaSincronizacaoWhatsApp, RespostaListaLeadsCampanha, RespostaCamposLead, RespostaImportacaoIniciada, ProgressoImportacao, RespostaApagarZipsEmLote, RespostaApagarZip, RespostaInbox, RespostaBuscaMensagens, RespostaMensagensLead, RespostaRecuperacao, RespostaAtualizacaoLoteLeads, RespostaLoteLeads, RespostaExclusaoLote } from './shared/contracts/rotas.js';
 import type { InboxConversation } from './shared/types.js';
 import { registerAutomacoesRoutes, applyAutomacoesMigration, applyAutomacoesEstadoMigration, applyAutomacoesFilaMigration, automacoesPersistenciaOn, iniciarWorkerAutomacoes } from './shared/lib/automacoesRoutes.js';
 import { registrarEventoCliente, registrarEventoGeral, pedidoDePararPelasRegras, pedidoDeAlertaPelasRegras, type ItemFila } from './shared/lib/automacoesExecucao.js';
@@ -8317,7 +8317,7 @@ app.post('/api/leads/recover-phones', async (req, res) => {
         success: true,
         recoveredCount,
         message: `${recoveredCount} telefones recuperados e restaurados no banco!`
-      });
+      } satisfies RespostaRecuperacao);
     } else {
       for (const lead of memoryLeadsMap.values()) {
         if (!lead.phoneNumber || lead.phoneNumber === '(Sem telefone)') {
@@ -8336,7 +8336,7 @@ app.post('/api/leads/recover-phones', async (req, res) => {
         success: true,
         recoveredCount,
         message: `${recoveredCount} telefones restaurados em memória!`
-      });
+      } satisfies RespostaRecuperacao);
     }
   } catch (err: any) {
     console.error('Error recovering phones:', err);
@@ -8434,7 +8434,7 @@ app.post('/api/leads/recover-websites', async (req, res) => {
         success: true,
         recoveredCount,
         message: `${recoveredCount} sites recuperados e sincronizados com sucesso no banco!`
-      });
+      } satisfies RespostaRecuperacao);
     } else {
       for (const lead of memoryLeadsMap.values()) {
         if (!lead.website || !lead.website.trim() || lead.website === '-') {
@@ -8455,7 +8455,7 @@ app.post('/api/leads/recover-websites', async (req, res) => {
         success: true,
         recoveredCount,
         message: `${recoveredCount} sites restaurados em memória!`
-      });
+      } satisfies RespostaRecuperacao);
     }
   } catch (err: any) {
     console.error('Error recovering websites:', err);
@@ -8875,7 +8875,7 @@ app.post('/api/leads/batch-update', async (req, res) => {
       notFoundCount: notFoundIdentifiers.length,
       updatedLeads: updatedLeadsList,
       notFoundIdentifiers
-    });
+    } satisfies RespostaAtualizacaoLoteLeads);
   } catch (error: any) {
     console.error('Error in batch update:', error);
     res.status(500).json({ error: `Erro ao processar atualização via JSON: ${error.message}` });
@@ -8891,7 +8891,7 @@ app.post('/api/leads/batch', async (req, res) => {
     }
 
     const stats = await processLeadItems(items, `Lote JSON ${new Date().toLocaleString('pt-BR')}`);
-    return res.json(stats);
+    return res.json(stats satisfies RespostaLoteLeads);
   } catch (error: any) {
     console.error('Error handling batch leads:', error);
     res.status(500).json({ error: `Erro ao salvar lote de leads: ${error.message}` });
@@ -9112,13 +9112,13 @@ app.post('/api/leads/bulk-delete', async (req: any, res) => {
     await logAudit('EXCLUIR_LEADS_LOTE', `Excluiu ${ids.length} leads em lote`, req);
     if (usePostgres && pgPool) {
       await pgPool.query(`DELETE FROM leads WHERE id = ANY($1::varchar[])`, [ids]);
-      return res.json({ success: true, count: ids.length, message: `${ids.length} lead(s) excluído(s) com sucesso!` });
+      return res.json({ success: true, count: ids.length, message: `${ids.length} lead(s) excluído(s) com sucesso!` } satisfies RespostaExclusaoLote);
     } else {
       for (const id of ids) {
         memoryLeadsMap.delete(id);
         memoryCallLogsMap.delete(id);
       }
-      return res.json({ success: true, count: ids.length, message: `${ids.length} lead(s) excluído(s) com sucesso!` });
+      return res.json({ success: true, count: ids.length, message: `${ids.length} lead(s) excluído(s) com sucesso!` } satisfies RespostaExclusaoLote);
     }
   } catch (error: any) {
     console.error('Error bulk deleting leads:', error);
