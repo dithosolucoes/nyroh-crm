@@ -1,4 +1,4 @@
-import type { User, AuditLog, Salesperson, CustomTag, Lead, LeadChatMessage } from '../types';
+import type { User, AuditLog, Salesperson, CustomTag, Lead, LeadChatMessage, CampaignLead } from '../types';
 import type { WebsiteAuditReport } from '../types/audit';
 import type { LogEntry } from '../lib/logBuffer';
 
@@ -800,6 +800,14 @@ export interface RespostaStatusTesteDisparo {
   translation?: unknown;
   eventTimestamp?: string;
   message?: string;
+}
+
+/** GET /api/campaign/leads: leads da campanha (linhas do Postgres com os aliases da rota, ou memória) */
+export type RespostaListaLeadsCampanha = CampaignLead[];
+
+/** GET /api/campaign/lead-fields: campos disponíveis para as tags da copy */
+export interface RespostaCamposLead {
+  fields: string[];
 }
 
 /** POST /api/campaign/batches/:id/sync-whatsapp-web (sucesso): safra conferida com a lista do WhatsApp Web */
