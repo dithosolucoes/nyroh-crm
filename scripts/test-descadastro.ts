@@ -4,7 +4,7 @@
  */
 import assert from 'node:assert/strict';
 import { pedidoDePararPelasRegras } from '../shared/lib/automacoesExecucao';
-import { AUTOMACAO_PARAR_PADRAO, PALAVRAS_PARAR_FIXAS } from '../shared/lib/descadastroPadrao';
+import { AUTOMACAO_PARAR_PADRAO, PALAVRAS_PARAR_FIXAS, ehCliqueDescadastro } from '../shared/lib/descadastroPadrao';
 import { validarAutomacao } from '../shared/lib/automacoes';
 
 let falhas = 0;
@@ -67,6 +67,22 @@ test('automação desativada não traz palavras extras', () => {
 
 test('apagar a automação não tira as palavras fixas', () => {
   assert.equal(pedidoDePararPelasRegras('PARAR', []), true);
+});
+
+test('clique de descadastro é reconhecido pelo reply.id configurado', () => {
+  assert.equal(ehCliqueDescadastro({ kind: 'list_reply', id: 'parar_1', title: 'Parar Mensagens' }, ['parar_1']), true);
+});
+
+test('clique sem id configurado não conta, mesmo com o texto do botão', () => {
+  assert.equal(ehCliqueDescadastro({ kind: 'list_reply', title: 'Parar Mensagens' }, ['parar_1']), false);
+  assert.equal(ehCliqueDescadastro({ kind: 'list_reply', id: 'outro', title: 'Parar Mensagens' }, ['parar_1']), false);
+  assert.equal(ehCliqueDescadastro({ kind: 'list_reply', id: 'parar_1' }, []), false);
+});
+
+test('reply ausente ou id vazio não conta', () => {
+  assert.equal(ehCliqueDescadastro(undefined, ['parar_1']), false);
+  assert.equal(ehCliqueDescadastro(null, ['parar_1']), false);
+  assert.equal(ehCliqueDescadastro({ id: '  ' }, ['  ']), false);
 });
 
 console.log('');

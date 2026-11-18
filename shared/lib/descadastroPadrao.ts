@@ -29,3 +29,21 @@ export const AUTOMACAO_PARAR_PADRAO: Automacao = {
   },
   passos: [{ acao: 'marcar_optout' }],
 };
+
+/** Resposta de um clique de botão (payload `data.reply` da FluxoAPI): `{ kind, id, title, description? }`. */
+export interface RespostaBotao {
+  kind?: unknown;
+  id?: unknown;
+  title?: unknown;
+}
+
+/**
+ * Item 3.1 a/b do checklist: o clique de descadastro é reconhecido pelo `reply.id`, nunca pelo texto.
+ * Os ids que significam "parar" vêm de configuração (`NYROH_DESCADASTRO_BOTAO_IDS`). Sem id
+ * configurado, nenhum clique conta: o valor real do botão ainda não foi confirmado (bloco H3).
+ */
+export function ehCliqueDescadastro(reply: RespostaBotao | null | undefined, idsConfigurados: readonly string[]): boolean {
+  if (!reply || typeof reply.id !== 'string') return false;
+  const id = reply.id.trim();
+  return id !== '' && idsConfigurados.includes(id);
+}
