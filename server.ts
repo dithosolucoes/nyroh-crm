@@ -21,6 +21,7 @@ import { aplicarMigracoes } from './shared/lib/migracoes.js';
 import { ESQUEMA_BASE } from './shared/lib/esquemaBase.js';
 import { VIEWS_COMPATIBILIDADE } from './shared/lib/esquemaViews.js';
 import { NOTAS_E_RESOLVIDA } from './shared/lib/esquemaNotas.js';
+import { CAIXA_DE_ENTRADA } from './shared/lib/esquemaCaixa.js';
 import type { RespostaListaUploads, UploadZipRegistro, RespostaUploadZipOk, RespostaEnviarMensagem, StatusMensagemEnviada, RespostaLoginOk, RespostaSessaoAtual, RespostaSucesso, UsuarioAdmin, RespostaListaUsuarios, RespostaAuditLogs, RespostaLogsServidor, RespostaListaVendedores, RespostaVendedorCriado, RespostaLoteVendedores, RespostaVendedorAtualizado, RespostaSenhaVendedor, RespostaVendedorStatus, RespostaRoletaConfig, RespostaDistribuicaoRoleta, RespostaListaEtiquetas, RespostaEtiquetaSalva, RespostaOk, RespostaListaNotas, RespostaNotaCriada, RespostaResolucao, RespostaAuditoriaSite, RespostaAtualizacaoLead, RespostaResumoLead, RespostaListaLigacoes, RespostaLigacaoRegistrada, RespostaListaLigacoesGerais, RespostaListaLeads, RespostaListaRespostasRapidas, RespostaRespostaRapidaCriada, RespostaRespostaRapidaExcluida, RespostaStatusMeta, RespostaContasMeta, RespostaSincronizacaoConta, RespostaSincronizacaoTodas, RespostaMetaRemovida, RespostaConfigFluxo, RespostaStatusFluxo, RespostaEventosFluxo, RespostaModoInstancia, RespostaListaModelosFluxo, RespostaSincronizacaoModelos, RespostaModeloCriado, RespostaInstanciasFluxo, RespostaCadastroContaOk, RespostaConfigEmbeddedSignup, RespostaEmbeddedSignupConcluido, RespostaLeituraMeta, RespostaCriacaoInstancia, RespostaEnvioTesteSucesso, RespostaDistribuicaoLeads, RespostaEstatisticasVendedor, RespostaTransferenciaLote, RespostaListaCopias, RespostaCopiaSalva, RespostaCopiaRemovida, RespostaListaLotes, RespostaVelocidadeDisparo, RespostaAlteracaoVelocidade, RespostaAcaoLote, RespostaCancelamentoLote, RespostaLiberacaoQuarentena, RespostaDevolucaoLeads, RespostaRetornoQuarentena, RespostaResetSafra, LoteCampanha, ProgressoLote, RespostaDisparo, RespostaTesteDisparo, RespostaStatusTesteDisparo, RespostaSincronizacaoWhatsApp, RespostaListaLeadsCampanha, RespostaCamposLead, RespostaImportacaoIniciada, ProgressoImportacao, RespostaApagarZipsEmLote, RespostaApagarZip, RespostaInbox, RespostaBuscaMensagens, RespostaMensagensLead, RespostaRecuperacao, RespostaAtualizacaoLoteLeads, RespostaLoteLeads, RespostaExclusaoLote, RespostaCliquesLink, RespostaSalvarConfigFluxo, RespostaTesteConexaoFluxo, RespostaRuntimeConfig, RespostaEventoSimulado, RespostaJanelaLead, RespostaPresenca, RespostaLeituraMarcada, RespostaCatalogoModelosMeta, RespostaSimulacaoWebhook, RespostaLigacoesRecentesVendedor, RespostaImportacaoZipDireta, RespostaSementes, RespostaAcaoSimulada, RespostaDistribuicaoCampanha, RespostaRespostaSimulada, RespostaStatusInfraestrutura, RespostaSaudeBasica, RespostaSaudeSimples, RespostaWebhookJaProcessado, RespostaWebhookRecebido, RespostaZipEnfileirado, RespostaLeituraNaoMarcada, RequisicaoDistribuicaoRoleta } from './shared/contracts/rotas.js';
 import type { InboxConversation } from './shared/types.js';
 import { registerAutomacoesRoutes, applyAutomacoesMigration, applyAutomacoesEstadoMigration, applyAutomacoesFilaMigration, automacoesPersistenciaOn, iniciarWorkerAutomacoes } from './shared/lib/automacoesRoutes.js';
@@ -881,28 +882,7 @@ END $$;
         // pelo CRM, espelho do celular, disparo), inclusive os que vierem depois.
         // ------------------------------------------------------------------------------
         try {
-          await client.query(`
-            CREATE OR REPLACE FUNCTION nyroh_touch_lead_on_message() RETURNS trigger AS $BODY$
-            BEGIN
-              UPDATE leads
-                 SET last_message_at = GREATEST(COALESCE(last_message_at, NEW.timestamp), NEW.timestamp),
-                     unread_count = CASE
-                       WHEN NEW.sender = 'lead' THEN COALESCE(unread_count, 0) + 1
-                       ELSE COALESCE(unread_count, 0)
-                     END
-               WHERE id = NEW.lead_id;
-              RETURN NEW;
-            END;
-            $BODY$ LANGUAGE plpgsql;
-
-            DROP TRIGGER IF EXISTS trg_lead_messages_touch ON lead_messages;
-            CREATE TRIGGER trg_lead_messages_touch
-              AFTER INSERT ON lead_messages
-              FOR EACH ROW EXECUTE FUNCTION nyroh_touch_lead_on_message();
-
-            CREATE INDEX IF NOT EXISTS idx_leads_last_message_at ON leads (last_message_at DESC NULLS LAST);
-            CREATE INDEX IF NOT EXISTS idx_leads_owner_last_message ON leads (salesperson_id, last_message_at DESC NULLS LAST);
-          `);
+          await aplicarMigracoes(client, [CAIXA_DE_ENTRADA]);
 
           // Preenche o histórico que já existia (uma vez; depois o gatilho cuida).
           await client.query(`

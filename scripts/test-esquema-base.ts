@@ -11,6 +11,7 @@ import { aplicarMigracoes } from '../shared/lib/migracoes.js';
 import { ESQUEMA_BASE } from '../shared/lib/esquemaBase.js';
 import { VIEWS_COMPATIBILIDADE } from '../shared/lib/esquemaViews.js';
 import { NOTAS_E_RESOLVIDA } from '../shared/lib/esquemaNotas.js';
+import { CAIXA_DE_ENTRADA } from '../shared/lib/esquemaCaixa.js';
 
 const base = process.env.E2E_DATABASE_URL;
 if (!base) {
@@ -44,6 +45,10 @@ async function assinatura(c: pg.Client): Promise<Record<string, string>> {
     AND table_name <> 'schema_migrations' ORDER BY 1`);
   const views = await c.query(`SELECT table_name, view_definition FROM information_schema.views
     WHERE table_schema='public' ORDER BY 1`);
+  const gatilhos = await c.query(`SELECT trigger_name, event_object_table, action_timing, event_manipulation, action_statement
+    FROM information_schema.triggers WHERE trigger_schema='public' ORDER BY 1,2,3`);
+  const funcoes = await c.query(`SELECT proname, prosrc FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname='public' ORDER BY 1`);
   const vendedor = await c.query(`SELECT id, name, active, slug, is_default, whatsapp_type
     FROM salespeople WHERE id='seller-thomas'`);
   return {
@@ -52,6 +57,8 @@ async function assinatura(c: pg.Client): Promise<Record<string, string>> {
     indices: JSON.stringify(indices.rows),
     restricoes: JSON.stringify(restricoes.rows),
     views: JSON.stringify(views.rows),
+    gatilhos: JSON.stringify(gatilhos.rows),
+    funcoes: JSON.stringify(funcoes.rows),
     vendedor_padrao: JSON.stringify(vendedor.rows),
   };
 }
@@ -61,6 +68,7 @@ async function main() {
   const dados = readFileSync(join(RAIZ, 'scripts/fixtures/esquema-dml.sql'), 'utf8');
   const views = readFileSync(join(RAIZ, 'scripts/fixtures/views-original.sql'), 'utf8');
   const notas = readFileSync(join(RAIZ, 'scripts/fixtures/notas-original.sql'), 'utf8');
+  const caixa = readFileSync(join(RAIZ, 'scripts/fixtures/caixa-original.sql'), 'utf8');
   const admin = new pg.Client({ connectionString: urlBanco('postgres') });
   await admin.connect();
 
@@ -68,6 +76,7 @@ async function main() {
   await a.query(original);
   await a.query(views);
   await a.query(notas);
+  await a.query(caixa);
   const assA = await assinatura(a);
   await a.end();
 
@@ -76,6 +85,7 @@ async function main() {
   await b.query(dados);
   await aplicarMigracoes(b, [VIEWS_COMPATIBILIDADE], async () => b);
   await aplicarMigracoes(b, [NOTAS_E_RESOLVIDA], async () => b);
+  await aplicarMigracoes(b, [CAIXA_DE_ENTRADA], async () => b);
   const assB = await assinatura(b);
   // segunda subida: o runner não pode reaplicar nem falhar
   const again = await aplicarMigracoes(b, [ESQUEMA_BASE], async () => b);
