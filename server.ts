@@ -20,6 +20,7 @@ import { variaveisFaltando, mensagemFaltando } from './shared/lib/configObrigato
 import { aplicarMigracoes } from './shared/lib/migracoes.js';
 import { ESQUEMA_BASE } from './shared/lib/esquemaBase.js';
 import { VIEWS_COMPATIBILIDADE } from './shared/lib/esquemaViews.js';
+import { NOTAS_E_RESOLVIDA } from './shared/lib/esquemaNotas.js';
 import type { RespostaListaUploads, UploadZipRegistro, RespostaUploadZipOk, RespostaEnviarMensagem, StatusMensagemEnviada, RespostaLoginOk, RespostaSessaoAtual, RespostaSucesso, UsuarioAdmin, RespostaListaUsuarios, RespostaAuditLogs, RespostaLogsServidor, RespostaListaVendedores, RespostaVendedorCriado, RespostaLoteVendedores, RespostaVendedorAtualizado, RespostaSenhaVendedor, RespostaVendedorStatus, RespostaRoletaConfig, RespostaDistribuicaoRoleta, RespostaListaEtiquetas, RespostaEtiquetaSalva, RespostaOk, RespostaListaNotas, RespostaNotaCriada, RespostaResolucao, RespostaAuditoriaSite, RespostaAtualizacaoLead, RespostaResumoLead, RespostaListaLigacoes, RespostaLigacaoRegistrada, RespostaListaLigacoesGerais, RespostaListaLeads, RespostaListaRespostasRapidas, RespostaRespostaRapidaCriada, RespostaRespostaRapidaExcluida, RespostaStatusMeta, RespostaContasMeta, RespostaSincronizacaoConta, RespostaSincronizacaoTodas, RespostaMetaRemovida, RespostaConfigFluxo, RespostaStatusFluxo, RespostaEventosFluxo, RespostaModoInstancia, RespostaListaModelosFluxo, RespostaSincronizacaoModelos, RespostaModeloCriado, RespostaInstanciasFluxo, RespostaCadastroContaOk, RespostaConfigEmbeddedSignup, RespostaEmbeddedSignupConcluido, RespostaLeituraMeta, RespostaCriacaoInstancia, RespostaEnvioTesteSucesso, RespostaDistribuicaoLeads, RespostaEstatisticasVendedor, RespostaTransferenciaLote, RespostaListaCopias, RespostaCopiaSalva, RespostaCopiaRemovida, RespostaListaLotes, RespostaVelocidadeDisparo, RespostaAlteracaoVelocidade, RespostaAcaoLote, RespostaCancelamentoLote, RespostaLiberacaoQuarentena, RespostaDevolucaoLeads, RespostaRetornoQuarentena, RespostaResetSafra, LoteCampanha, ProgressoLote, RespostaDisparo, RespostaTesteDisparo, RespostaStatusTesteDisparo, RespostaSincronizacaoWhatsApp, RespostaListaLeadsCampanha, RespostaCamposLead, RespostaImportacaoIniciada, ProgressoImportacao, RespostaApagarZipsEmLote, RespostaApagarZip, RespostaInbox, RespostaBuscaMensagens, RespostaMensagensLead, RespostaRecuperacao, RespostaAtualizacaoLoteLeads, RespostaLoteLeads, RespostaExclusaoLote, RespostaCliquesLink, RespostaSalvarConfigFluxo, RespostaTesteConexaoFluxo, RespostaRuntimeConfig, RespostaEventoSimulado, RespostaJanelaLead, RespostaPresenca, RespostaLeituraMarcada, RespostaCatalogoModelosMeta, RespostaSimulacaoWebhook, RespostaLigacoesRecentesVendedor, RespostaImportacaoZipDireta, RespostaSementes, RespostaAcaoSimulada, RespostaDistribuicaoCampanha, RespostaRespostaSimulada, RespostaStatusInfraestrutura, RespostaSaudeBasica, RespostaSaudeSimples, RespostaWebhookJaProcessado, RespostaWebhookRecebido, RespostaZipEnfileirado, RespostaLeituraNaoMarcada, RequisicaoDistribuicaoRoleta } from './shared/contracts/rotas.js';
 import type { InboxConversation } from './shared/types.js';
 import { registerAutomacoesRoutes, applyAutomacoesMigration, applyAutomacoesEstadoMigration, applyAutomacoesFilaMigration, automacoesPersistenciaOn, iniciarWorkerAutomacoes } from './shared/lib/automacoesRoutes.js';
@@ -856,18 +857,14 @@ END $$;
         }
 
         // Notas internas da conversa (só a equipe vê; o cliente nunca) e marcação de "resolvida".
+        // Notas internas e "resolvida" pelo runner de migrações (item 2.2a-2 b). Ver shared/lib/esquemaNotas.ts.
+        try {
+          await aplicarMigracoes(client, [NOTAS_E_RESOLVIDA]);
+        } catch (notasErr: any) {
+          console.warn('[PostgreSQL] Aviso ao aplicar notas/resolvida:', notasErr?.message);
+        }
         try {
           await client.query(`
-            CREATE TABLE IF NOT EXISTS lead_notes (
-              id VARCHAR(255) PRIMARY KEY,
-              lead_id VARCHAR(255) NOT NULL,
-              author_id VARCHAR(255),
-              author_name VARCHAR(255),
-              text TEXT NOT NULL,
-              created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-            );
-            CREATE INDEX IF NOT EXISTS idx_lead_notes_lead ON lead_notes (lead_id, created_at DESC);
-            ALTER TABLE leads ADD COLUMN IF NOT EXISTS resolved_at TIMESTAMP WITH TIME ZONE;
             -- Busca no histórico de mensagens
             CREATE INDEX IF NOT EXISTS idx_lead_messages_text ON lead_messages USING gin (to_tsvector('portuguese', coalesce(text, '')));
           `);

@@ -10,6 +10,7 @@ import pg from 'pg';
 import { aplicarMigracoes } from '../shared/lib/migracoes.js';
 import { ESQUEMA_BASE } from '../shared/lib/esquemaBase.js';
 import { VIEWS_COMPATIBILIDADE } from '../shared/lib/esquemaViews.js';
+import { NOTAS_E_RESOLVIDA } from '../shared/lib/esquemaNotas.js';
 
 const base = process.env.E2E_DATABASE_URL;
 if (!base) {
@@ -59,12 +60,14 @@ async function main() {
   const original = readFileSync(join(RAIZ, 'scripts/fixtures/esquema-original.sql'), 'utf8');
   const dados = readFileSync(join(RAIZ, 'scripts/fixtures/esquema-dml.sql'), 'utf8');
   const views = readFileSync(join(RAIZ, 'scripts/fixtures/views-original.sql'), 'utf8');
+  const notas = readFileSync(join(RAIZ, 'scripts/fixtures/notas-original.sql'), 'utf8');
   const admin = new pg.Client({ connectionString: urlBanco('postgres') });
   await admin.connect();
 
   const a = await recriar(admin, 'nyroh_esquema_original');
   await a.query(original);
   await a.query(views);
+  await a.query(notas);
   const assA = await assinatura(a);
   await a.end();
 
@@ -72,6 +75,7 @@ async function main() {
   await aplicarMigracoes(b, [ESQUEMA_BASE], async () => b);
   await b.query(dados);
   await aplicarMigracoes(b, [VIEWS_COMPATIBILIDADE], async () => b);
+  await aplicarMigracoes(b, [NOTAS_E_RESOLVIDA], async () => b);
   const assB = await assinatura(b);
   // segunda subida: o runner não pode reaplicar nem falhar
   const again = await aplicarMigracoes(b, [ESQUEMA_BASE], async () => b);
