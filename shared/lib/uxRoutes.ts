@@ -12,6 +12,14 @@
 import type { Express, Request, Response } from 'express';
 import crypto from 'crypto';
 import type pg from 'pg';
+import type {
+  RespostaListaMarcas, RespostaMarcaAtualizada, RespostaVinculoMarcaNumeros, RespostaListaNumeros,
+  RespostaNumeroAtualizado, RespostaVinculoSafraMarca, RespostaListaPedidosBloqueioLead, RespostaListaRegrasContato,
+  RespostaConfirmacao, RespostaPreviaRegras, RespostaCentralRemessas, RespostaListaPedidosBloqueio,
+  RespostaDecisaoBloqueio, RespostaListaSelecoesCentral, RespostaAnaliseCentral,
+  RespostaMarcaCriada, RespostaNumeroCriado, RespostaRegraCriada, RespostaRemessaCriada,
+  RespostaSelecaoCriada, RespostaPedidoBloqueioCriado, RespostaSafraCriadaUx
+} from '../contracts/rotas.js';
 
 export const TAMANHOS_BLOCO = [20, 50, 100, 300, 500, 1000, 5000, 10000, 50000, 100000] as const;
 
@@ -246,7 +254,7 @@ export function registerUxRoutes(app: Express, deps: UxDeps): void {
              COALESCE(json_agg(bn.phone_number_id) FILTER (WHERE bn.phone_number_id IS NOT NULL), '[]') AS "numberIds"
       FROM brands b LEFT JOIN brand_numbers bn ON bn.brand_id = b.id
       GROUP BY b.id ORDER BY b.name`);
-    res.json(r.rows);
+    res.json(r.rows satisfies RespostaListaMarcas);
   }));
 
   app.post('/api/brands', withDb(async (pool, req, res) => {
@@ -258,7 +266,7 @@ export function registerUxRoutes(app: Express, deps: UxDeps): void {
       `INSERT INTO brands (id, name, services, message_templates) VALUES ($1, $2, $3, $4)`,
       [id, name, String(req.body?.services || ''), JSON.stringify(req.body?.messageTemplates || [])]
     );
-    res.status(201).json({ id, name });
+    res.status(201).json({ id, name } satisfies RespostaMarcaCriada);
   }));
 
   /** Edita nome e serviços da marca. Só os campos enviados mudam. */
@@ -277,7 +285,7 @@ export function registerUxRoutes(app: Express, deps: UxDeps): void {
     if (!sets.length) return res.status(400).json({ error: 'Nada para alterar.' });
     const r = await pool.query(`UPDATE brands SET ${sets.join(', ')} WHERE id = $1 RETURNING id, name, services`, vals);
     if (!r.rowCount) return res.status(404).json({ error: 'Marca não encontrada.' });
-    res.json(r.rows[0]);
+    res.json(r.rows[0] satisfies RespostaMarcaAtualizada);
   }));
 
   /** Vínculo N:N: define exatamente quais números a marca usa. */
@@ -298,7 +306,7 @@ export function registerUxRoutes(app: Express, deps: UxDeps): void {
     } finally {
       client.release();
     }
-    res.json({ brandId: req.params.id, numberIds: ids });
+    res.json({ brandId: req.params.id, numberIds: ids } satisfies RespostaVinculoMarcaNumeros);
   }));
 
   // ---------- Números ----------
@@ -310,7 +318,7 @@ export function registerUxRoutes(app: Express, deps: UxDeps): void {
              COALESCE(json_agg(bn.brand_id) FILTER (WHERE bn.brand_id IS NOT NULL), '[]') AS "brandIds"
       FROM phone_numbers p LEFT JOIN brand_numbers bn ON bn.phone_number_id = p.id
       GROUP BY p.id ORDER BY p.label`);
-    res.json(r.rows);
+    res.json(r.rows satisfies RespostaListaNumeros);
   }));
 
   app.post('/api/phone-numbers', withDb(async (pool, req, res) => {
@@ -322,7 +330,7 @@ export function registerUxRoutes(app: Express, deps: UxDeps): void {
       `INSERT INTO phone_numbers (id, label, phone_display, meta_phone_number_id, fluxo_instance_id) VALUES ($1,$2,$3,$4,$5)`,
       [id, label, req.body?.phoneDisplay || null, req.body?.metaPhoneNumberId || null, req.body?.fluxoInstanceId || null]
     );
-    res.status(201).json({ id, label });
+    res.status(201).json({ id, label } satisfies RespostaNumeroCriado);
   }));
 
   /** Edita os dados de um número. Só os campos enviados mudam. */
@@ -340,7 +348,7 @@ export function registerUxRoutes(app: Express, deps: UxDeps): void {
     if (!sets.length) return res.status(400).json({ error: 'Nada para alterar.' });
     const r = await pool.query(`UPDATE phone_numbers SET ${sets.join(', ')} WHERE id = $1 RETURNING id, label, phone_display AS "phoneDisplay", meta_phone_number_id AS "metaPhoneNumberId"`, vals);
     if (!r.rowCount) return res.status(404).json({ error: 'Número não encontrado.' });
-    res.json(r.rows[0]);
+    res.json(r.rows[0] satisfies RespostaNumeroAtualizado);
   }));
 
   /** Liga a safra (campanha) a uma marca. Só admin (rota /api/campaign/ já é restrita). */
@@ -348,7 +356,7 @@ export function registerUxRoutes(app: Express, deps: UxDeps): void {
     if (!requireAdmin(req, res)) return;
     const brandId = req.body?.brandId ? String(req.body.brandId) : null;
     await pool.query(`UPDATE campaign_batches SET brand_id = $1 WHERE id = $2`, [brandId, req.params.id]);
-    res.json({ batchId: req.params.id, brandId });
+    res.json({ batchId: req.params.id, brandId } satisfies RespostaVinculoSafraMarca);
   }));
 
   /** Histórico de pedidos de bloqueio de um lead (admin vê todos; vendedor só os seus). */
@@ -362,7 +370,7 @@ export function registerUxRoutes(app: Express, deps: UxDeps): void {
       `SELECT id, reason_code AS "reasonCode", reason_text AS "reasonText", status, decision_note AS "decisionNote",
               requested_at AS "requestedAt", decided_at AS "decidedAt"
        FROM lead_block_requests WHERE lead_id = $1 ORDER BY requested_at DESC LIMIT 50`, [req.params.id]);
-    res.json(r.rows);
+    res.json(r.rows satisfies RespostaListaPedidosBloqueioLead);
   }));
 
   // ---------- Central de leads ----------
@@ -408,7 +416,7 @@ export function registerUxRoutes(app: Express, deps: UxDeps): void {
          FROM regras_contato r LEFT JOIN brands b ON b.id = r.marca_id
         ORDER BY r.criada_em, r.id`
     );
-    res.json(r.rows);
+    res.json(r.rows satisfies RespostaListaRegrasContato);
   }));
 
   app.post('/api/regras-contato', withDb(async (pool, req, res) => {
@@ -423,7 +431,7 @@ export function registerUxRoutes(app: Express, deps: UxDeps): void {
       [id, v.nome, v.tipo, v.escopo, v.marcaId, v.max, v.janela, v.ativa]
     );
     invalidarCacheRegras();
-    res.status(201).json({ id });
+    res.status(201).json({ id } satisfies RespostaRegraCriada);
   }));
 
   app.patch('/api/regras-contato/:id', withDb(async (pool, req, res) => {
@@ -439,14 +447,14 @@ export function registerUxRoutes(app: Express, deps: UxDeps): void {
       [req.params.id, v.nome, v.tipo, v.escopo, v.marcaId, v.max, v.janela, v.ativa]
     );
     invalidarCacheRegras();
-    res.json({ ok: true });
+    res.json({ ok: true } satisfies RespostaConfirmacao);
   }));
 
   app.delete('/api/regras-contato/:id', withDb(async (pool, req, res) => {
     if (!requireAdmin(req, res)) return;
     await pool.query('DELETE FROM regras_contato WHERE id = $1', [req.params.id]);
     invalidarCacheRegras();
-    res.json({ ok: true });
+    res.json({ ok: true } satisfies RespostaConfirmacao);
   }));
 
   /** Prévia: quantos contatos em espera passariam hoje com as regras atuais. */
@@ -455,7 +463,7 @@ export function registerUxRoutes(app: Express, deps: UxDeps): void {
     const filtro = await regrasDeContatoSql(pool);
     const total = await pool.query(`SELECT COUNT(*)::int AS n FROM campaign_leads WHERE status = 'STAGING' AND is_mobile = TRUE`);
     const passam = await pool.query(`SELECT COUNT(*)::int AS n FROM campaign_leads WHERE status = 'STAGING' AND is_mobile = TRUE ${filtro}`);
-    res.json({ emEspera: total.rows[0].n, passariam: passam.rows[0].n, barrados: total.rows[0].n - passam.rows[0].n });
+    res.json({ emEspera: total.rows[0].n, passariam: passam.rows[0].n, barrados: total.rows[0].n - passam.rows[0].n } satisfies RespostaPreviaRegras);
   }));
 
   app.get('/api/central/remessas', withDb(async (pool, req, res) => {
@@ -473,7 +481,7 @@ export function registerUxRoutes(app: Express, deps: UxDeps): void {
       FROM remessas r LEFT JOIN leads l ON l.remessa_id = r.id
       GROUP BY r.id ORDER BY r.created_at DESC`);
     const semRemessa = await pool.query(`SELECT COUNT(*)::int AS n FROM leads WHERE remessa_id IS NULL`);
-    res.json({ remessas: r.rows, semRemessa: semRemessa.rows[0].n, tamanhosBloco: TAMANHOS_BLOCO });
+    res.json({ remessas: r.rows, semRemessa: semRemessa.rows[0].n, tamanhosBloco: TAMANHOS_BLOCO } satisfies RespostaCentralRemessas);
   }));
 
   app.post('/api/central/remessas', withDb(async (pool, req, res) => {
@@ -482,7 +490,7 @@ export function registerUxRoutes(app: Express, deps: UxDeps): void {
     if (!name) return res.status(400).json({ error: 'Nome da remessa é obrigatório.' });
     const id = newId('rem');
     await pool.query(`INSERT INTO remessas (id, name) VALUES ($1, $2)`, [id, name]);
-    res.status(201).json({ id, name });
+    res.status(201).json({ id, name } satisfies RespostaRemessaCriada);
   }));
 
   /** Seleção por ID: cria um bloco com os IDs escolhidos (não copia os leads). */
@@ -500,7 +508,7 @@ export function registerUxRoutes(app: Express, deps: UxDeps): void {
       `INSERT INTO lead_selections (id, name, size, lead_ids, created_by) VALUES ($1,$2,$3,$4,$5)`,
       [id, name, leadIds.length, JSON.stringify(leadIds), deps.currentUser(req)?.id || null]
     );
-    res.status(201).json({ id, name, size: leadIds.length });
+    res.status(201).json({ id, name, size: leadIds.length } satisfies RespostaSelecaoCriada);
   }));
 
   // ---------- Bloqueio com motivo e aprovação ----------
@@ -522,7 +530,7 @@ export function registerUxRoutes(app: Express, deps: UxDeps): void {
       `INSERT INTO lead_block_requests (id, lead_id, requested_by, reason_code, reason_text, status) VALUES ($1,$2,$3,$4,$5,'pendente')`,
       [id, req.params.id, user.id || null, code, text || null]
     );
-    res.status(201).json({ id, status: 'pendente' });
+    res.status(201).json({ id, status: 'pendente' } satisfies RespostaPedidoBloqueioCriado);
   }));
 
   app.get('/api/block-requests', withDb(async (pool, req, res) => {
@@ -533,7 +541,7 @@ export function registerUxRoutes(app: Express, deps: UxDeps): void {
               reason_text AS "reasonText", status, decided_by AS "decidedBy", decision_note AS "decisionNote",
               requested_at AS "requestedAt", decided_at AS "decidedAt"
        FROM lead_block_requests WHERE status = $1 ORDER BY requested_at DESC LIMIT 200`, [status]);
-    res.json(r.rows);
+    res.json(r.rows satisfies RespostaListaPedidosBloqueio);
   }));
 
   /** Admin aprova ou recusa. Aprovado: lead sai da base principal e o motivo fica no histórico. */
@@ -559,7 +567,7 @@ export function registerUxRoutes(app: Express, deps: UxDeps): void {
         await client.query(`UPDATE leads SET blocked_at = CURRENT_TIMESTAMP, blocked_reason = $1 WHERE id = $2`, [texto, cur.rows[0].lead_id]);
       }
       await client.query('COMMIT');
-      res.json({ id: req.params.id, status: newStatus });
+      res.json({ id: req.params.id, status: newStatus } satisfies RespostaDecisaoBloqueio);
     } catch (e) {
       await client.query('ROLLBACK');
       throw e;
@@ -621,7 +629,7 @@ export function registerUxRoutes(app: Express, deps: UxDeps): void {
         [batchId]
       );
       await client.query('COMMIT');
-      res.status(201).json({ batchId, name: nome, brandId, total: ins.rowCount });
+      res.status(201).json({ batchId, name: nome, brandId, total: ins.rowCount } satisfies RespostaSafraCriadaUx);
     } catch (e) {
       await client.query('ROLLBACK');
       throw e;
@@ -646,7 +654,7 @@ export function registerUxRoutes(app: Express, deps: UxDeps): void {
                 )) AS "contatadosHoje"
          FROM lead_selections s ORDER BY s.created_at DESC LIMIT 100`
     );
-    res.json(r.rows);
+    res.json(r.rows satisfies RespostaListaSelecoesCentral);
   }));
 
   app.post('/api/central/selections/:id/direcionar', withDb(async (pool, req, res) => {
@@ -702,7 +710,7 @@ export function registerUxRoutes(app: Express, deps: UxDeps): void {
        GROUP BY b.id, b.name, b.phone_number, b.blocked_at
        ORDER BY b.name
        LIMIT 5000`, params);
-    res.json({ leads: r.rows, total: r.rowCount });
+    res.json({ leads: r.rows, total: r.rowCount } satisfies RespostaAnaliseCentral);
   }));
 
   app.post('/api/central/remessas/:id/direcionar', withDb(async (pool, req, res) => {

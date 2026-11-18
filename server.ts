@@ -17,7 +17,7 @@ import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regrasDeC
 import { validarInstanciaEscolhida, escolherInstanciaDisparo } from './shared/lib/dispatchInstancia.js';
 import { recuperarFixosDescartados } from './shared/lib/recuperacaoFixos.js';
 import { variaveisFaltando, mensagemFaltando } from './shared/lib/configObrigatoria.js';
-import type { RespostaListaUploads, UploadZipRegistro, RespostaUploadZipOk, RespostaEnviarMensagem, StatusMensagemEnviada, RespostaLoginOk, RespostaSessaoAtual, RespostaSucesso, UsuarioAdmin, RespostaListaUsuarios, RespostaAuditLogs, RespostaLogsServidor, RespostaListaVendedores, RespostaVendedorCriado, RespostaLoteVendedores, RespostaVendedorAtualizado, RespostaSenhaVendedor, RespostaVendedorStatus, RespostaRoletaConfig, RespostaDistribuicaoRoleta, RespostaListaEtiquetas, RespostaEtiquetaSalva, RespostaOk, RespostaListaNotas, RespostaNotaCriada, RespostaResolucao, RespostaAuditoriaSite, RespostaAtualizacaoLead, RespostaResumoLead, RespostaListaLigacoes, RespostaLigacaoRegistrada, RespostaListaLigacoesGerais, RespostaListaLeads, RespostaListaRespostasRapidas, RespostaRespostaRapidaCriada, RespostaRespostaRapidaExcluida, RespostaStatusMeta, RespostaContasMeta, RespostaSincronizacaoConta, RespostaSincronizacaoTodas, RespostaMetaRemovida, RespostaConfigFluxo, RespostaStatusFluxo, RespostaEventosFluxo, RespostaModoInstancia, RespostaListaModelosFluxo, RespostaSincronizacaoModelos, RespostaModeloCriado, RespostaInstanciasFluxo, RespostaCadastroContaOk, RespostaConfigEmbeddedSignup, RespostaEmbeddedSignupConcluido, RespostaLeituraMeta, RespostaCriacaoInstancia, RespostaEnvioTesteSucesso, RespostaDistribuicaoLeads, RespostaEstatisticasVendedor, RespostaTransferenciaLote, RespostaListaCopias, RespostaCopiaSalva, RespostaCopiaRemovida, RespostaListaLotes, RespostaVelocidadeDisparo, RespostaAlteracaoVelocidade, RespostaAcaoLote, RespostaCancelamentoLote, RespostaLiberacaoQuarentena, RespostaDevolucaoLeads, RespostaRetornoQuarentena, RespostaResetSafra, LoteCampanha, ProgressoLote, RespostaDisparo, RespostaTesteDisparo, RespostaStatusTesteDisparo, RespostaSincronizacaoWhatsApp, RespostaListaLeadsCampanha, RespostaCamposLead, RespostaImportacaoIniciada, ProgressoImportacao, RespostaApagarZipsEmLote, RespostaApagarZip, RespostaInbox, RespostaBuscaMensagens, RespostaMensagensLead, RespostaRecuperacao, RespostaAtualizacaoLoteLeads, RespostaLoteLeads, RespostaExclusaoLote } from './shared/contracts/rotas.js';
+import type { RespostaListaUploads, UploadZipRegistro, RespostaUploadZipOk, RespostaEnviarMensagem, StatusMensagemEnviada, RespostaLoginOk, RespostaSessaoAtual, RespostaSucesso, UsuarioAdmin, RespostaListaUsuarios, RespostaAuditLogs, RespostaLogsServidor, RespostaListaVendedores, RespostaVendedorCriado, RespostaLoteVendedores, RespostaVendedorAtualizado, RespostaSenhaVendedor, RespostaVendedorStatus, RespostaRoletaConfig, RespostaDistribuicaoRoleta, RespostaListaEtiquetas, RespostaEtiquetaSalva, RespostaOk, RespostaListaNotas, RespostaNotaCriada, RespostaResolucao, RespostaAuditoriaSite, RespostaAtualizacaoLead, RespostaResumoLead, RespostaListaLigacoes, RespostaLigacaoRegistrada, RespostaListaLigacoesGerais, RespostaListaLeads, RespostaListaRespostasRapidas, RespostaRespostaRapidaCriada, RespostaRespostaRapidaExcluida, RespostaStatusMeta, RespostaContasMeta, RespostaSincronizacaoConta, RespostaSincronizacaoTodas, RespostaMetaRemovida, RespostaConfigFluxo, RespostaStatusFluxo, RespostaEventosFluxo, RespostaModoInstancia, RespostaListaModelosFluxo, RespostaSincronizacaoModelos, RespostaModeloCriado, RespostaInstanciasFluxo, RespostaCadastroContaOk, RespostaConfigEmbeddedSignup, RespostaEmbeddedSignupConcluido, RespostaLeituraMeta, RespostaCriacaoInstancia, RespostaEnvioTesteSucesso, RespostaDistribuicaoLeads, RespostaEstatisticasVendedor, RespostaTransferenciaLote, RespostaListaCopias, RespostaCopiaSalva, RespostaCopiaRemovida, RespostaListaLotes, RespostaVelocidadeDisparo, RespostaAlteracaoVelocidade, RespostaAcaoLote, RespostaCancelamentoLote, RespostaLiberacaoQuarentena, RespostaDevolucaoLeads, RespostaRetornoQuarentena, RespostaResetSafra, LoteCampanha, ProgressoLote, RespostaDisparo, RespostaTesteDisparo, RespostaStatusTesteDisparo, RespostaSincronizacaoWhatsApp, RespostaListaLeadsCampanha, RespostaCamposLead, RespostaImportacaoIniciada, ProgressoImportacao, RespostaApagarZipsEmLote, RespostaApagarZip, RespostaInbox, RespostaBuscaMensagens, RespostaMensagensLead, RespostaRecuperacao, RespostaAtualizacaoLoteLeads, RespostaLoteLeads, RespostaExclusaoLote, RespostaCliquesLink, RespostaSalvarConfigFluxo, RespostaTesteConexaoFluxo, RespostaRuntimeConfig, RespostaEventoSimulado, RespostaJanelaLead, RespostaPresenca, RespostaLeituraMarcada, RespostaCatalogoModelosMeta, RespostaSimulacaoWebhook, RespostaLigacoesRecentesVendedor, RespostaImportacaoZipDireta, RespostaSementes, RespostaAcaoSimulada, RespostaDistribuicaoCampanha, RespostaRespostaSimulada, RespostaStatusInfraestrutura, RespostaSaudeBasica, RespostaSaudeSimples, RespostaWebhookJaProcessado, RespostaWebhookRecebido, RespostaZipEnfileirado, RespostaLeituraNaoMarcada, RequisicaoDistribuicaoRoleta } from './shared/contracts/rotas.js';
 import type { InboxConversation } from './shared/types.js';
 import { registerAutomacoesRoutes, applyAutomacoesMigration, applyAutomacoesEstadoMigration, applyAutomacoesFilaMigration, automacoesPersistenciaOn, iniciarWorkerAutomacoes } from './shared/lib/automacoesRoutes.js';
 import { registrarEventoCliente, registrarEventoGeral, pedidoDePararPelasRegras, pedidoDeAlertaPelasRegras, type ItemFila } from './shared/lib/automacoesExecucao.js';
@@ -170,7 +170,7 @@ app.get('/r/:token', async (req: any, res) => {
 // Quem clicou (admin): leads com pelo menos um clique, do mais recente para o mais antigo.
 app.get('/api/campaign/link-clicks', async (req: any, res) => {
   if (!isUserAdmin(req.user)) return res.status(403).json({ error: 'Acesso restrito ao Administrador.' });
-  if (!usePostgres || !pgPool) return res.json({ clicks: [] });
+  if (!usePostgres || !pgPool) return res.json({ clicks: [] } satisfies RespostaCliquesLink);
   try {
     const r = await pgPool.query(
       `SELECT c.token, c.lead_id, c.target_url, c.click_count, c.first_clicked_at, c.last_clicked_at,
@@ -181,7 +181,7 @@ app.get('/api/campaign/link-clicks', async (req: any, res) => {
         ORDER BY c.last_clicked_at DESC
         LIMIT 200`
     );
-    res.json({ clicks: r.rows });
+    res.json({ clicks: r.rows } satisfies RespostaCliquesLink);
   } catch (err) {
     console.error('Erro ao listar cliques:', err);
     res.status(500).json({ error: 'Erro ao listar cliques.' });
@@ -190,7 +190,7 @@ app.get('/api/campaign/link-clicks', async (req: any, res) => {
 
 app.get('/api/health', (req, res) => {
   // /health (acima) continua respondendo na hora para o healthcheck da Railway; aqui o estado do banco, para monitoramento
-  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString(), database: { connected: usePostgres, starting: isDatabaseStarting() } });
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString(), database: { connected: usePostgres, starting: isDatabaseStarting() } } satisfies RespostaSaudeBasica);
 });
 
 // Multer memory storage for small uploads
@@ -1626,7 +1626,7 @@ app.get(['/health', '/api/health', '/healthz', '/ping'], (req, res) => {
     uptime: Math.floor(process.uptime()),
     database: usePostgres ? 'postgresql' : 'in-memory',
     timestamp: new Date().toISOString()
-  });
+  } satisfies RespostaSaudeSimples);
 });
 
 // Helper: Grava registro de auditoria no PostgreSQL ou na memória
@@ -2172,7 +2172,7 @@ app.post('/api/admin/sync-credentials', async (req: any, res) => {
   try {
     await syncSalespeopleUsers();
     await logAudit('SINCRONIZAR_CREDENCIAIS', 'Admin executou sincronização geral de contas de login de vendedores.', req);
-    return res.json({ success: true, message: 'Contas e acessos de todos os vendedores foram sincronizados com sucesso!' });
+    return res.json({ success: true, message: 'Contas e acessos de todos os vendedores foram sincronizados com sucesso!' } satisfies RespostaSucesso);
   } catch (error: any) {
     return res.status(500).json({ error: 'Erro ao sincronizar credenciais.' });
   }
@@ -2430,7 +2430,7 @@ app.post('/api/admin/db/migrate', async (req: any, res) => {
   }
 
   if (!usePostgres || !pgPool) {
-    return res.json({ success: true, message: 'Postgres não configurado (modo em memória).' });
+    return res.json({ success: true, message: 'Postgres não configurado (modo em memória).' } satisfies RespostaSucesso);
   }
 
   try {
@@ -2445,7 +2445,7 @@ app.post('/api/admin/db/migrate', async (req: any, res) => {
       ALTER TABLE leads ADD COLUMN IF NOT EXISTS website TEXT;
     `);
     console.log('✅ [Postgres Migration] Colunas sincronizadas com sucesso via /api/admin/db/migrate');
-    return res.json({ success: true, message: 'Migração de colunas concluída com sucesso no PostgreSQL.' });
+    return res.json({ success: true, message: 'Migração de colunas concluída com sucesso no PostgreSQL.' } satisfies RespostaSucesso);
   } catch (err: any) {
     console.error('❌ [Postgres Migration Error]:', err.message);
     return res.status(500).json({ error: `Erro na migração: ${err.message}` });
@@ -2591,7 +2591,7 @@ app.post('/api/admin/fluxo/config', async (req: any, res) => {
     message: 'Credenciais salvas com sucesso!',
     isConfigured: Boolean(memoryFluxoConfig.apiKey && memoryFluxoConfig.apiSecret),
     isMetaConfigured: Boolean(memoryMetaConfig.accessToken && memoryMetaConfig.wabaId)
-  });
+  } satisfies RespostaSalvarConfigFluxo);
 });
 
 // POST test-connection
@@ -2642,7 +2642,7 @@ app.post('/api/admin/fluxo/test-connection', async (req: any, res) => {
         latencyMs: result.latencyMs,
         instances,
         message: `Conexão autenticada via HMAC-SHA256 com sucesso! Encontrada(s) ${instances.length} instância(s).`
-      });
+      } satisfies RespostaTesteConexaoFluxo);
     } else {
       await logAudit(
         'TESTE_CONEXAO_FLUXO_FALHA',
@@ -2860,7 +2860,7 @@ app.get('/api/admin/fluxo/instances', async (req: any, res) => {
       configured: false,
       instances: [],
       error: describeFluxoError({ code: 'missing_credentials' })
-    });
+    } satisfies RespostaInstanciasFluxo);
   }
 
   try {
@@ -2877,7 +2877,7 @@ app.get('/api/admin/fluxo/instances', async (req: any, res) => {
         configured: true,
         instances: [],
         error: describeFluxoError(result.error, result.status)
-      });
+      } satisfies RespostaInstanciasFluxo);
     }
 
     const raw = Array.isArray(result.data) ? result.data : (result.data?.instances || result.data?.data || []);
@@ -2913,7 +2913,7 @@ app.get('/api/admin/fluxo/instances', async (req: any, res) => {
       configured: true,
       instances: [],
       error: describeFluxoError({ code: 'network_error', message: err?.message })
-    });
+    } satisfies RespostaInstanciasFluxo);
   }
 });
 // GET /api/runtime-config
@@ -2957,7 +2957,7 @@ app.get('/api/runtime-config', async (_req: any, res) => {
     instancePhone: info.phone || null,
     instanceStatus: info.status || 'unknown',
     whatsappConnected: info.status === 'connected'
-  });
+  } satisfies RespostaRuntimeConfig);
 });
 
 // GET /api/admin/fluxo/instance-mode (T30: Diagnóstico do modo da instância para verificar se Coexistence está ativo)
@@ -4419,7 +4419,7 @@ app.post('/api/admin/fluxo/events/simulate', (req: any, res) => {
   lastFluxoWebhookEvents.unshift(simulatedEvent);
   if (lastFluxoWebhookEvents.length > 50) lastFluxoWebhookEvents.pop();
 
-  return res.json({ success: true, event: simulatedEvent });
+  return res.json({ success: true, event: simulatedEvent } satisfies RespostaEventoSimulado);
 });
 
 // ESPELHAMENTO OPCIONAL de webhooks de outro ambiente (ex.: produção → seu computador). DESLIGADO por padrão.
@@ -4471,11 +4471,11 @@ app.get('/api/whatsapp/fluxo-templates', async (req: any, res) => {
   const apiSecret = (memoryFluxoConfig.apiSecret || '').trim();
   const instanceId = (memoryFluxoConfig.instanceId || '').trim();
   if (!apiKey || !apiSecret || !instanceId) {
-    return res.json({ success: false, templates: [], error: describeFluxoError({ code: !apiKey || !apiSecret ? 'missing_credentials' : 'instance_required' }) });
+    return res.json({ success: false, templates: [], error: describeFluxoError({ code: !apiKey || !apiSecret ? 'missing_credentials' : 'instance_required' }) } satisfies RespostaListaModelosFluxo);
   }
   const fresh = req.query.refresh === '1';
   if (!fresh && fluxoCatalogCache && Date.now() - fluxoCatalogCache.at < 5 * 60 * 1000) {
-    return res.json({ success: true, cached: true, templates: fluxoCatalogCache.data });
+    return res.json({ success: true, cached: true, templates: fluxoCatalogCache.data } satisfies RespostaListaModelosFluxo);
   }
   const r = await executeFluxoRequest<any>({
     method: 'GET',
@@ -4484,7 +4484,7 @@ app.get('/api/whatsapp/fluxo-templates', async (req: any, res) => {
     apiSecret
   });
   if (!r.success) {
-    return res.json({ success: false, templates: fluxoCatalogCache?.data || [], error: describeFluxoError(r.error, r.status) });
+    return res.json({ success: false, templates: fluxoCatalogCache?.data || [], error: describeFluxoError(r.error, r.status) } satisfies RespostaListaModelosFluxo);
   }
   const list: any[] = Array.isArray(r.data) ? r.data : Array.isArray((r.raw as any)?.data) ? (r.raw as any).data : [];
   const data = list
@@ -4509,7 +4509,7 @@ app.get('/api/whatsapp/fluxo-templates', async (req: any, res) => {
       };
     });
   fluxoCatalogCache = { at: Date.now(), data };
-  return res.json({ success: true, templates: data });
+  return res.json({ success: true, templates: data } satisfies RespostaCatalogoModelosMeta);
 });
 // GET /api/whatsapp/approved-templates (Para uso pelos vendedores no modal de WhatsApp)
 app.get('/api/whatsapp/approved-templates', async (req: any, res) => {
@@ -4560,7 +4560,7 @@ app.get('/api/whatsapp/approved-templates', async (req: any, res) => {
       }
     }
 
-    return res.json({ success: true, templates: approvedList });
+    return res.json({ success: true, templates: approvedList } satisfies RespostaListaModelosFluxo);
   } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message, templates: [] });
   }
@@ -5497,7 +5497,7 @@ app.post(['/api/v1/webhook', '/api/webhooks/fluxo', '/api/webhooks/meta', '/api/
       status: 'already_processed',
       event_id: eventId,
       accepted_at: new Date().toISOString()
-    });
+    } satisfies RespostaWebhookJaProcessado);
   }
 
   inFlightWebhookEventIds.add(eventId);
@@ -5522,7 +5522,7 @@ app.post(['/api/v1/webhook', '/api/webhooks/fluxo', '/api/webhooks/meta', '/api/
     received: true,
     event_id: eventId,
     accepted_at: new Date().toISOString()
-  });
+  } satisfies RespostaWebhookRecebido);
 });
 
 async function processWebhookEventAsync(event: any) {
@@ -6010,7 +6010,7 @@ app.post('/api/webhooks/simulate-incoming', async (req: any, res) => {
     success: true,
     message: 'Mensagem simulada via webhook processada com sucesso!',
     data: result
-  });
+  } satisfies RespostaSimulacaoWebhook);
 });
 
 // 8. Salesperson Inspection Stats & Recent Calls
@@ -6080,7 +6080,7 @@ app.get('/api/admin/salesperson/:id/stats', async (req: any, res) => {
     }
   } catch (err: any) {
     console.error('Erro ao buscar stats do vendedor:', err);
-    return res.json({ salespersonId: id, recentCalls: [] });
+    return res.json({ salespersonId: id, recentCalls: [] } satisfies RespostaLigacoesRecentesVendedor);
   }
 });
 
@@ -6108,7 +6108,7 @@ app.get('/api/inbox', async (req: any, res) => {
   let ownerFilter: string | null = null;
   if (!isUserAdmin(req.user)) {
     const own = req.user?.salespersonId;
-    if (!own) return res.json({ conversations: [], nextCursor: null, hasMore: false });
+    if (!own) return res.json({ conversations: [], nextCursor: null, hasMore: false } satisfies RespostaInbox);
     ownerFilter = own;
   } else if (req.query.salespersonId && req.query.salespersonId !== 'ALL') {
     ownerFilter = String(req.query.salespersonId);
@@ -6198,7 +6198,7 @@ app.get('/api/inbox', async (req: any, res) => {
 app.get('/api/messages/search', async (req: any, res) => {
   const q = String(req.query.q || '').trim();
   const limit = Math.min(Math.max(Number(req.query.limit) || 30, 1), 100);
-  if (q.length < 2) return res.json({ results: [], query: q });
+  if (q.length < 2) return res.json({ results: [], query: q } satisfies RespostaBuscaMensagens);
 
   if (!usePostgres || !pgPool) {
     const termo = q.toLowerCase();
@@ -6219,7 +6219,7 @@ app.get('/api/messages/search', async (req: any, res) => {
   let ownerClause = '';
   if (!isUserAdmin(req.user)) {
     const own = req.user?.salespersonId;
-    if (!own) return res.json({ results: [], query: q });
+    if (!own) return res.json({ results: [], query: q } satisfies RespostaBuscaMensagens);
     params.push(own);
     ownerClause = ` AND l.salesperson_id = $${params.length}`;
   }
@@ -6336,7 +6336,7 @@ app.get('/api/leads', async (req: any, res) => {
   if (!isUserAdmin(req.user)) {
     const own = req.user?.salespersonId;
     if (!own) {
-      return res.json([]); // sem carteira vinculada, não há leads para mostrar
+      return res.json([] satisfies RespostaListaLeads); // sem carteira vinculada, não há leads para mostrar
     }
     salespersonId = own;
   }
@@ -7710,7 +7710,9 @@ app.post('/api/salespeople/reset-daily-leads', async (req, res) => {
 
 // Execução da Roleta em Lote (Distribui leads pendentes respeitando limites e pesos)
 app.post('/api/salespeople/distribute-roulette', async (req, res) => {
-  const { leadType = 'geral', maxCount = 50 } = req.body;
+  const { leadType = 'geral', count, maxCount } = (req.body ?? {}) satisfies RequisicaoDistribuicaoRoleta;
+  // O front envia `count`. `maxCount` continua aceito por compatibilidade.
+  const limite = Number(count ?? maxCount) || 50;
 
   let leadIds: string[] = [];
   if (usePostgres && pgPool) {
@@ -7719,13 +7721,13 @@ app.post('/api/salespeople/distribute-roulette', async (req, res) => {
        WHERE column_status = 'Leads'
        ORDER BY created_at DESC 
        LIMIT $1`,
-      [Number(maxCount) || 50]
+      [limite]
     );
     leadIds = qRes.rows.map(r => r.id);
   } else {
     leadIds = Array.from(memoryLeadsMap.values())
       .filter(l => l.columnStatus === 'Leads')
-      .slice(0, Number(maxCount) || 50)
+      .slice(0, limite)
       .map(l => l.id);
   }
 
@@ -8486,7 +8488,7 @@ app.post('/api/upload-zip', diskUpload.single('zipFile') as any, async (req, res
         queued: true,
         message: 'Arquivo .ZIP recebido com sucesso! O processamento em segundo plano foi iniciado via BullMQ.',
         fileName: req.file.originalname
-      });
+      } satisfies RespostaZipEnfileirado);
     }
 
     const fileBuffer = await fs.promises.readFile(tempFilePath);
@@ -8570,7 +8572,7 @@ app.post('/api/upload-zip', diskUpload.single('zipFile') as any, async (req, res
       insertedCount: stats.insertedCount,
       skippedDuplicates: stats.skippedDuplicates,
       errors
-    });
+    } satisfies RespostaImportacaoZipDireta);
   } catch (error: any) {
     if (tempFilePath) {
       await fs.promises.unlink(tempFilePath).catch(() => {});
@@ -9089,11 +9091,11 @@ app.delete('/api/leads/:id', async (req: any, res) => {
     await logAudit('EXCLUIR_LEAD', `Excluiu lead ID: ${id}`, req);
     if (usePostgres && pgPool) {
       await pgPool.query(`DELETE FROM leads WHERE id = $1`, [id]);
-      return res.json({ success: true });
+      return res.json({ success: true } satisfies RespostaOk);
     } else {
       memoryLeadsMap.delete(id);
       memoryCallLogsMap.delete(id);
-      return res.json({ success: true });
+      return res.json({ success: true } satisfies RespostaOk);
     }
   } catch (error) {
     console.error('Error deleting lead:', error);
@@ -9134,7 +9136,7 @@ app.get('/api/calls', async (req: any, res) => {
   // Antes, `?salespersonId=ALL` devolvia as ligações de todo mundo para qualquer vendedor.
   if (!isUserAdmin(req.user)) {
     const own = req.user?.salespersonId;
-    if (!own) return res.json([]);
+    if (!own) return res.json([] satisfies RespostaListaLigacoesGerais);
     salespersonId = own;
   }
 
@@ -9370,7 +9372,7 @@ app.post('/api/seed-samples', async (req, res) => {
     }
   }
 
-  res.json({ message: `${insertedCount} leads de exemplo adicionados com sucesso!` });
+  res.json({ message: `${insertedCount} leads de exemplo adicionados com sucesso!` } satisfies RespostaSementes);
 });
 
 // ==========================================================================
@@ -10082,7 +10084,7 @@ app.post('/api/campaign/upload-zip', diskUpload.single('zipFile') as any, async 
 
 // Histórico dos ZIPs subidos (um registro por arquivo)
 app.get('/api/campaign/uploads', async (_req, res) => {
-  if (!usePostgres || !pgPool) return res.json({ uploads: [] });
+  if (!usePostgres || !pgPool) return res.json({ uploads: [] } satisfies RespostaListaUploads);
   try {
     const r = await pgPool.query(
       `SELECT u.id, u.batch_id, u.file_name, u.file_size_bytes, u.leads_in_zip, u.leads_saved,
@@ -11161,7 +11163,7 @@ app.post('/api/campaign/simulate-action', async (req: any, res) => {
       if (result.rowCount === 0) {
         return res.status(404).json({ error: 'Lead de campanha não encontrado.' });
       }
-      return res.json({ success: true, lead: result.rows[0] });
+      return res.json({ success: true, lead: result.rows[0] } satisfies RespostaAcaoSimulada);
     } else {
       const lead = memoryCampaignLeadsMap.get(leadId);
       if (!lead) {
@@ -11170,7 +11172,7 @@ app.post('/api/campaign/simulate-action', async (req: any, res) => {
       lead.status = newStatus as any;
       if (newStatus === 'INTERESSADO') lead.respondedAt = now;
       lead.responsePreview = preview || undefined;
-      return res.json({ success: true, lead });
+      return res.json({ success: true, lead } satisfies RespostaAcaoSimulada);
     }
   } catch (err: any) {
     console.error('Erro ao simular ação do lead:', err);
@@ -11329,7 +11331,7 @@ app.post('/api/campaign/distribute', async (req: any, res) => {
       remaining: eligibleLeads.length - leadIndex,
       summary: summaryPerSeller,
       message: `${distributedTotal} leads distribuídos com sucesso no Pipeline CRM para ligação telefônica!`
-    });
+    } satisfies RespostaDistribuicaoCampanha);
   } catch (err: any) {
     console.error('Erro na distribuição de campanha:', err);
     res.status(500).json({ error: `Erro na distribuição: ${err.message}` });
@@ -11973,7 +11975,7 @@ app.delete('/api/campaign/batches/:batchId', async (req: any, res) => {
     }
     await logAudit('CAMPANHA_EXCLUIDA', `Excluiu safra ${batchId}`, req);
     broadcastSSE('CAMPAIGN_BATCH_DELETED', { batchId });
-    return res.json({ success: true, message: 'Safra excluída com sucesso.' });
+    return res.json({ success: true, message: 'Safra excluída com sucesso.' } satisfies RespostaSucesso);
   } catch (err: any) {
     console.error('Erro ao excluir safra:', err);
     res.status(500).json({ error: 'Erro ao excluir safra.' });
@@ -12151,7 +12153,7 @@ app.get('/api/leads/:leadId/window', async (req: any, res) => {
   const { leadId } = req.params;
   const target = await findLeadTarget(leadId).catch(() => null);
   const windowExpiresAt = await resolveLeadWindowExpiry(leadId, target);
-  return res.json({ success: true, leadId, windowExpiresAt, windowOpen: isWindowOpen(windowExpiresAt) });
+  return res.json({ success: true, leadId, windowExpiresAt, windowOpen: isWindowOpen(windowExpiresAt) } satisfies RespostaJanelaLead);
 });
 
 // ---------------------------------------------------------------------------
@@ -12717,7 +12719,7 @@ function broadcastPresenceIfChanged(leadId: string, before: string) {
 }
 
 app.get('/api/leads/:leadId/presence', (req: any, res) => {
-  return res.json({ success: true, leadId: req.params.leadId, users: presenceSnapshot(req.params.leadId) });
+  return res.json({ success: true, leadId: req.params.leadId, users: presenceSnapshot(req.params.leadId) } satisfies RespostaPresenca);
 });
 
 app.post('/api/leads/:leadId/presence', (req: any, res) => {
@@ -12733,7 +12735,7 @@ app.post('/api/leads/:leadId/presence', (req: any, res) => {
     m.set(user.id, { userId: user.id, name: String(user.name || 'Vendedor'), typing: Boolean(req.body?.typing), at: Date.now() });
   }
   broadcastPresenceIfChanged(leadId, before);
-  return res.json({ success: true, me: user.id, users: presenceSnapshot(leadId) });
+  return res.json({ success: true, me: user.id, users: presenceSnapshot(leadId) } satisfies RespostaPresenca);
 });
 
 // Expira quem sumiu (aba fechada, queda de rede) e avisa os outros
@@ -12765,7 +12767,7 @@ app.post('/api/leads/:leadId/read', async (req: any, res) => {
   }
 
   // no máx. 1 marcação a cada 20s por lead: abrir/fechar conversa não consome o limite da API
-  if (now - (lastReadMarkAt.get(leadId) || 0) < 20000) return res.json({ success: true, marked: false, reason: 'recent' });
+  if (now - (lastReadMarkAt.get(leadId) || 0) < 20000) return res.json({ success: true, marked: false, reason: 'recent' } satisfies RespostaLeituraMarcada);
 
   let wamid: string | undefined;
   if (usePostgres && pgPool) {
@@ -12788,8 +12790,8 @@ app.post('/api/leads/:leadId/read', async (req: any, res) => {
   if (usePostgres && pgPool) {
     pgPool.query(`UPDATE leads SET unread_count = 0 WHERE id = $1`, [leadId]).catch(() => {});
   }
-  if (!wamid) return res.json({ success: true, marked: false, reason: 'no_inbound' });
-  if (getMetaProvider() !== 'meta' && (!memoryFluxoConfig.apiKey || !memoryFluxoConfig.apiSecret)) return res.json({ success: true, marked: false, reason: 'not_configured' });
+  if (!wamid) return res.json({ success: true, marked: false, reason: 'no_inbound' } satisfies RespostaLeituraMarcada);
+  if (getMetaProvider() !== 'meta' && (!memoryFluxoConfig.apiKey || !memoryFluxoConfig.apiSecret)) return res.json({ success: true, marked: false, reason: 'not_configured' } satisfies RespostaLeituraMarcada);
 
   lastReadMarkAt.set(leadId, now);
   const fRes = getMetaProvider() === 'meta'
@@ -12802,9 +12804,9 @@ app.post('/api/leads/:leadId/read', async (req: any, res) => {
       });
   if (!fRes.success) {
     const info = describeFluxoError(fRes.error, fRes.status);
-    return res.status(200).json({ success: true, marked: false, reason: info.code, message: info.message });
+    return res.status(200).json({ success: true, marked: false, reason: info.code, message: info.message } satisfies RespostaLeituraNaoMarcada);
   }
-  return res.json({ success: true, marked: true, messageId: wamid });
+  return res.json({ success: true, marked: true, messageId: wamid } satisfies RespostaLeituraMarcada);
 });
 
 // POST /api/leads/:leadId/simulate-reply (Simular resposta de lead no WhatsApp em tempo real)
@@ -12894,7 +12896,7 @@ app.post('/api/leads/:leadId/simulate-reply', async (req: any, res) => {
   return res.json({
     success: true,
     message: incomingMessage
-  });
+  } satisfies RespostaRespostaSimulada);
 });
 
 
@@ -13059,7 +13061,7 @@ app.get('/api/infrastructure/status', async (req, res) => {
         plan: { planRpm: planRpm(), dispatchRpm: dispatchRpm() }
       },
       ...queueStatus
-    });
+    } satisfies RespostaStatusInfraestrutura);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

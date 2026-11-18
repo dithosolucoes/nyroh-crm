@@ -239,9 +239,30 @@ export interface LeadAtualizado {
 /**
  * GET /api/leads/:id/summary: um lead só, com os campos da conversa.
  * Não é o Lead inteiro: o SELECT do Postgres traz um subconjunto (e no fallback de
- * memória devolve o Lead completo). Por isso é Partial.
+ * memória devolve o Lead completo). Por isso é este subconjunto (ResumoLead), não o Lead inteiro.
  */
-export type RespostaResumoLead = Partial<Lead>;
+export interface ResumoLead {
+  id: string;
+  name: string;
+  phoneNumber: string;
+  columnStatus: string;
+  subStatus?: string | null;
+  niche?: string | null;
+  publicUrl?: string | null;
+  salespersonId?: string | null;
+  salespersonName?: string | null;
+  lastMessageAt?: string | null;
+  unreadCount?: number;
+  windowExpiresAt?: string | null;
+  whatsappReplied?: boolean;
+  lastWhatsAppMessage?: string | null;
+  lastMessageText?: string | null;
+  lastMessageSender?: string | null;
+  lastMessageStatus?: string | null;
+}
+
+/** GET /api/leads/:id/summary: o resumo de um lead (ver ResumoLead) */
+export type RespostaResumoLead = ResumoLead;
 
 /**
  * Ligação registrada num lead, como sai do servidor. `followUpAt` vem null do
@@ -498,6 +519,7 @@ export interface ModeloFluxo {
 /** GET /api/admin/fluxo/templates (sucesso ou erro; o campo `success` diz qual) */
 export interface RespostaListaModelosFluxo {
   success: boolean;
+  cached?: boolean;
   templates: ModeloFluxo[];
   error?: { message: string };
   errors?: Array<{ accountId: string; accountName?: string; message: string }>;
@@ -780,16 +802,29 @@ export interface RespostaDevolucaoLeads {
 }
 
 /**
- * POST /api/campaign/test-dispatch: disparo de teste para um número. `lead` e `dispatchResult`
- * ainda são `unknown` (no servidor são `any`). Tipar esses dois é pendência de depois.
+ * Resultado devolvido pela FluxoAPI/Meta ao disparo de teste. O servidor monta esse objeto a partir
+ * de respostas de rede variadas, então `error` aceita string (erro de rede) ou objeto (erro da Meta).
+ */
+export interface ResultadoEnvioFluxo {
+  success: boolean;
+  mode?: string;
+  messageId?: string;
+  status?: number;
+  error?: string | { message?: string; [chave: string]: unknown };
+  data?: { id?: string; message?: string; error?: { message?: string }; [chave: string]: unknown };
+}
+
+/**
+ * POST /api/campaign/test-dispatch: disparo de teste para um número. `success: true` só quando a
+ * FluxoAPI/Meta aceitou o envio (ver `dispatchResult.success`).
  */
 export interface RespostaTesteDisparo {
   success: boolean;
   message?: string;
   error?: string;
-  lead: unknown;
+  lead: Lead;
   outgoingMessage: LeadChatMessage;
-  dispatchResult: unknown;
+  dispatchResult: ResultadoEnvioFluxo;
 }
 
 /** GET /api/campaign/test-dispatch/status/:messageId: situação de entrega do teste */
@@ -1082,3 +1117,367 @@ export const EXEMPLO_UPLOAD_REGISTRO = {
   landlines: 0,
   createdAt: '2026-11-13T18:00:00.000Z'
 } satisfies UploadZipRegistro;
+
+/** GET /api/campaign/link-clicks: cliques registrados nos links da campanha */
+export interface RespostaCliquesLink {
+  clicks: Array<Record<string, unknown>>;
+}
+
+/** POST /api/admin/fluxo/config: credenciais salvas (sem segredo na resposta) */
+export interface RespostaSalvarConfigFluxo {
+  success: true;
+  message: string;
+  isConfigured: boolean;
+  isMetaConfigured: boolean;
+}
+
+/** POST /api/admin/fluxo/test-connection: conexão autenticada */
+export interface RespostaTesteConexaoFluxo {
+  success: true;
+  latencyMs: number;
+  instances: unknown[];
+  message: string;
+}
+
+/** GET /api/runtime-config: flags de execução para a interface */
+export interface RespostaRuntimeConfig {
+  simulatorsEnabled: boolean;
+  isProduction: boolean;
+  instancePhone: string | null;
+  instanceStatus: string;
+  whatsappConnected: boolean;
+}
+
+/** POST /api/admin/fluxo/events/simulate */
+export interface RespostaEventoSimulado {
+  success: true;
+  event: EventoWebhookFluxo;
+}
+
+/** GET /api/leads/:leadId/window: janela de 24h do lead */
+export interface RespostaJanelaLead {
+  success: true;
+  leadId: string;
+  windowExpiresAt: string | null;
+  windowOpen: boolean;
+}
+
+/** GET e POST /api/leads/:leadId/presence: quem está com o lead aberto */
+export interface RespostaPresenca {
+  success: true;
+  leadId?: string;
+  me?: string;
+  users: unknown[];
+}
+
+/** POST /api/leads/:leadId/read: marca como lida (ou o motivo de não marcar) */
+export interface RespostaLeituraMarcada {
+  success: true;
+  marked: boolean;
+  reason?: string;
+  messageId?: string;
+}
+
+/** GET /api/whatsapp/fluxo-templates (catálogo da Meta, formato bruto da Meta) */
+export interface RespostaCatalogoModelosMeta {
+  success: true;
+  templates: Array<Record<string, unknown>>;
+}
+
+/** POST /api/webhooks/simulate-incoming */
+export interface RespostaSimulacaoWebhook {
+  success: true;
+  message: string;
+  data: unknown;
+}
+
+/** GET /api/admin/salesperson/:id/stats: últimas ligações do vendedor */
+export interface RespostaLigacoesRecentesVendedor {
+  salespersonId: string;
+  recentCalls: LigacaoRecenteVendedor[];
+}
+
+/** POST /api/upload-zip: importação direta de leads (sem campanha) */
+export interface RespostaImportacaoZipDireta {
+  totalProcessed: number;
+  insertedCount: number;
+  skippedDuplicates: number;
+  errors: unknown[];
+}
+
+/** POST /api/seed-samples: leads de exemplo */
+export interface RespostaSementes {
+  message: string;
+}
+
+/** POST /api/campaign/simulate-action: ação simulada sobre um lead */
+export interface RespostaAcaoSimulada {
+  success: true;
+  lead: unknown;
+}
+
+/** POST /api/campaign/distribute: distribuição de leads no Pipeline para ligação */
+export interface RespostaDistribuicaoCampanha {
+  success: true;
+  totalDistributed: number;
+  remaining: number;
+  summary: unknown;
+  message: string;
+}
+
+/** POST /api/leads/:leadId/simulate-reply */
+export interface RespostaRespostaSimulada {
+  success: true;
+  message: LeadChatMessage;
+}
+
+/** GET /api/infrastructure/status: saúde do servidor, banco, WhatsApp e fila */
+export interface RespostaStatusInfraestrutura {
+  status: 'ok';
+  timestamp: string;
+  server: string;
+  database: { connected: boolean; starting: boolean };
+  whatsapp: Record<string, unknown> & { plan: { planRpm: number; dispatchRpm: number } };
+  [chave: string]: unknown;
+}
+
+/* ---------- Experiências de UX (shared/lib/uxRoutes.ts) ---------- */
+
+/** GET /api/brands: marca com os números vinculados */
+export interface RespostaMarca {
+  id: string;
+  name: string;
+  services: string;
+  messageTemplates: unknown;
+  numberIds: string[];
+}
+export type RespostaListaMarcas = RespostaMarca[];
+
+/** PATCH /api/brands/:id */
+export interface RespostaMarcaAtualizada {
+  id: string;
+  name: string;
+  services: string;
+}
+
+/** PUT /api/brands/:id/numbers */
+export interface RespostaVinculoMarcaNumeros {
+  brandId: string;
+  numberIds: string[];
+}
+
+/** GET /api/phone-numbers: número com as marcas que o usam */
+export interface RespostaNumero {
+  id: string;
+  label: string;
+  phoneDisplay: string | null;
+  metaPhoneNumberId: string | null;
+  fluxoInstanceId: string | null;
+  brandIds: string[];
+}
+export type RespostaListaNumeros = RespostaNumero[];
+
+/** PATCH /api/phone-numbers/:id */
+export interface RespostaNumeroAtualizado {
+  id: string;
+  label: string;
+  phoneDisplay: string | null;
+  metaPhoneNumberId: string | null;
+}
+
+/** PUT /api/campaign/batches/:id/brand */
+export interface RespostaVinculoSafraMarca {
+  batchId: string;
+  brandId: string | null;
+}
+
+/** Pedido de bloqueio de um lead, como sai do banco */
+export interface PedidoBloqueioLead {
+  id: string;
+  reasonCode: string;
+  reasonText: string | null;
+  status: string;
+  decisionNote: string | null;
+  requestedAt: string;
+  decidedAt: string | null;
+}
+export type RespostaListaPedidosBloqueioLead = PedidoBloqueioLead[];
+
+/** GET /api/regras-contato */
+export interface RegraContatoLinha {
+  id: string;
+  nome: string;
+  tipo: string;
+  escopo: string;
+  marcaId: string | null;
+  marcaNome: string | null;
+  maxContatos: number | null;
+  janelaHoras: number | null;
+  ativa: boolean;
+}
+export type RespostaListaRegrasContato = RegraContatoLinha[];
+
+/** PATCH e DELETE /api/regras-contato/:id */
+export interface RespostaConfirmacao {
+  ok: true;
+}
+
+/** POST /api/regras-contato/previa */
+export interface RespostaPreviaRegras {
+  emEspera: number;
+  passariam: number;
+  barrados: number;
+}
+
+/** Remessa com a contagem de leads, bloqueados e contatados hoje */
+export interface RemessaCentral {
+  id: string;
+  name: string;
+  createdAt: string;
+  leadCount: number;
+  blockedCount: number;
+  contatadosHoje: number;
+}
+
+/** GET /api/central/remessas */
+export interface RespostaCentralRemessas {
+  remessas: RemessaCentral[];
+  semRemessa: number;
+  tamanhosBloco: readonly number[];
+}
+
+/** GET /api/block-requests: pedido de bloqueio com o lead */
+export interface PedidoBloqueioFila {
+  id: string;
+  leadId: string;
+  requestedBy: string | null;
+  reasonCode: string;
+  reasonText: string | null;
+  status: string;
+  decidedBy: string | null;
+  decisionNote: string | null;
+  requestedAt: string;
+  decidedAt: string | null;
+}
+export type RespostaListaPedidosBloqueio = PedidoBloqueioFila[];
+
+/** PATCH /api/block-requests/:id */
+export interface RespostaDecisaoBloqueio {
+  id: string;
+  status: string;
+}
+
+/** Bloco salvo por ID, como sai de GET /api/central/selections */
+export interface SelecaoCentral {
+  id: string;
+  name: string;
+  size: number;
+  createdAt: string;
+  contatadosHoje: number;
+}
+export type RespostaListaSelecoesCentral = SelecaoCentral[];
+
+/** GET /api/central/analise: leads com histórico de envio */
+export interface RespostaAnaliseCentral {
+  leads: Array<Record<string, unknown>>;
+  total: number;
+}
+
+/* ---------- Respostas de criação e saúde (status 200/201/202) ---------- */
+
+/** GET /api/health (e /api/status simples): saúde do servidor */
+export interface RespostaSaudeBasica {
+  status: 'ok';
+  timestamp: string;
+  database: { connected: boolean; starting: boolean };
+}
+
+/** GET de saúde detalhada: uptime e banco */
+export interface RespostaSaudeSimples {
+  status: 'ok';
+  uptime: number;
+  database: string;
+  timestamp: string;
+}
+
+/** POST de webhook que já foi processado (mesmo event_id) */
+export interface RespostaWebhookJaProcessado {
+  status: 'already_processed';
+  event_id: string;
+  accepted_at: string;
+}
+
+/** POST de webhook recebido e aceito para processamento */
+export interface RespostaWebhookRecebido {
+  status: 'received';
+  received: true;
+  event_id: string;
+  accepted_at: string;
+}
+
+/** POST /api/upload-zip (ZIP grande): enfileirado no BullMQ */
+export interface RespostaZipEnfileirado {
+  success: true;
+  queued: true;
+  message: string;
+  fileName: string;
+}
+
+/** POST /api/leads/:leadId/read quando a Meta não marca como lida */
+export interface RespostaLeituraNaoMarcada {
+  success: true;
+  marked: false;
+  reason: string;
+  message: string;
+}
+
+/** POST /api/brands */
+export interface RespostaMarcaCriada {
+  id: string;
+  name: string;
+}
+
+/** POST /api/phone-numbers */
+export interface RespostaNumeroCriado {
+  id: string;
+  label: string;
+}
+
+/** POST /api/regras-contato */
+export interface RespostaRegraCriada {
+  id: string;
+}
+
+/** POST /api/central/remessas */
+export interface RespostaRemessaCriada {
+  id: string;
+  name: string;
+}
+
+/** POST /api/central/selections */
+export interface RespostaSelecaoCriada {
+  id: string;
+  name: string;
+  size: number;
+}
+
+/** POST /api/leads/... pedido de bloqueio criado */
+export interface RespostaPedidoBloqueioCriado {
+  id: string;
+  status: string;
+}
+
+/** POST /api/campaign/batches (criada pela central, com marca) */
+export interface RespostaSafraCriadaUx {
+  batchId: string;
+  name: string;
+  brandId: string | null;
+  total: number;
+}
+
+/** POST /api/salespeople/distribute-roulette: o front envia `count`; `maxCount` ficou só por compatibilidade */
+export interface RequisicaoDistribuicaoRoleta {
+  leadType?: string;
+  count?: number | null;
+  maxCount?: number;
+}

@@ -610,6 +610,10 @@ async function main() {
       ok(!!left, 'quando o vendedor sai da conversa, o admin é avisado', left?.data);
       sse.close();
       ok((await anon.req('POST', `/api/leads/${leadA}/presence`, { json: {} })).status === 401, 'presença exige login');
+
+      // Roleta em lote: o front envia `count`. O servidor tem que respeitar esse limite (antes ignorava e usava 50).
+      const roleta1 = await admin.req('POST', '/api/salespeople/distribute-roulette', { json: { count: 1, leadType: 'geral' } });
+      ok(roleta1.status === 200 && roleta1.json?.totalProcessed <= 1, 'roleta em lote respeita count=1 (não processa mais que 1 lead)', roleta1.json);
     }
 
     group('🔌 Tempo real: SSE com replay (queda de conexão não perde evento)');

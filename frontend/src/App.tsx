@@ -28,7 +28,8 @@ import { getLeadNiche } from '@shared/lib/niche';
 import { setStoredWhatsAppAppType } from '@shared/lib/phone';
 import { PhoneCall, Users, CheckCircle, RefreshCw, UserCheck, Share2, Plus, ArrowLeft, ExternalLink, Shield, LogOut, Lock, MessageSquare } from 'lucide-react';
 import { getSalespersonSlug, matchSalespersonFromRoute } from '@shared/lib/salesperson';
-import type { RespostaSessaoAtual, RespostaListaEtiquetas, RespostaListaLeads } from '@shared/contracts/rotas';
+import type { RespostaSessaoAtual, RespostaListaEtiquetas, RespostaListaLeads, RespostaResumoLead } from '@shared/contracts/rotas';
+import { leadListadoParaLead, resumoParaLead } from '@shared/lib/leadConversao';
 
 export default function App() {
   // Authentication & RBAC
@@ -293,8 +294,8 @@ export default function App() {
       for (const id of ids.slice(0, 20)) {
         try {
           const r = await fetch(`/api/leads/${encodeURIComponent(id)}/summary`);
-          // O resumo é parcial (só campos da conversa). Até a base ser tipada, entra na lista como Lead.
-          if (r.ok) novos.push((await r.json()) as Lead);
+          // O resumo é um subconjunto (ResumoLead). Entra no estado pela conversão explícita para Lead.
+          if (r.ok) novos.push(resumoParaLead((await r.json()) as RespostaResumoLead));
         } catch {
           /* ignora: a rede de segurança de 30s cobre */
         }
@@ -421,9 +422,9 @@ export default function App() {
       const res = await fetch('/api/leads');
       const contentType = res.headers.get('content-type') || '';
       if (res.ok && contentType.includes('application/json')) {
-        // A listagem vem como LeadListado (campos com null). Entra no estado como Lead até o estado ser tipado.
+        // A listagem vem como LeadListado (campos com null). Convertida para Lead pela função explícita, sem cast.
         const data = (await res.json()) as RespostaListaLeads;
-        setLeads(Array.isArray(data) ? (data as Lead[]) : []);
+        setLeads(Array.isArray(data) ? data.map(leadListadoParaLead) : []);
       } else {
         setLeads([]);
       }
