@@ -1,3 +1,4 @@
+import { aplicarMigracoesArquivo, MIGRACOES_UX } from './migracoesArquivos.js';
 /**
  * Rotas das experiências de UX: marcas, números, central de leads, seleções por ID e bloqueio.
  *
@@ -45,10 +46,7 @@ export const uxSchemaOn = (): boolean => process.env[SCHEMA_FLAG] === 'true';
 
 /** Aplica a migração de UX (idempotente). Chamado no boot só com a flag ligada. */
 export async function applyUxMigration(pool: pg.Pool): Promise<void> {
-  const { default: fs } = await import('fs');
-  const path = await import('path');
-  const sql = fs.readFileSync(path.resolve(process.cwd(), 'migrations', '2026-11-ux-experiencias.sql'), 'utf8');
-  await pool.query(sql);
+  await aplicarMigracoesArquivo(pool, MIGRACOES_UX);
   console.log('[UX] migração de UX aplicada (flag NYROH_APLICAR_MIGRACOES_UX=true).');
 }
 

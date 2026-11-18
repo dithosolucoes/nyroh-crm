@@ -1,3 +1,4 @@
+import { aplicarMigracoesArquivo, MIGRACOES_AUTOMACOES_RESPOSTAS, MIGRACOES_AUTOMACOES_ESTADO, MIGRACOES_AUTOMACOES_FILA } from './migracoesArquivos.js';
 import { randomUUID } from 'crypto';
 import type { RespostaListaAutomacoes, RespostaAutomacaoSalva, RespostaExecucoesAutomacao, RespostaFilaAutomacao, RespostaRevisaoAutomacao, RespostaConfiguracaoAutomacao, RespostaPausaGeral, RespostaEnvioAutomacao, RespostaRemocaoAutomacao } from '../contracts/rotas.js';
 /**
@@ -106,10 +107,7 @@ export const automacoesPersistenciaOn = (): boolean => flagLigada(process.env[FL
 
 /** Aplica a migração de automações (idempotente). Chamado no boot só com a flag ligada. */
 export async function applyAutomacoesMigration(pool: pg.Pool): Promise<void> {
-  const { default: fs } = await import('fs');
-  const path = await import('path');
-  const sql = fs.readFileSync(path.resolve(process.cwd(), 'migrations', '2026-11-automacoes-respostas.sql'), 'utf8');
-  await pool.query(sql);
+  await aplicarMigracoesArquivo(pool, MIGRACOES_AUTOMACOES_RESPOSTAS);
   console.log('[AUTOMACOES] migração aplicada (flag NYROH_AUTOMACOES_PERSISTENCIA=true).');
 }
 
@@ -322,20 +320,12 @@ export function registerAutomacoesRoutes(app: Express, deps: AutomacoesDeps): vo
  * Os arquivos só criam tabelas e colunas que não existem (IF NOT EXISTS). Não apagam nada.
  */
 export async function applyAutomacoesEstadoMigration(pool: pg.Pool): Promise<void> {
-  const { default: fs } = await import('fs');
-  const path = await import('path');
-  for (const arquivo of ['2026-11-leads-estado-auditoria.sql', '2026-11-lead-tags.sql', '2026-11-automacoes-config.sql']) {
-    const sql = fs.readFileSync(path.resolve(process.cwd(), 'migrations', arquivo), 'utf8');
-    await pool.query(sql);
-  }
+  await aplicarMigracoesArquivo(pool, MIGRACOES_AUTOMACOES_ESTADO);
   console.log('[AUTOMACOES] tabelas de estado, auditoria, etiquetas e configuração conferidas (flag NYROH_AUTOMACOES_PERSISTENCIA=true).');
 }
 
 export async function applyAutomacoesFilaMigration(pool: pg.Pool): Promise<void> {
-  const { default: fs } = await import('fs');
-  const path = await import('path');
-  const sql = fs.readFileSync(path.resolve(process.cwd(), 'migrations', '2026-11-automacoes-fila.sql'), 'utf8');
-  await pool.query(sql);
+  await aplicarMigracoesArquivo(pool, MIGRACOES_AUTOMACOES_FILA);
   console.log('[AUTOMACOES] fila criada (flag NYROH_AUTOMACOES_EXECUCAO=true).');
 }
 

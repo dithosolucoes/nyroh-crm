@@ -13,6 +13,7 @@ import { VIEWS_COMPATIBILIDADE } from '../shared/lib/esquemaViews.js';
 import { NOTAS_E_RESOLVIDA } from '../shared/lib/esquemaNotas.js';
 import { CAIXA_DE_ENTRADA } from '../shared/lib/esquemaCaixa.js';
 import { BUSCA_MENSAGENS } from '../shared/lib/esquemaBusca.js';
+import { MIGRACOES_UX, MIGRACOES_AUTOMACOES_RESPOSTAS, MIGRACOES_AUTOMACOES_ESTADO, MIGRACOES_AUTOMACOES_FILA, lerMigracoesArquivo } from '../shared/lib/migracoesArquivos.js';
 
 const base = process.env.E2E_DATABASE_URL;
 if (!base) {
@@ -80,6 +81,8 @@ async function main() {
   await a.query(notas);
   await a.query(caixa);
   await a.query(busca);
+  const arquivos = lerMigracoesArquivo(RAIZ, [...MIGRACOES_UX, ...MIGRACOES_AUTOMACOES_RESPOSTAS, ...MIGRACOES_AUTOMACOES_ESTADO, ...MIGRACOES_AUTOMACOES_FILA]);
+  for (const m of arquivos) await a.query(m.sql);
   const assA = await assinatura(a);
   await a.end();
 
@@ -90,9 +93,10 @@ async function main() {
   await aplicarMigracoes(b, [NOTAS_E_RESOLVIDA], async () => b);
   await aplicarMigracoes(b, [CAIXA_DE_ENTRADA], async () => b);
   await aplicarMigracoes(b, [BUSCA_MENSAGENS], async () => b);
+  await aplicarMigracoes(b, arquivos, async () => b);
   const assB = await assinatura(b);
   // segunda subida: o runner não pode reaplicar nem falhar
-  const again = await aplicarMigracoes(b, [ESQUEMA_BASE], async () => b);
+  const again = await aplicarMigracoes(b, [ESQUEMA_BASE, ...arquivos], async () => b);
   await b.end();
   await admin.end();
 
