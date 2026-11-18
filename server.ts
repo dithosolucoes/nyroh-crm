@@ -19,6 +19,7 @@ import { recuperarFixosDescartados } from './shared/lib/recuperacaoFixos.js';
 import { variaveisFaltando, mensagemFaltando } from './shared/lib/configObrigatoria.js';
 import { aplicarMigracoes } from './shared/lib/migracoes.js';
 import { ESQUEMA_BASE } from './shared/lib/esquemaBase.js';
+import { VIEWS_COMPATIBILIDADE } from './shared/lib/esquemaViews.js';
 import type { RespostaListaUploads, UploadZipRegistro, RespostaUploadZipOk, RespostaEnviarMensagem, StatusMensagemEnviada, RespostaLoginOk, RespostaSessaoAtual, RespostaSucesso, UsuarioAdmin, RespostaListaUsuarios, RespostaAuditLogs, RespostaLogsServidor, RespostaListaVendedores, RespostaVendedorCriado, RespostaLoteVendedores, RespostaVendedorAtualizado, RespostaSenhaVendedor, RespostaVendedorStatus, RespostaRoletaConfig, RespostaDistribuicaoRoleta, RespostaListaEtiquetas, RespostaEtiquetaSalva, RespostaOk, RespostaListaNotas, RespostaNotaCriada, RespostaResolucao, RespostaAuditoriaSite, RespostaAtualizacaoLead, RespostaResumoLead, RespostaListaLigacoes, RespostaLigacaoRegistrada, RespostaListaLigacoesGerais, RespostaListaLeads, RespostaListaRespostasRapidas, RespostaRespostaRapidaCriada, RespostaRespostaRapidaExcluida, RespostaStatusMeta, RespostaContasMeta, RespostaSincronizacaoConta, RespostaSincronizacaoTodas, RespostaMetaRemovida, RespostaConfigFluxo, RespostaStatusFluxo, RespostaEventosFluxo, RespostaModoInstancia, RespostaListaModelosFluxo, RespostaSincronizacaoModelos, RespostaModeloCriado, RespostaInstanciasFluxo, RespostaCadastroContaOk, RespostaConfigEmbeddedSignup, RespostaEmbeddedSignupConcluido, RespostaLeituraMeta, RespostaCriacaoInstancia, RespostaEnvioTesteSucesso, RespostaDistribuicaoLeads, RespostaEstatisticasVendedor, RespostaTransferenciaLote, RespostaListaCopias, RespostaCopiaSalva, RespostaCopiaRemovida, RespostaListaLotes, RespostaVelocidadeDisparo, RespostaAlteracaoVelocidade, RespostaAcaoLote, RespostaCancelamentoLote, RespostaLiberacaoQuarentena, RespostaDevolucaoLeads, RespostaRetornoQuarentena, RespostaResetSafra, LoteCampanha, ProgressoLote, RespostaDisparo, RespostaTesteDisparo, RespostaStatusTesteDisparo, RespostaSincronizacaoWhatsApp, RespostaListaLeadsCampanha, RespostaCamposLead, RespostaImportacaoIniciada, ProgressoImportacao, RespostaApagarZipsEmLote, RespostaApagarZip, RespostaInbox, RespostaBuscaMensagens, RespostaMensagensLead, RespostaRecuperacao, RespostaAtualizacaoLoteLeads, RespostaLoteLeads, RespostaExclusaoLote, RespostaCliquesLink, RespostaSalvarConfigFluxo, RespostaTesteConexaoFluxo, RespostaRuntimeConfig, RespostaEventoSimulado, RespostaJanelaLead, RespostaPresenca, RespostaLeituraMarcada, RespostaCatalogoModelosMeta, RespostaSimulacaoWebhook, RespostaLigacoesRecentesVendedor, RespostaImportacaoZipDireta, RespostaSementes, RespostaAcaoSimulada, RespostaDistribuicaoCampanha, RespostaRespostaSimulada, RespostaStatusInfraestrutura, RespostaSaudeBasica, RespostaSaudeSimples, RespostaWebhookJaProcessado, RespostaWebhookRecebido, RespostaZipEnfileirado, RespostaLeituraNaoMarcada, RequisicaoDistribuicaoRoleta } from './shared/contracts/rotas.js';
 import type { InboxConversation } from './shared/types.js';
 import { registerAutomacoesRoutes, applyAutomacoesMigration, applyAutomacoesEstadoMigration, applyAutomacoesFilaMigration, automacoesPersistenciaOn, iniciarWorkerAutomacoes } from './shared/lib/automacoesRoutes.js';
@@ -847,27 +848,9 @@ END $$;
           WHERE (phone_clean IS NULL OR phone_clean = '') AND phone_number IS NOT NULL;
         `);
 
-        // Create compatibility views safely in a separate guarded block
+        // Views de compatibilidade pelo runner de migrações (item 2.2a-2 a). Ver shared/lib/esquemaViews.ts.
         try {
-          await client.query(`
-            CREATE OR REPLACE VIEW vendedores AS 
-              SELECT id, name AS nome, email, pct_interessados, pct_nao_interessados, 
-                     limite_leads_diario, leads_recebidos_hoje, 
-                     COALESCE(ativo, true) AS ativo, 
-                     created_at AS criado_em 
-              FROM salespeople;
-
-            CREATE OR REPLACE VIEW respostas_rapidas AS
-              SELECT id, salesperson_id AS vendedor_id, shortcut AS atalho, type AS tipo, content AS conteudo, created_at AS criado_em
-              FROM quick_replies;
-
-            CREATE OR REPLACE VIEW mensagens AS
-              SELECT id, lead_id, salesperson_id AS vendedor_id, 
-                     CASE WHEN sender = 'lead' THEN 'entrada' ELSE 'saida' END AS direcao,
-                     CASE WHEN is_audio THEN 'audio' WHEN media_type IS NOT NULL THEN media_type ELSE 'texto' END AS tipo,
-                     text AS conteudo, whatsapp_message_id AS mensagem_id_meta, created_at AS criado_em
-              FROM lead_messages;
-          `);
+          await aplicarMigracoes(client, [VIEWS_COMPATIBILIDADE]);
         } catch (viewErr: any) {
           console.warn('[PostgreSQL Views] Aviso ao criar views relacionais de compatibilidade:', viewErr?.message);
         }

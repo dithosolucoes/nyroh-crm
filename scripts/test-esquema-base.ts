@@ -9,6 +9,7 @@ import { join } from 'node:path';
 import pg from 'pg';
 import { aplicarMigracoes } from '../shared/lib/migracoes.js';
 import { ESQUEMA_BASE } from '../shared/lib/esquemaBase.js';
+import { VIEWS_COMPATIBILIDADE } from '../shared/lib/esquemaViews.js';
 
 const base = process.env.E2E_DATABASE_URL;
 if (!base) {
@@ -40,6 +41,8 @@ async function assinatura(c: pg.Client): Promise<Record<string, string>> {
     ORDER BY 1,2`);
   const tabelas = await c.query(`SELECT table_name FROM information_schema.tables WHERE table_schema='public'
     AND table_name <> 'schema_migrations' ORDER BY 1`);
+  const views = await c.query(`SELECT table_name, view_definition FROM information_schema.views
+    WHERE table_schema='public' ORDER BY 1`);
   const vendedor = await c.query(`SELECT id, name, active, slug, is_default, whatsapp_type
     FROM salespeople WHERE id='seller-thomas'`);
   return {
@@ -47,6 +50,7 @@ async function assinatura(c: pg.Client): Promise<Record<string, string>> {
     colunas: JSON.stringify(colunas.rows),
     indices: JSON.stringify(indices.rows),
     restricoes: JSON.stringify(restricoes.rows),
+    views: JSON.stringify(views.rows),
     vendedor_padrao: JSON.stringify(vendedor.rows),
   };
 }
@@ -54,17 +58,20 @@ async function assinatura(c: pg.Client): Promise<Record<string, string>> {
 async function main() {
   const original = readFileSync(join(RAIZ, 'scripts/fixtures/esquema-original.sql'), 'utf8');
   const dados = readFileSync(join(RAIZ, 'scripts/fixtures/esquema-dml.sql'), 'utf8');
+  const views = readFileSync(join(RAIZ, 'scripts/fixtures/views-original.sql'), 'utf8');
   const admin = new pg.Client({ connectionString: urlBanco('postgres') });
   await admin.connect();
 
   const a = await recriar(admin, 'nyroh_esquema_original');
   await a.query(original);
+  await a.query(views);
   const assA = await assinatura(a);
   await a.end();
 
   const b = await recriar(admin, 'nyroh_esquema_runner');
   await aplicarMigracoes(b, [ESQUEMA_BASE], async () => b);
   await b.query(dados);
+  await aplicarMigracoes(b, [VIEWS_COMPATIBILIDADE], async () => b);
   const assB = await assinatura(b);
   // segunda subida: o runner não pode reaplicar nem falhar
   const again = await aplicarMigracoes(b, [ESQUEMA_BASE], async () => b);
