@@ -18,6 +18,7 @@ import { validarInstanciaEscolhida, escolherInstanciaDisparo } from './shared/li
 import { recuperarFixosDescartados } from './shared/lib/recuperacaoFixos.js';
 import { variaveisFaltando, mensagemFaltando } from './shared/lib/configObrigatoria.js';
 import { aplicarMigracoes } from './shared/lib/migracoes.js';
+import { optOutPorBotaoDoWebhook } from './shared/lib/descadastroPadrao.js';
 import { ESQUEMA_BASE } from './shared/lib/esquemaBase.js';
 import { VIEWS_COMPATIBILIDADE } from './shared/lib/esquemaViews.js';
 import { NOTAS_E_RESOLVIDA } from './shared/lib/esquemaNotas.js';
@@ -579,7 +580,6 @@ const memoryCampaignCopyTemplatesMap = new Map<string, StoredCampaignCopyTemplat
     }
   ]
 ]);
-
 
 // Lead Chat Messages store (real-time chat with leads)
 export interface LeadChatMessage {
@@ -1390,7 +1390,6 @@ function isAdminOnlyRequest(method: string, fullPath: string): boolean {
 /** Tamanho mínimo de senha em todo o sistema (antes: 4 caracteres, ou nenhum mínimo). */
 const MIN_PASSWORD_LENGTH = 8;
 
-
 /**
  * Dono do lead: admin vê tudo; vendedor só o que é dele.
  *
@@ -1558,7 +1557,6 @@ app.use('/api/leads/:id', (req: any, res, next) => {
   if (['batch', 'batch-assign', 'batch-update', 'bulk-delete', 'distribute'].includes(first)) return next();
   return assertLeadAccess(req, res, next);
 });
-
 
 // Limite de tentativas de login (força bruta): 10 falhas por IP+e-mail a cada 15 min
 const loginFailures = new Map<string, { count: number; firstAt: number }>();
@@ -3715,7 +3713,6 @@ function translateMetaErrorCode(code: number | string | undefined, originalMsg?:
   };
 }
 
-
 // Endpoint de Verificação em Tempo Real do Status de Entrega da Meta
 app.get('/api/campaign/test-dispatch/status/:messageId', async (req: any, res) => {
   const { messageId } = req.params;
@@ -4306,6 +4303,7 @@ async function fetchAndStoreInboundMedia(
 async function processIncomingWhatsAppMessage(params: {
   phone: string;
   text: string;
+  optOutPorBotao?: boolean;
   senderName?: string;
   messageId?: string;
   timestamp?: string;
@@ -4498,7 +4496,7 @@ async function processIncomingWhatsAppMessage(params: {
   // palavra "pare" de verdade ("remover" não dispara dentro de "removeram", etc.).
   // Opt-out: palavras vêm só das automações ativas no JSON (gatilho "pediu para parar").
   const regrasParaParar = await carregarRegrasAutomacoes().catch(() => []);
-  const isOptOut = pedidoDePararPelasRegras(String(effectiveText || ''), regrasParaParar);
+  const isOptOut = Boolean(params.optOutPorBotao) || pedidoDePararPelasRegras(String(effectiveText || ''), regrasParaParar);
   // Palavra de alerta: também só do JSON (gatilho "cliente_ameacou"). Usada só pela automação.
   const isAlerta = pedidoDeAlertaPelasRegras(String(effectiveText || ''), regrasParaParar);
 
@@ -5020,7 +5018,6 @@ async function processDeliveryStatusUpdate(params: {
   await applyMessageStatus({ messageId: id, status: params.status, rank: params.rank, error: params.error });
 }
 
-
 // GET WEBHOOK META (Verificação oficial do Webhook com hub.challenge)
 app.get(['/api/v1/webhook', '/api/webhooks/fluxo', '/api/webhooks/meta', '/api/webhook/whatsapp', '/webhook'], (req, res) => {
   const mode = req.query['hub.mode'];
@@ -5368,6 +5365,7 @@ async function processWebhookEventAsync(event: any) {
           senderName,
           messageId,
           eventTimestamp: event.created_at,
+          optOutPorBotao: optOutPorBotaoDoWebhook(kind, msgData.reply),
           conversationId: msgData.conversation_id,
           isAudio: mediaType === 'audio',
           mediaType,
@@ -12505,7 +12503,6 @@ app.post('/api/leads/:leadId/simulate-reply', async (req: any, res) => {
   } satisfies RespostaRespostaSimulada);
 });
 
-
 // Rota de diagnóstico de infraestrutura (Redis, BullMQ, WebSockets)
 /**
  * Lista honesta do que está (ou NÃO está) pronto para o WhatsApp funcionar de ponta a ponta.
@@ -12724,7 +12721,6 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
     error: err.message || 'Erro interno no servidor.'
   });
 });
-
 
 // START SERVER & VITE INTEGRATION
 async function main() {

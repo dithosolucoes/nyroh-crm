@@ -7,6 +7,7 @@
  *   "marcar opt-out" (nenhum envio futuro).
  */
 import type { Automacao } from './automacoes';
+import { flagLigada } from './flagLigada.js';
 
 export const PALAVRAS_PARAR_FIXAS: readonly string[] = [
   'parar',
@@ -46,4 +47,19 @@ export function ehCliqueDescadastro(reply: RespostaBotao | null | undefined, ids
   if (!reply || typeof reply.id !== 'string') return false;
   const id = reply.id.trim();
   return id !== '' && idsConfigurados.includes(id);
+}
+
+/** Lê a lista de ids de botão de descadastro (variável separada por vírgula). Vazia por padrão. */
+export function idsDescadastroBotao(valor: string | undefined | null): string[] {
+  return String(valor ?? '').split(',').map((id) => id.trim()).filter((id) => id !== '');
+}
+
+/**
+ * Item 3.1 c: o webhook marca o evento como descadastro quando é um clique de botão com reply.id
+ * configurado. Desligado (retorna false) sem NYROH_DESCADASTRO_POR_BOTAO=true.
+ */
+export function optOutPorBotaoDoWebhook(kind: string, reply: RespostaBotao | undefined, ambiente: NodeJS.ProcessEnv = process.env): boolean {
+  if (!flagLigada(ambiente.NYROH_DESCADASTRO_POR_BOTAO)) return false;
+  if (kind !== 'interactive' && kind !== 'button') return false;
+  return ehCliqueDescadastro(reply, idsDescadastroBotao(ambiente.NYROH_DESCADASTRO_BOTAO_IDS));
 }

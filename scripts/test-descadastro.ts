@@ -4,7 +4,7 @@
  */
 import assert from 'node:assert/strict';
 import { pedidoDePararPelasRegras } from '../shared/lib/automacoesExecucao';
-import { AUTOMACAO_PARAR_PADRAO, PALAVRAS_PARAR_FIXAS, ehCliqueDescadastro } from '../shared/lib/descadastroPadrao';
+import { AUTOMACAO_PARAR_PADRAO, PALAVRAS_PARAR_FIXAS, ehCliqueDescadastro, idsDescadastroBotao } from '../shared/lib/descadastroPadrao';
 import { validarAutomacao } from '../shared/lib/automacoes';
 
 let falhas = 0;
@@ -83,6 +83,12 @@ test('reply ausente ou id vazio não conta', () => {
   assert.equal(ehCliqueDescadastro(undefined, ['parar_1']), false);
   assert.equal(ehCliqueDescadastro(null, ['parar_1']), false);
   assert.equal(ehCliqueDescadastro({ id: '  ' }, ['  ']), false);
+});
+
+test('ids de botão vêm de lista separada por vírgula, vazia por padrão', () => {
+  assert.deepEqual(idsDescadastroBotao(undefined), []);
+  assert.deepEqual(idsDescadastroBotao(''), []);
+  assert.deepEqual(idsDescadastroBotao(' parar_1 , parar_2 ,, '), ['parar_1', 'parar_2']);
 });
 
 console.log('');
