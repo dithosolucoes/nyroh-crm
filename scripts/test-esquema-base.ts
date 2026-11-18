@@ -12,6 +12,7 @@ import { ESQUEMA_BASE } from '../shared/lib/esquemaBase.js';
 import { VIEWS_COMPATIBILIDADE } from '../shared/lib/esquemaViews.js';
 import { NOTAS_E_RESOLVIDA } from '../shared/lib/esquemaNotas.js';
 import { CAIXA_DE_ENTRADA } from '../shared/lib/esquemaCaixa.js';
+import { BUSCA_MENSAGENS } from '../shared/lib/esquemaBusca.js';
 
 const base = process.env.E2E_DATABASE_URL;
 if (!base) {
@@ -69,6 +70,7 @@ async function main() {
   const views = readFileSync(join(RAIZ, 'scripts/fixtures/views-original.sql'), 'utf8');
   const notas = readFileSync(join(RAIZ, 'scripts/fixtures/notas-original.sql'), 'utf8');
   const caixa = readFileSync(join(RAIZ, 'scripts/fixtures/caixa-original.sql'), 'utf8');
+  const busca = readFileSync(join(RAIZ, 'scripts/fixtures/busca-original.sql'), 'utf8');
   const admin = new pg.Client({ connectionString: urlBanco('postgres') });
   await admin.connect();
 
@@ -77,6 +79,7 @@ async function main() {
   await a.query(views);
   await a.query(notas);
   await a.query(caixa);
+  await a.query(busca);
   const assA = await assinatura(a);
   await a.end();
 
@@ -86,6 +89,7 @@ async function main() {
   await aplicarMigracoes(b, [VIEWS_COMPATIBILIDADE], async () => b);
   await aplicarMigracoes(b, [NOTAS_E_RESOLVIDA], async () => b);
   await aplicarMigracoes(b, [CAIXA_DE_ENTRADA], async () => b);
+  await aplicarMigracoes(b, [BUSCA_MENSAGENS], async () => b);
   const assB = await assinatura(b);
   // segunda subida: o runner não pode reaplicar nem falhar
   const again = await aplicarMigracoes(b, [ESQUEMA_BASE], async () => b);

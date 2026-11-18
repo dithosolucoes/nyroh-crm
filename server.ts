@@ -22,6 +22,7 @@ import { ESQUEMA_BASE } from './shared/lib/esquemaBase.js';
 import { VIEWS_COMPATIBILIDADE } from './shared/lib/esquemaViews.js';
 import { NOTAS_E_RESOLVIDA } from './shared/lib/esquemaNotas.js';
 import { CAIXA_DE_ENTRADA } from './shared/lib/esquemaCaixa.js';
+import { BUSCA_MENSAGENS } from './shared/lib/esquemaBusca.js';
 import type { RespostaListaUploads, UploadZipRegistro, RespostaUploadZipOk, RespostaEnviarMensagem, StatusMensagemEnviada, RespostaLoginOk, RespostaSessaoAtual, RespostaSucesso, UsuarioAdmin, RespostaListaUsuarios, RespostaAuditLogs, RespostaLogsServidor, RespostaListaVendedores, RespostaVendedorCriado, RespostaLoteVendedores, RespostaVendedorAtualizado, RespostaSenhaVendedor, RespostaVendedorStatus, RespostaRoletaConfig, RespostaDistribuicaoRoleta, RespostaListaEtiquetas, RespostaEtiquetaSalva, RespostaOk, RespostaListaNotas, RespostaNotaCriada, RespostaResolucao, RespostaAuditoriaSite, RespostaAtualizacaoLead, RespostaResumoLead, RespostaListaLigacoes, RespostaLigacaoRegistrada, RespostaListaLigacoesGerais, RespostaListaLeads, RespostaListaRespostasRapidas, RespostaRespostaRapidaCriada, RespostaRespostaRapidaExcluida, RespostaStatusMeta, RespostaContasMeta, RespostaSincronizacaoConta, RespostaSincronizacaoTodas, RespostaMetaRemovida, RespostaConfigFluxo, RespostaStatusFluxo, RespostaEventosFluxo, RespostaModoInstancia, RespostaListaModelosFluxo, RespostaSincronizacaoModelos, RespostaModeloCriado, RespostaInstanciasFluxo, RespostaCadastroContaOk, RespostaConfigEmbeddedSignup, RespostaEmbeddedSignupConcluido, RespostaLeituraMeta, RespostaCriacaoInstancia, RespostaEnvioTesteSucesso, RespostaDistribuicaoLeads, RespostaEstatisticasVendedor, RespostaTransferenciaLote, RespostaListaCopias, RespostaCopiaSalva, RespostaCopiaRemovida, RespostaListaLotes, RespostaVelocidadeDisparo, RespostaAlteracaoVelocidade, RespostaAcaoLote, RespostaCancelamentoLote, RespostaLiberacaoQuarentena, RespostaDevolucaoLeads, RespostaRetornoQuarentena, RespostaResetSafra, LoteCampanha, ProgressoLote, RespostaDisparo, RespostaTesteDisparo, RespostaStatusTesteDisparo, RespostaSincronizacaoWhatsApp, RespostaListaLeadsCampanha, RespostaCamposLead, RespostaImportacaoIniciada, ProgressoImportacao, RespostaApagarZipsEmLote, RespostaApagarZip, RespostaInbox, RespostaBuscaMensagens, RespostaMensagensLead, RespostaRecuperacao, RespostaAtualizacaoLoteLeads, RespostaLoteLeads, RespostaExclusaoLote, RespostaCliquesLink, RespostaSalvarConfigFluxo, RespostaTesteConexaoFluxo, RespostaRuntimeConfig, RespostaEventoSimulado, RespostaJanelaLead, RespostaPresenca, RespostaLeituraMarcada, RespostaCatalogoModelosMeta, RespostaSimulacaoWebhook, RespostaLigacoesRecentesVendedor, RespostaImportacaoZipDireta, RespostaSementes, RespostaAcaoSimulada, RespostaDistribuicaoCampanha, RespostaRespostaSimulada, RespostaStatusInfraestrutura, RespostaSaudeBasica, RespostaSaudeSimples, RespostaWebhookJaProcessado, RespostaWebhookRecebido, RespostaZipEnfileirado, RespostaLeituraNaoMarcada, RequisicaoDistribuicaoRoleta } from './shared/contracts/rotas.js';
 import type { InboxConversation } from './shared/types.js';
 import { registerAutomacoesRoutes, applyAutomacoesMigration, applyAutomacoesEstadoMigration, applyAutomacoesFilaMigration, automacoesPersistenciaOn, iniciarWorkerAutomacoes } from './shared/lib/automacoesRoutes.js';
@@ -864,13 +865,11 @@ END $$;
         } catch (notasErr: any) {
           console.warn('[PostgreSQL] Aviso ao aplicar notas/resolvida:', notasErr?.message);
         }
+        // Índice de busca no histórico de mensagens pelo runner (item 2.2a-2 d). Ver shared/lib/esquemaBusca.ts.
         try {
-          await client.query(`
-            -- Busca no histórico de mensagens
-            CREATE INDEX IF NOT EXISTS idx_lead_messages_text ON lead_messages USING gin (to_tsvector('portuguese', coalesce(text, '')));
-          `);
-        } catch (notesErr: any) {
-          console.warn('[PostgreSQL] Aviso ao preparar notas/busca:', notesErr?.message);
+          await aplicarMigracoes(client, [BUSCA_MENSAGENS]);
+        } catch (buscaErr: any) {
+          console.warn('[PostgreSQL] Aviso ao aplicar índice de busca:', buscaErr?.message);
         }
 
         // ------------------------------------------------------------------------------
