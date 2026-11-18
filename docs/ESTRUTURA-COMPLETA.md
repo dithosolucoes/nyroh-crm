@@ -128,7 +128,7 @@ Ordem prática, quando um item não pode andar em paralelo:
 - [x] **S1. Configuração validada na subida** (concluída no código, com a chave `NYROH_EXIGIR_CONFIG` desligada por padrão. Verificado: com a chave ligada e sem `DATABASE_URL` em produção, o sistema recusa subir com mensagem clara (saída 1); com a chave desligada, sobe como antes. Teste de regra: `npm run test:config`. Ligar a chave na Railway é decisão sua, depois de revisar)
   - Depende de: nada
   - Pronto quando: o sistema recusa subir com variável obrigatória faltando, com mensagem clara, e isso está testado.
-- [ ] **C1. Contratos compartilhados** (em andamento)
+- [x] **C1. Contratos compartilhados** (concluída em 18/11/2026)
   - Feito, tipado no servidor e no front:
     - [x] Auth: login, me, logout, troca de senha
     - [x] Admin: usuários, logs, auditoria
@@ -158,7 +158,8 @@ Ordem prática, quando um item não pode andar em paralelo:
     - [x] Listagem de leads é convertida de `LeadListado` para `Lead` pela função `leadListadoParaLead`, sem cast. O estado do front continua `Lead` (modelo de tela); status fora do funil cai em `Leads`. (`App.tsx`); o estado ainda não é `LeadListado`
     - [x] Roleta em lote: o servidor agora lê `count` (o que o front envia), com `maxCount` só por compatibilidade. Coberto no E2E ("roleta em lote respeita count=1"). E2E 160/160., o front envia `count` (bug de comportamento, fora da C1)
   - Verificado a cada rodada: `npm run lint`, `npm run qualidade` e E2E 159/159 em banco recriado.
-  - Pendência de documentação: o critério "Pronto quando" cita `packages/contracts`, mas os contratos estão em `shared/contracts` (decisão para o W1 ou para o Thomas). C1 segue aberta até essa decisão.
+  - Decisão (18/11/2026): os contratos ficam em `shared/contracts`, usado pelos dois lados. Mover para `packages/contracts` fica para o W1, se o Thomas quiser esse nome.
+  - Verificado no commit `025411e`: `tsc` raiz e front, `qualidade`, E2E 160/160 em PostgreSQL real.
   - Depende de: nada
   - Pronto quando: `packages/contracts` tem os tipos e schemas das rotas usadas pelo front, e o build confirma que front e back usam o mesmo tipo.
 - [ ] **FT1. Testes de interface das telas principais**
