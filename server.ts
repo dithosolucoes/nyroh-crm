@@ -18,7 +18,7 @@ import { validarInstanciaEscolhida, escolherInstanciaDisparo } from './shared/li
 import { recuperarFixosDescartados } from './shared/lib/recuperacaoFixos.js';
 import { variaveisFaltando, mensagemFaltando } from './shared/lib/configObrigatoria.js';
 import { aplicarMigracoes } from './shared/lib/migracoes.js';
-import { optOutPorBotaoDoWebhook } from './shared/lib/descadastroPadrao.js';
+import { optOutPorBotaoDoWebhook, confirmarDescadastroSeLigada, enviarTextoFluxo } from './shared/lib/descadastroPadrao.js';
 import { ESQUEMA_BASE } from './shared/lib/esquemaBase.js';
 import { VIEWS_COMPATIBILIDADE } from './shared/lib/esquemaViews.js';
 import { NOTAS_E_RESOLVIDA } from './shared/lib/esquemaNotas.js';
@@ -4453,8 +4453,8 @@ async function processIncomingWhatsAppMessage(params: {
   };
 
   // PERSISTE PRIMEIRO no banco (se falhar, lança → o job é reprocessado, a mensagem não se perde);
-  // só depois entra no cache em memória.
-  if (usePostgres && pgPool) {
+  // só depois entra no cache em memória. Item 3.1 d: clique de descadastro não grava balão.
+  if (usePostgres && pgPool && !params.optOutPorBotao) {
     try {
       await pgPool.query(
         `INSERT INTO lead_messages (id, lead_id, phone_number, whatsapp_message_id, conversation_id, sender, sender_name, text, is_audio, audio_url, audio_duration, media_type, media_url, media_name, status, status_rank, timestamp)
@@ -4486,7 +4486,7 @@ async function processIncomingWhatsAppMessage(params: {
 
   // Salva no histórico em memória (cache) — sem duplicar
   const currentList = memoryLeadMessagesMap.get(targetId!) || [];
-  if (!currentList.some(m => m.id === incomingMessage.id)) currentList.push(incomingMessage);
+  if (!params.optOutPorBotao && !currentList.some(m => m.id === incomingMessage.id)) currentList.push(incomingMessage);
   memoryLeadMessagesMap.set(targetId!, currentList);
 
   // Detecção de descadastro por PALAVRA INTEIRA.
@@ -4511,6 +4511,7 @@ async function processIncomingWhatsAppMessage(params: {
     { carregarRegras: carregarRegrasAutomacoes, gravarFila: gravarFilaAutomacoes }
   ).catch((e: any) => console.warn('[AUTOMACOES] não agendei a resposta:', e?.message));
 
+  if (isOptOut && matched) await confirmarDescadastroSeLigada({ telefone: cleanPhone, enviarTexto: (t, x) => enviarTextoFluxo(t, x, { apiKey: (memoryFluxoConfig.apiKey || process.env.FLUXO_KEY || '').trim(), apiSecret: (memoryFluxoConfig.apiSecret || process.env.FLUXO_SECRET || '').trim(), instanceId: memoryFluxoConfig.instanceId || process.env.FLUXO_INSTANCE_ID || '' }) }).catch((e: any) => console.warn('[descadastro] confirmação não enviada:', e?.message)); // item 3.2, desligado por padrão
   // FASE 2: quem pediu descadastro recebe a tag "Sem interesse" (atrás de flag, desligada por padrão).
   if (isOptOut && matched && process.env.NYROH_TAG_SEM_INTERESSE === 'true') {
     const taggedLead = memoryLeadsMap.get(matched.id);
@@ -4664,7 +4665,7 @@ async function processIncomingWhatsAppMessage(params: {
     }
   }
 
-  // Notificar todos os desktops e painéis conectados via SSE & WebSockets em tempo real
+  if (!params.optOutPorBotao) { // notifica painéis em tempo real; clique de descadastro (3.1 d) não vira balão
   await broadcastLeadSSE('NEW_MESSAGE', {
     leadId: targetId,
     leadName: targetName,
@@ -4681,8 +4682,7 @@ async function processIncomingWhatsAppMessage(params: {
     message: incomingMessage,
     isReply: true
   });
-  if (targetId) {
-    broadcastToLead(targetId, 'new_message', incomingMessage);
+  if (targetId) broadcastToLead(targetId, 'new_message', incomingMessage);
   }
 
   await broadcastLeadSSE('LEAD_UPDATED', {

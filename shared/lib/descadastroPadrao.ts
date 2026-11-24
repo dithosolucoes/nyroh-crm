@@ -63,3 +63,6 @@ export function optOutPorBotaoDoWebhook(kind: string, reply: RespostaBotao | und
   if (kind !== 'interactive' && kind !== 'button') return false;
   return ehCliqueDescadastro(reply, idsDescadastroBotao(ambiente.NYROH_DESCADASTRO_BOTAO_IDS));
 }
+
+/** Item 3.2: confirmação automática de descadastro (ver descadastroEnvio.ts). Desligada por padrão. */
+export { confirmarDescadastroSeLigada, enviarTextoFluxo } from './descadastroEnvio.js';
