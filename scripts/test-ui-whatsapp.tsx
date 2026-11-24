@@ -40,6 +40,21 @@ const mesa = renderizar('Mesa', React.createElement(ThomasWhatsAppDesktopView, {
 }));
 checar('Mesa: mostra o nome do closer padrão', mesa.includes('Thomas'));
 
+// Item 7.3: lead selecionado abre o dossiê (isDossierOpen começa aberto). O nome aparece na lista e no dossiê.
+const lead: any = {
+  id: 'l1', name: 'Maria Teste', phoneNumber: '5511999990000', columnStatus: 'Leads',
+  createdAt: '2026-11-01T10:00:00Z', updatedAt: '2026-11-01T10:00:00Z', niche: 'Teste',
+  city: 'BH', notes: '', calls: [], unreadCount: 0, lastMessageText: 'oi',
+  lastMessageSender: 'lead', lastMessageAt: '2026-11-01T10:00:00Z', variaveisJson: {}, marcas: [],
+};
+const mesaComLead = renderizar('Mesa com lead', React.createElement(ThomasWhatsAppDesktopView, {
+  leads: [lead] as any, initialLeadId: 'l1', onShowToast: () => {},
+} as any));
+const vezesNome = mesaComLead.split('Maria Teste').length - 1;
+checar('Mesa com lead: dossiê mostra o nome (lista e dossiê)', vezesNome >= 2, `apareceu ${vezesNome} vez(es)`);
+checar('Mesa com lead: mostra o telefone no dossiê', mesaComLead.includes('5511999990000') || mesaComLead.includes('99999-0000') || mesaComLead.includes('+55'));
+// Limite: os modais (Modelos e Respostas rápidas) só abrem com clique; isso exige teste de navegador, não de servidor.
+
 console.log('');
 if (falhas) { console.log(`${falhas} falha(s).`); process.exit(1); }
 console.log('Todos os testes passaram.');

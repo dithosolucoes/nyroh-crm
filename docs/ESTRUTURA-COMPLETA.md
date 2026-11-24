@@ -92,7 +92,7 @@ ONDA 3
   D1   modo mock para o designer         ← C1, C2
 
 ONDA 4
-  W1   workspaces (apps/ e packages/)    ← B6, B7, F1, F2, D1
+  W1   workspaces (apps/ e packages/)    ← B6, B7, F1, F2, D1  (feito em apps/web e apps/api; packages/ depende da decisão D4)
 
 ONDA 5
   Z1   revisão final                     ← tudo
@@ -263,3 +263,13 @@ Ordem prática, quando um item não pode andar em paralelo:
 - Trocar fornecedor (FluxoAPI ou Meta).
 - Mudar o design visual. A separação só move o front, não redesenha.
 - Criptografia do backup e restauração. Ficam para depois do projeto finalizado.
+
+## Estado atual (24/11/2026)
+
+- Front em `apps/web/` (workspace). Servidor em `apps/api/server.ts` (workspace). `shared/` e `server/` continuam na raiz.
+- Motivo de `shared/` e `server/` na raiz: o front usa 23 módulos de `shared/` (contratos e regras puras), e `shared/lib/rotas/demais.ts` importa `server/redisQueue`. Mover quebraria a fronteira.
+- C1 fechada: os contratos estão em `shared/contracts`.
+- Visitas de site (pedido do Thomas): endpoint `POST /api/integracoes/visita-site` com chave, flag `NYROH_LINK_DIRETO` desligada, campo "site hospedado" na tela do lead.
+- Pendências de decisão: D4 (manter `shared/` com nome honesto ou separar `packages/contracts`), D2 (`/api/campaign/link-clicks` público), D1 (lote cancelado na pausa ainda envia 1 mensagem).
+- Checklist de execução: `claude/nyroh-documentacao/18-checklist-autonomo.md` no projeto NYROH.
+
