@@ -13,6 +13,7 @@ import type { RespostaListaAutomacoes, RespostaAutomacaoSalva, RespostaExecucoes
 import type { Express, Request, Response } from 'express';
 import type pg from 'pg';
 import { flagLigada } from './flagLigada';
+import { garantirAutomacaoPararPadrao } from './automacaoPararPadrao.js';
 import { validarAutomacao, type Automacao } from './automacoes';
 import { processarVencidos } from './automacoesWorker';
 import { criarExecutorAcoes, camposDoLead, tabelaExiste } from './automacoesExecutores';
@@ -109,6 +110,12 @@ export const automacoesPersistenciaOn = (): boolean => flagLigada(process.env[FL
 export async function applyAutomacoesMigration(pool: pg.Pool): Promise<void> {
   await aplicarMigracoesArquivo(pool, MIGRACOES_AUTOMACOES_RESPOSTAS);
   console.log('[AUTOMACOES] migração aplicada (flag NYROH_AUTOMACOES_PERSISTENCIA=true).');
+  // Item 3.4: automação "Parar mensagens" (atrás de NYROH_AUTOMACAO_PARAR_PADRAO, padrão desligada).
+  const pararPadrao = await garantirAutomacaoPararPadrao(pool).catch((e: any) => {
+    console.warn('[AUTOMACOES] automação "Parar mensagens" não gravada:', e?.message);
+    return 'falhou' as const;
+  });
+  if (pararPadrao === 'criada') console.log('[AUTOMACOES] automação "Parar mensagens" criada (inativa até ativação).');
 }
 
 export function registerAutomacoesRoutes(app: Express, deps: AutomacoesDeps): void {
