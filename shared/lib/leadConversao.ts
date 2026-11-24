@@ -24,6 +24,7 @@ export function leadListadoParaLead(l: LeadListado): Lead {
     phoneNumber: l.phoneNumber ?? '',
     publicUrl: semNulo(l.publicUrl),
     website: semNulo(l.website),
+    siteDoCliente: semNulo(l.siteDoCliente),
     // Status fora do funil cai em 'Leads' (o kanban só mostra as colunas conhecidas).
     columnStatus: ehColumnStatus(l.columnStatus) ? l.columnStatus : 'Leads',
     createdAt: l.createdAt ?? '',

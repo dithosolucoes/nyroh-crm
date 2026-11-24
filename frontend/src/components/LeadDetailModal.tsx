@@ -88,6 +88,13 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
   const [websiteDraft, setWebsiteDraft] = useState(lead?.website || '');
   const [isSavingWebsite, setIsSavingWebsite] = useState(false);
 
+  // Site hospedado (rastreio de visitas)
+  const [siteDraft, setSiteDraft] = useState(lead?.siteDoCliente || '');
+  const [isSavingSite, setIsSavingSite] = useState(false);
+  useEffect(() => {
+    setSiteDraft(lead?.siteDoCliente || '');
+  }, [lead?.id, lead?.siteDoCliente]);
+
   // Sync website draft when active lead changes
   useEffect(() => {
     setWebsiteDraft(lead?.website || '');
@@ -119,6 +126,32 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
       onShowToast('Falha na comunicação com o servidor.');
     } finally {
       setIsSavingWebsite(false);
+    }
+  };
+
+  const handleSaveSite = async () => {
+    if (!lead) return;
+    setIsSavingSite(true);
+    try {
+      const res = await apiFetch(`/api/leads/${lead.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ siteDoCliente: siteDraft.trim() })
+      });
+      if (res.ok) {
+        const salvo = siteDraft.trim() || undefined;
+        lead.siteDoCliente = salvo;
+        setSiteDraft(salvo || '');
+        onShowToast(salvo ? 'Site hospedado salvo. As visitas deste lead passam a contar.' : 'Site hospedado removido.');
+        if (onRefreshData) onRefreshData();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        onShowToast(data?.error || 'Erro ao salvar o site hospedado.');
+      }
+    } catch (e) {
+      onShowToast('Falha na comunicação com o servidor.');
+    } finally {
+      setIsSavingSite(false);
     }
   };
 
@@ -890,6 +923,38 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                   </button>
                 </div>
               )}
+            </div>
+
+            {/* Site hospedado: a plataforma de sites avisa o CRM quando alguém abre este site */}
+            <div className="bg-white border border-neutral-200 rounded-xl p-3.5 shadow-2xs space-y-2">
+              <div>
+                <p className="text-xs font-bold text-neutral-800">Site hospedado (rastreio de visitas)</p>
+                <p className="text-[10.5px] text-neutral-500">Endereço do site que a plataforma de sites usa para avisar as visitas deste lead.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={siteDraft}
+                  onChange={(e) => setSiteDraft(e.target.value)}
+                  placeholder="https://site-do-cliente.com.br"
+                  aria-label="Site hospedado do cliente"
+                  className="flex-1 px-2.5 py-1 text-xs bg-white border border-neutral-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleSaveSite();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={handleSaveSite}
+                  disabled={isSavingSite || siteDraft.trim() === (lead?.siteDoCliente || '')}
+                  className="px-2.5 py-1 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 disabled:opacity-50 rounded-lg transition-colors cursor-pointer"
+                >
+                  {isSavingSite ? 'Salvando...' : 'Salvar'}
+                </button>
+              </div>
             </div>
 
             {/* Form de Registro da Ligação */}

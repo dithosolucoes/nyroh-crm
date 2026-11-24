@@ -310,6 +310,8 @@ export interface LeadListado {
   phoneNumber?: string | null;
   publicUrl?: string | null;
   website?: string | null;
+  /** Site hospedado do cliente (variaveis_json.site_do_cliente). Usado para rastrear visitas. */
+  siteDoCliente?: string | null;
   columnStatus: string;
   createdAt?: string | null;
   updatedAt?: string | null;

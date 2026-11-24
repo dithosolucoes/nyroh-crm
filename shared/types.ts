@@ -104,6 +104,8 @@ export interface Lead {
   phoneNumber: string;
   publicUrl?: string;
   website?: string; // Site legado / original do cliente (Google Maps / Google Meu Negócio)
+  /** Site hospedado do cliente: a plataforma de sites avisa o CRM quando alguém abre esse site. */
+  siteDoCliente?: string;
   columnStatus: ColumnStatus;
   createdAt: string;
   updatedAt: string;

@@ -35,3 +35,14 @@ export const SQL_UPDATE_LEADS_2 = `UPDATE leads
                website = COALESCE($4, website),
                updated_at = CURRENT_TIMESTAMP 
            WHERE id = $5 RETURNING id, name, phone_number AS "phoneNumber", column_status AS "columnStatus", sub_status AS "subStatus", loss_reason AS "lossReason", salesperson_id AS "salespersonId", salesperson_name AS "salespersonName", created_at AS "createdAt", updated_at AS "updatedAt"`;
+
+/** Grava ou remove (null) o site hospedado do lead, dentro de variaveis_json. Sem migração de esquema. */
+export const SQL_UPDATE_SITE_DO_CLIENTE = `UPDATE leads
+           SET variaveis_json = CASE WHEN $2::text IS NULL
+                 THEN COALESCE(variaveis_json, '{}'::jsonb) - 'site_do_cliente'
+                 ELSE jsonb_set(COALESCE(variaveis_json, '{}'::jsonb), '{site_do_cliente}', to_jsonb($2::text))
+               END
+           WHERE id = $1`;
+
+/** Outro lead que já usa o mesmo site hospedado (evita dois leads com o mesmo site). */
+export const SQL_SELECT_SITE_EM_OUTRO_LEAD = `SELECT id FROM leads WHERE variaveis_json->>'site_do_cliente' = $1 AND id <> $2 LIMIT 1`;

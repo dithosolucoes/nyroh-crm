@@ -10,7 +10,8 @@ import { PIPELINE_COLUMNS, type ColumnStatus } from '../../types.js';
 import { uxSchemaOn } from '../uxRoutes.js';
 import { isUserAdmin } from '../serverAuth.js';
 import type { RespostaAtualizacaoLead, RespostaListaLeads, RespostaListaNotas, RespostaNotaCriada, RespostaResolucao, RespostaResumoLead } from '../../contracts/rotas.js';
-import { SQL_SELECT_LEAD_NOTES, SQL_INSERT_LEAD_NOTES, SQL_SELECT_LEADS, SQL_UPDATE_LEADS, SQL_UPDATE_LEADS_2 } from './repo/leads.js';
+import { SQL_SELECT_LEAD_NOTES, SQL_INSERT_LEAD_NOTES, SQL_SELECT_LEADS, SQL_UPDATE_LEADS, SQL_UPDATE_LEADS_2, SQL_UPDATE_SITE_DO_CLIENTE, SQL_SELECT_SITE_EM_OUTRO_LEAD } from './repo/leads.js';
+import { normalizarSite } from '../visitaSite.js';
 export interface DependenciasLeads {
   readonly emitirEventoLead: (evento: any, leadId: string, contexto: any) => void;
   readonly memoryCallLogsMap: Map<string, any[]>;
@@ -144,6 +145,7 @@ export function registrarLeads(app: Express): void {
             l.phone_number AS "phoneNumber",
             l.public_url AS "publicUrl",
             l.website AS "website",
+            l.variaveis_json->>'site_do_cliente' AS "siteDoCliente",
             COALESCE(l.column_status, 'Leads') AS "columnStatus",
             COALESCE(l.salesperson_id, 'seller-thomas') AS "salespersonId",
             COALESCE(l.salesperson_name, 'Thomas') AS "salespersonName",
@@ -252,8 +254,30 @@ export function registrarLeads(app: Express): void {
   app.put('/api/leads/:id', async (req, res) => {
     const { id } = req.params;
     const { name, phoneNumber, publicUrl, website } = req.body;
+    // Site hospedado (rastreio de visitas). Só entra se vier no corpo; vazio remove.
+    const temSite = Object.prototype.hasOwnProperty.call(req.body || {}, 'siteDoCliente');
+    let siteNovo: string | null = null;
+    if (temSite) {
+      const bruto = String(req.body.siteDoCliente ?? '').trim();
+      siteNovo = bruto === '' ? null : normalizarSite(bruto);
+      if (bruto !== '' && !siteNovo) {
+        return res.status(400).json({ error: 'Site inválido. Use o endereço completo, começando com https://.' });
+      }
+      if (!D.usePostgres || !D.pgPool) {
+        return res.status(503).json({ error: 'Salvar o site do cliente precisa do banco.' });
+      }
+    }
 
     try {
+      if (temSite && siteNovo) {
+        const outro = await D.pgPool.query(SQL_SELECT_SITE_EM_OUTRO_LEAD, [siteNovo, id]);
+        if (outro.rowCount) {
+          return res.status(409).json({ error: 'Esse site já está em outro lead.' });
+        }
+      }
+      if (temSite) {
+        await D.pgPool.query(SQL_UPDATE_SITE_DO_CLIENTE, [id, siteNovo]);
+      }
       if (D.usePostgres && D.pgPool) {
         const result = await D.pgPool.query(
           SQL_UPDATE_LEADS_2,
