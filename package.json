@@ -36,7 +36,8 @@
     "test:fila-envio": "tsx scripts/test-fila-envio.ts",
     "test:ui-disparos": "bash scripts/run-ui-disparos.sh",
     "test:ui-whatsapp": "bash scripts/run-ui-whatsapp.sh",
-    "test:ui-telas": "bash scripts/run-ui-telas.sh"
+    "test:ui-telas": "bash scripts/run-ui-telas.sh",
+    "test:bundle-sem-mock": "bash scripts/test-bundle-sem-mock.sh"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

@@ -10,7 +10,19 @@
 
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
-export function apiFetch(path: string, init?: RequestInit, fetchImpl: FetchLike = fetch): Promise<Response> {
+/**
+ * Ligado no build pelo vite.config (define), só com USE_MOCK_API=true e fora de produção.
+ * Quando está desligado, o módulo ../mocks nem entra no bundle.
+ */
+declare const __USE_MOCK_API__: boolean;
+const MOCK_COMPILADO: boolean = typeof __USE_MOCK_API__ !== 'undefined' ? __USE_MOCK_API__ : false;
+
+export async function apiFetch(path: string, init?: RequestInit, fetchImpl: FetchLike = fetch): Promise<Response> {
+  if (MOCK_COMPILADO) {
+    const { respostaMock } = await import('../mocks');
+    const falsa = respostaMock(path, init);
+    if (falsa) return falsa;
+  }
   return fetchImpl(path, init);
 }
 

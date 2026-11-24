@@ -4,6 +4,7 @@
  */
 import assert from 'node:assert/strict';
 import { apiFetch, isMockApiAllowed } from '../frontend/src/api/client';
+import { respostaMock } from '../frontend/src/mocks';
 
 let falhas = 0;
 function test(nome: string, fn: () => void | Promise<void>) {
@@ -50,6 +51,29 @@ function test(nome: string, fn: () => void | Promise<void>) {
   });
   await test('NUNCA liga no Railway (RAILWAY_ENVIRONMENT), mesmo com a variável', () => {
     assert.equal(isMockApiAllowed({ USE_MOCK_API: 'true', RAILWAY_ENVIRONMENT: 'production' }), false);
+  });
+
+  console.log('\nDados falsos (respostaMock, item 5.5 a)');
+  await test('GET /api/leads devolve a lista falsa em JSON', async () => {
+    const r = respostaMock('/api/leads');
+    assert.ok(r, 'deveria haver mock para /api/leads');
+    const lista = await r.json();
+    assert.equal(Array.isArray(lista), true);
+    assert.equal(lista.length, 6);
+    assert.match(lista[0].name, /Fictício/);
+  });
+  await test('GET com query (/api/salespeople?x=1) usa o mesmo mock', async () => {
+    const r = respostaMock('/api/salespeople?x=1');
+    assert.ok(r);
+    const lista = await r.json();
+    assert.equal(lista[0].name, 'Vendedor Fictício');
+  });
+  await test('métodos que não são GET NÃO são mockados (vão para a API real)', () => {
+    assert.equal(respostaMock('/api/leads', { method: 'POST' }), null);
+    assert.equal(respostaMock('/api/leads', { method: 'DELETE' }), null);
+  });
+  await test('rota sem mock devolve null', () => {
+    assert.equal(respostaMock('/api/rota-que-nao-existe'), null);
   });
 
   console.log('');
