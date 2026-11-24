@@ -32,7 +32,8 @@
     "verificar:arquitetura": "node scripts/verificar-arquitetura.mjs",
     "verificar:arquitetura:baseline": "node scripts/verificar-arquitetura.mjs --atualizar-baseline",
     "test:migracoes": "tsx scripts/test-migracoes.ts",
-    "test:esquema": "tsx scripts/test-esquema-base.ts"
+    "test:esquema": "tsx scripts/test-esquema-base.ts",
+    "test:fila-envio": "tsx scripts/test-fila-envio.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
