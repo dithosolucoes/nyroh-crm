@@ -61,7 +61,7 @@ export function startNyrohServer(extraEnv: NodeJS.ProcessEnv): RunningServer {
     if (!(k in extraEnv)) delete env[k];
   }
   const tsxCli = path.join(process.cwd(), 'node_modules', 'tsx', 'dist', 'cli.mjs');
-  const child = spawn(process.execPath, [tsxCli, 'server.ts'], {
+  const child = spawn(process.execPath, [tsxCli, 'apps/api/server.ts'], {
     env,
     cwd: process.cwd(),
     stdio: ['ignore', 'pipe', 'pipe'],

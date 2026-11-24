@@ -5,7 +5,7 @@
  */
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { AdminCampaignDisparosView } from '../frontend/src/components/AdminCampaignDisparosView';
+import { AdminCampaignDisparosView } from '../apps/web/src/components/AdminCampaignDisparosView';
 
 let falhas = 0;
 function checar(nome: string, cond: boolean, detalhe?: string) {

@@ -5,8 +5,8 @@
  */
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { AdminWhatsAppFluxoView } from '../frontend/src/components/AdminWhatsAppFluxoView';
-import { ThomasWhatsAppDesktopView } from '../frontend/src/components/ThomasWhatsAppDesktopView';
+import { AdminWhatsAppFluxoView } from '../apps/web/src/components/AdminWhatsAppFluxoView';
+import { ThomasWhatsAppDesktopView } from '../apps/web/src/components/ThomasWhatsAppDesktopView';
 
 let falhas = 0;
 function checar(nome: string, cond: boolean, detalhe?: string) {

@@ -44,7 +44,7 @@ const rel = (p) => relative(RAIZ, p).split(sep).join('/');
 // ---------- 1. Fronteiras (sem baseline: violação é falha direta) ----------
 const importacoes = (texto) => [...texto.matchAll(/(?:import|export)[^'"]*?from\s+['"]([^'"]+)['"]|import\s+['"]([^'"]+)['"]|import\(\s*['"]([^'"]+)['"]\s*\)/g)].map((m) => m[1] || m[2] || m[3]);
 
-const FRONT = arquivos(join(RAIZ, 'frontend', 'src'));
+const FRONT = arquivos(join(RAIZ, 'apps', 'web', 'src'));
 const SHARED = arquivos(join(RAIZ, 'shared'));
 
 const violFront = [];
@@ -60,7 +60,7 @@ for (const f of FRONT) {
 const violShared = [];
 for (const f of SHARED) {
   for (const imp of importacoes(readFileSync(f, 'utf8'))) {
-    if (/(^|\/)frontend\//.test(imp) || /(^|\/)server(\.ts|\.js)?$/.test(imp)) violShared.push(`${rel(f)} -> ${imp}`);
+    if (/(^|\/)(frontend|apps\/web)\//.test(imp) || /(^|\/)server(\.ts|\.js)?$/.test(imp)) violShared.push(`${rel(f)} -> ${imp}`);
   }
 }
 (violShared.length ? falhas : oks).push(
@@ -74,13 +74,13 @@ const medidas = {
   any_em_contratos: contar(contratos, /\bany\b/g),
   unknown_em_contratos: contar(contratos, /\bunknown\b/g),
   as_any_no_front: contar(FRONT, /\bas any\b/g),
-  linhas_server_ts: readFileSync(join(RAIZ, 'server.ts'), 'utf8').split('\n').length,
+  linhas_server_ts: readFileSync(join(RAIZ, 'apps', 'api', 'server.ts'), 'utf8').split('\n').length,
 };
 
 const descricaoMedida = {
   any_em_contratos: 'any em shared/contracts (objetivo: 0)',
   unknown_em_contratos: 'unknown em shared/contracts (diminuir até só sobrar o que é de propósito)',
-  as_any_no_front: 'as any em frontend/src (diminuir)',
+  as_any_no_front: 'as any em apps/web/src (diminuir)',
   linhas_server_ts: 'linhas de server.ts (diminuir a cada módulo extraído)',
 };
 
@@ -115,7 +115,7 @@ function rodar(titulo, cmd) {
 }
 if (!args.has('--rapido')) {
   rodar('tsc (raiz)', 'npx tsc --noEmit');
-  rodar('tsc (front)', 'npx tsc --noEmit -p frontend');
+  rodar('tsc (front)', 'npx tsc --noEmit -p apps/web');
 }
 if (args.has('--com-testes')) rodar('testes unitários', 'npm test');
 

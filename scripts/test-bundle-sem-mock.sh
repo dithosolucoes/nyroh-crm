@@ -4,7 +4,7 @@
 # (2) produção COM USE_MOCK_API=true => 0 (produção recusa o mock);
 # (3) desenvolvimento COM flag => >=1 (controle: o marcador aparece quando o mock está ligado).
 set -e
-cd "$(dirname "$0")/../frontend"
+cd "$(dirname "$0")/../apps/web"
 MARCA='MARCADOR-DADOS-FALSOS-NYROH'
 contar() { grep -rl "$MARCA" "$1" 2>/dev/null | wc -l; }
 falhas=0

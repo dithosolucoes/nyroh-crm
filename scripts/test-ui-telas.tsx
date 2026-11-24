@@ -5,10 +5,10 @@
  */
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ThomasWhatsAppDesktopView } from '../frontend/src/components/ThomasWhatsAppDesktopView';
-import { KanbanBoard } from '../frontend/src/components/KanbanBoard';
-import { AllLeadsTable } from '../frontend/src/components/AllLeadsTable';
-import { AdminCampaignDisparosView } from '../frontend/src/components/AdminCampaignDisparosView';
+import { ThomasWhatsAppDesktopView } from '../apps/web/src/components/ThomasWhatsAppDesktopView';
+import { KanbanBoard } from '../apps/web/src/components/KanbanBoard';
+import { AllLeadsTable } from '../apps/web/src/components/AllLeadsTable';
+import { AdminCampaignDisparosView } from '../apps/web/src/components/AdminCampaignDisparosView';
 
 let falhas = 0;
 function checar(nome: string, cond: boolean, detalhe?: string) {

@@ -4,8 +4,8 @@ import path from 'path';
 import {defineConfig} from 'vite';
 import { isMockApiAllowed } from './src/api/client';
 
-// Front-end isolado: a raiz do Vite é esta pasta (frontend/).
-// Código compartilhado com o backend fica em ../shared e é importado como @shared/...
+// Front-end isolado (workspace apps/web): a raiz do Vite é esta pasta.
+// Código compartilhado com o backend fica em ../../shared e é importado como @shared/...
 export default defineConfig(({ mode }) => {
   return {
     root: __dirname,
@@ -21,12 +21,12 @@ export default defineConfig(({ mode }) => {
     resolve: {
       alias: {
         '@': path.resolve(__dirname, 'src'),
-        '@shared': path.resolve(__dirname, '../shared'),
+        '@shared': path.resolve(__dirname, '../../shared'),
       },
     },
     build: {
       // Saída continua em dist/ na raiz, como o servidor espera.
-      outDir: path.resolve(__dirname, '../dist'),
+      outDir: path.resolve(__dirname, '../../dist'),
       emptyOutDir: true,
     },
     server: {

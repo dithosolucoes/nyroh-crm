@@ -1,0 +1,6 @@
+{
+  "name": "nyroh-api",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Servidor do CRM NYROH (Express). Código compartilhado fica em ../../shared e ../../server."
+}
