@@ -4496,7 +4496,7 @@ async function processIncomingWhatsAppMessage(params: {
   // palavra "pare" de verdade ("remover" não dispara dentro de "removeram", etc.).
   // Opt-out: palavras vêm só das automações ativas no JSON (gatilho "pediu para parar").
   const regrasParaParar = await carregarRegrasAutomacoes().catch(() => []);
-  const isOptOut = Boolean(params.optOutPorBotao) || pedidoDePararPelasRegras(String(effectiveText || ''), regrasParaParar);
+  const isOptOut = params.optOutPorBotao ?? pedidoDePararPelasRegras(String(effectiveText || ''), regrasParaParar);
   // Palavra de alerta: também só do JSON (gatilho "cliente_ameacou"). Usada só pela automação.
   const isAlerta = pedidoDeAlertaPelasRegras(String(effectiveText || ''), regrasParaParar);
 
@@ -4511,7 +4511,7 @@ async function processIncomingWhatsAppMessage(params: {
     { carregarRegras: carregarRegrasAutomacoes, gravarFila: gravarFilaAutomacoes }
   ).catch((e: any) => console.warn('[AUTOMACOES] não agendei a resposta:', e?.message));
 
-  if (isOptOut && matched) await confirmarDescadastroSeLigada({ telefone: cleanPhone, enviarTexto: (t, x) => enviarTextoFluxo(t, x, { apiKey: (memoryFluxoConfig.apiKey || process.env.FLUXO_KEY || '').trim(), apiSecret: (memoryFluxoConfig.apiSecret || process.env.FLUXO_SECRET || '').trim(), instanceId: memoryFluxoConfig.instanceId || process.env.FLUXO_INSTANCE_ID || '' }) }).catch((e: any) => console.warn('[descadastro] confirmação não enviada:', e?.message)); // item 3.2, desligado por padrão
+  if (isOptOut && targetId) await confirmarDescadastroSeLigada({ telefone: cleanPhone, enviarTexto: (t, x) => enviarTextoFluxo(t, x, { apiKey: (memoryFluxoConfig.apiKey || process.env.FLUXO_KEY || '').trim(), apiSecret: (memoryFluxoConfig.apiSecret || process.env.FLUXO_SECRET || '').trim(), instanceId: memoryFluxoConfig.instanceId || process.env.FLUXO_INSTANCE_ID || '' }) }).catch((e: any) => console.warn('[descadastro] confirmação não enviada:', e?.message)); // item 3.2, desligado por padrão
   // FASE 2: quem pediu descadastro recebe a tag "Sem interesse" (atrás de flag, desligada por padrão).
   if (isOptOut && matched && process.env.NYROH_TAG_SEM_INTERESSE === 'true') {
     const taggedLead = memoryLeadsMap.get(matched.id);

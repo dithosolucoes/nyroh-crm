@@ -55,12 +55,13 @@ export function idsDescadastroBotao(valor: string | undefined | null): string[] 
 }
 
 /**
- * Item 3.1 c: o webhook marca o evento como descadastro quando é um clique de botão com reply.id
- * configurado. Desligado (retorna false) sem NYROH_DESCADASTRO_POR_BOTAO=true.
+ * Item 3.1 c: com NYROH_DESCADASTRO_POR_BOTAO=true, um clique de botão (interactive|button) vira
+ * descadastro só pelo reply.id configurado: true (é descadastro) ou false (não é, e o texto do botão
+ * não conta). Sem a flag, ou para outros tipos de mensagem, devolve undefined: segue a regra antiga.
  */
-export function optOutPorBotaoDoWebhook(kind: string, reply: RespostaBotao | undefined, ambiente: NodeJS.ProcessEnv = process.env): boolean {
-  if (!flagLigada(ambiente.NYROH_DESCADASTRO_POR_BOTAO)) return false;
-  if (kind !== 'interactive' && kind !== 'button') return false;
+export function optOutPorBotaoDoWebhook(kind: string, reply: RespostaBotao | undefined, ambiente: NodeJS.ProcessEnv = process.env): boolean | undefined {
+  if (!flagLigada(ambiente.NYROH_DESCADASTRO_POR_BOTAO)) return undefined;
+  if (kind !== 'interactive' && kind !== 'button') return undefined;
   return ehCliqueDescadastro(reply, idsDescadastroBotao(ambiente.NYROH_DESCADASTRO_BOTAO_IDS));
 }
 

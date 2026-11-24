@@ -26,6 +26,7 @@
     "test:config": "tsx scripts/test-config-obrigatoria.ts",
     "test:descadastro": "tsx scripts/test-descadastro.ts",
     "test:confirmacao-descadastro": "tsx scripts/test-confirmacao-descadastro.ts",
+    "test:e2e-descadastro": "tsx scripts/e2e-descadastro.ts",
     "test:recuperacao": "tsx scripts/test-recuperacao-fixos.ts",
     "verificar:arquitetura": "node scripts/verificar-arquitetura.mjs",
     "verificar:arquitetura:baseline": "node scripts/verificar-arquitetura.mjs --atualizar-baseline",

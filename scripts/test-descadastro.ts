@@ -4,7 +4,7 @@
  */
 import assert from 'node:assert/strict';
 import { pedidoDePararPelasRegras } from '../shared/lib/automacoesExecucao';
-import { AUTOMACAO_PARAR_PADRAO, PALAVRAS_PARAR_FIXAS, ehCliqueDescadastro, idsDescadastroBotao } from '../shared/lib/descadastroPadrao';
+import { AUTOMACAO_PARAR_PADRAO, PALAVRAS_PARAR_FIXAS, ehCliqueDescadastro, idsDescadastroBotao, optOutPorBotaoDoWebhook } from '../shared/lib/descadastroPadrao';
 import { validarAutomacao } from '../shared/lib/automacoes';
 
 let falhas = 0;
@@ -89,6 +89,21 @@ test('ids de botão vêm de lista separada por vírgula, vazia por padrão', () 
   assert.deepEqual(idsDescadastroBotao(undefined), []);
   assert.deepEqual(idsDescadastroBotao(''), []);
   assert.deepEqual(idsDescadastroBotao(' parar_1 , parar_2 ,, '), ['parar_1', 'parar_2']);
+});
+
+test('regra do webhook: com a flag desligada, não decide (undefined) e segue a regra antiga', () => {
+  assert.equal(optOutPorBotaoDoWebhook('interactive', { id: 'parar_1' }, { NYROH_DESCADASTRO_BOTAO_IDS: 'parar_1' } as any), undefined);
+});
+
+test('regra do webhook: flag ligada, clique com id configurado é descadastro; id desconhecido não é', () => {
+  const amb = { NYROH_DESCADASTRO_POR_BOTAO: 'true', NYROH_DESCADASTRO_BOTAO_IDS: 'parar_1' } as any;
+  assert.equal(optOutPorBotaoDoWebhook('interactive', { id: 'parar_1' }, amb), true);
+  assert.equal(optOutPorBotaoDoWebhook('button', { id: 'outro', title: 'Parar Mensagens' }, amb), false);
+});
+
+test('regra do webhook: flag ligada, mensagem que não é clique não decide', () => {
+  const amb = { NYROH_DESCADASTRO_POR_BOTAO: 'true', NYROH_DESCADASTRO_BOTAO_IDS: 'parar_1' } as any;
+  assert.equal(optOutPorBotaoDoWebhook('text', { id: 'parar_1' }, amb), undefined);
 });
 
 console.log('');
