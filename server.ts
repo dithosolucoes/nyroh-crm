@@ -29,6 +29,7 @@ import { configurarFluxoMeta, registrarFluxoMeta } from './shared/lib/rotas/flux
 import { configurarAuth, registrarAuth } from './shared/lib/rotas/auth.js';
 import { configurarLeadsRestantes, registrarLeadsRestantes } from './shared/lib/rotas/leadsRestantes.js';
 import { configurarDemais, registrarDemais } from './shared/lib/rotas/demais.js';
+import { configurarVisitasSite, registrarVisitasSite } from './shared/lib/rotas/visitasSite.js';
 import { ESQUEMA_BASE } from './shared/lib/esquemaBase.js';
 import { VIEWS_COMPATIBILIDADE } from './shared/lib/esquemaViews.js';
 import { NOTAS_E_RESOLVIDA } from './shared/lib/esquemaNotas.js';
@@ -148,20 +149,7 @@ app.get('/health', (req, res) => {
   res.status(200).send('OK');
 });
 
-// Link de rastreio por lead: o CRM registra o clique e redireciona para o site do cliente.
-const TRACKING_BASE_URL = (process.env.PUBLIC_APP_URL || 'https://nyroh-crm-production-fedd.up.railway.app').replace(/\/$/, '');
-async function trackedLinkFor(leadId: string, targetUrl: string): Promise<string> {
-  const destino = String(targetUrl || '').trim();
-  if (!destino || !/^https?:\/\//i.test(destino) || !usePostgres || !pgPool) return destino;
-  try {
-    const token = crypto.randomBytes(9).toString('base64url');
-    await pgPool.query('INSERT INTO link_clicks (token, lead_id, target_url) VALUES ($1, $2, $3)', [token, leadId, destino]);
-    return `${TRACKING_BASE_URL}/r/${token}`;
-  } catch (err) {
-    console.warn('[Rastreio] não consegui criar o link de rastreio; usando o link direto.', err);
-    return destino;
-  }
-}
+import { configurarRastreioLinks, trackedLinkFor } from './shared/lib/rotas/rastreioLinks.js';
 
 app.get('/r/:token', async (req: any, res) => {
   const token = String(req.params.token || '').replace(/[^A-Za-z0-9_-]/g, '');
@@ -1526,6 +1514,18 @@ const SIMULATOR_PATHS = [
   '/api/admin/fluxo/events/simulate',
   '/simulate-reply'
 ];
+
+// Visitas aos sites hospedados: rota com chave secreta, fica antes do guarda de sessão do /api.
+configurarRastreioLinks({
+    get pgPool() { return pgPool; },
+    get usePostgres() { return usePostgres; },
+});
+configurarVisitasSite({
+    env: process.env,
+    get pgPool() { return pgPool; },
+    get usePostgres() { return usePostgres; },
+});
+registrarVisitasSite(app);
 
 // Em produção, nenhuma gravação passa sem banco (vale para todo /api, não só webhooks).
 app.use('/api', (req: any, res, next) => {

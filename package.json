@@ -34,6 +34,7 @@
     "test:migracoes": "tsx scripts/test-migracoes.ts",
     "test:esquema": "tsx scripts/test-esquema-base.ts",
     "test:fila-envio": "tsx scripts/test-fila-envio.ts",
+    "test:visita-site": "tsx scripts/test-visita-site.ts",
     "test:ui-disparos": "bash scripts/run-ui-disparos.sh",
     "test:ui-whatsapp": "bash scripts/run-ui-whatsapp.sh",
     "test:ui-telas": "bash scripts/run-ui-telas.sh",
