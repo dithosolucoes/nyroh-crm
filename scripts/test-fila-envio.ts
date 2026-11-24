@@ -112,27 +112,29 @@ function testeD() {
 }
 
 async function testeC() {
-  console.log('\n[c] Fila Redis (BullMQ) com atrasos de ritmo, Redis de teste');
+  console.log('\n[c] Adaptador Redis (BullMQ) de verdade, num Redis de teste local');
   const url = process.env.REDIS_TEST_URL || 'redis://127.0.0.1:6390';
-  const nomeFila = `teste-fila-envio-${Date.now()}`;
-  const fila = new Queue(nomeFila, { connection: { url } as any });
+  if (!/127\.0\.0\.1|localhost/.test(url)) { checar('Redis de teste é local (não rodar contra produção)', false, url); return; }
+  // O módulo da fila lê REDIS_URL ao carregar: aponta para o Redis de teste ANTES de importar.
+  process.env.REDIS_URL = url;
+  const rq = await import('../server/redisQueue.js');
+  const leitor = new Queue('campaign-dispatch-queue', { connection: { url } as any });
   try {
-    await fila.waitUntilReady();
-    const jobs = [0, 1, 2, 3].map(i => ({
-      name: 'campaign-message-send',
-      data: { n: i },
-      opts: { delay: delayForIndex(i, 0.8) },
-    }));
-    await fila.addBulk(jobs);
-    const todos = await fila.getJobs(['waiting', 'delayed']);
-    checar('4 jobs enfileirados', todos.length === 4, String(todos.length));
-    const porIndice = todos.sort((a, b) => a.data.n - b.data.n).map(j => j.opts.delay ?? 0);
-    checar('atrasos gravados = 0, 1250, 2500, 3750 (o job 0 vai direto para a espera)', JSON.stringify(porIndice) === '[0,1250,2500,3750]', JSON.stringify(porIndice));
+    await leitor.waitUntilReady();
+    await leitor.obliterate({ force: true });
+    const jobs = [0, 1, 2, 3].map(i => ({ campaignId: 'C-TESTE', leadId: 'L' + i, phone: '5511900000' + i, batchId: 'B-TESTE' }));
+    const r = await rq.enqueueCampaignDispatchBatch(jobs as any, 5);
+    checar('adaptador Redis enfileirou os 4 disparos', r.enqueued === 4, String(r.enqueued));
+    checar('pedido de 5/s limitado a 0,8/s (48/min) e sinalizado', Math.abs(r.speed - 0.8) < 1e-9 && r.cappedByPlan === true, JSON.stringify(r));
+    const todos = await leitor.getJobs(['waiting', 'delayed']);
+    checar('4 jobs na fila campaign-dispatch-queue', todos.length === 4, String(todos.length));
+    const atrasos = todos.sort((x, y) => x.data.jobIndex - y.data.jobIndex).map(j => j.opts.delay ?? 0);
+    checar('atrasos gravados = 0, 1250, 2500, 3750', JSON.stringify(atrasos) === '[0,1250,2500,3750]', JSON.stringify(atrasos));
   } catch (e: any) {
     checar('Redis de teste respondeu', false, e?.message || String(e));
   } finally {
-    await fila.obliterate({ force: true }).catch(() => {});
-    await fila.close().catch(() => {});
+    await leitor.obliterate({ force: true }).catch(() => {});
+    await leitor.close().catch(() => {});
   }
 }
 
