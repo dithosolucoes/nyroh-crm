@@ -25,8 +25,8 @@ export default defineConfig(({ mode }) => {
       },
     },
     build: {
-      // Saída continua em dist/ na raiz, como o servidor espera.
-      outDir: path.resolve(__dirname, '../../dist'),
+      // Saída própria do front: apps/web/dist. O servidor serve essa pasta (com fallback para dist/).
+      outDir: path.resolve(__dirname, 'dist'),
       emptyOutDir: true,
     },
     server: {

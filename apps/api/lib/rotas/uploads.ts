@@ -7,7 +7,7 @@
 import type { Express } from 'express';
 import fs from 'fs';
 import JSZip from 'jszip';
-import type { ProgressoImportacao, RespostaApagarZip, RespostaApagarZipsEmLote, RespostaImportacaoIniciada, RespostaImportacaoZipDireta, RespostaListaUploads, RespostaUploadZipOk, RespostaZipEnfileirado, UploadZipRegistro } from '../../contracts/rotas.js';
+import type { ProgressoImportacao, RespostaApagarZip, RespostaApagarZipsEmLote, RespostaImportacaoIniciada, RespostaImportacaoZipDireta, RespostaListaUploads, RespostaUploadZipOk, RespostaZipEnfileirado, UploadZipRegistro } from '../../../../shared/contracts/rotas.js';
 import { SQL_INSERT_CAMPAIGN_BATCHES, SQL_INSERT_CAMPAIGN_BATCHES_2, SQL_SELECT_CAMPAIGN_LEADS, SQL_UPDATE_CAMPAIGN_BATCHES, SQL_INSERT_ZIP_UPLOADS, SQL_SELECT_ZIP_UPLOADS, SQL_SELECT_ZIP_UPLOADS_2, SQL_SELECT_ZIP_UPLOADS_3, SQL_DELETE_CAMPAIGN_LEADS, SQL_DELETE_ZIP_UPLOADS, SQL_DELETE_CAMPAIGN_BATCHES, SQL_DELETE_ZIP_UPLOADS_2, SQL_SELECT_ZIP_UPLOADS_4, SQL_SELECT_CAMPAIGN_LEADS_2, SQL_SELECT_ZIP_UPLOADS_5, SQL_DELETE_CAMPAIGN_LEADS_2, SQL_DELETE_CAMPAIGN_BATCHES_2, SQL_DELETE_ZIP_UPLOADS_3 } from './repo/uploads.js';
 
 export interface DependenciasUploads {

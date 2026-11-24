@@ -11,10 +11,10 @@ import {
   delayForIndex,
   estimateSeconds,
   FluxoRateLimitedError
-} from '../shared/lib/dispatchRate.js';
+} from '../apps/api/lib/dispatchRate.js';
 import type { ProgressoLote } from '../shared/contracts/rotas.js';
-import { executarLoteEmMemoria } from '../shared/lib/filaEnvioMemoria.js';
-import { modoFilaEnvio, escolherAdaptadorFila } from '../shared/lib/filaEnvio.js';
+import { executarLoteEmMemoria } from '../apps/api/lib/filaEnvioMemoria.js';
+import { modoFilaEnvio, escolherAdaptadorFila } from '../apps/api/lib/filaEnvio.js';
 
 // ============================================================================
 // REDIS CONNECTION & CLIENT FACTORY
@@ -665,7 +665,7 @@ export async function enqueueCampaignDispatchBatch(
     }
   }
 
-  // Fallback assíncrono em memória com throttle exato (esteira extraída em shared/lib/filaEnvioMemoria.ts)
+  // Fallback assíncrono em memória com throttle exato (esteira extraída em apps/api/lib/filaEnvioMemoria.ts)
   setImmediate(() => {
     executarLoteEmMemoria(jobs, {
       velocidade: safeSpeed,

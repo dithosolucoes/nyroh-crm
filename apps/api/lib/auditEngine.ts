@@ -1,4 +1,4 @@
-import { WebsiteAuditReport, AuditCheckItem } from '../types/audit.js';
+import { WebsiteAuditReport, AuditCheckItem } from '../../../shared/types/audit.js';
 
 /**
  * Normaliza e sanitiza a URL fornecida

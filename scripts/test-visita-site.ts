@@ -10,8 +10,8 @@ import {
   chaveConfere,
   linkDiretoLigado,
   normalizarSite,
-} from '../shared/lib/visitaSite';
-import { configurarVisitasSite, registrarVisitasSite } from '../shared/lib/rotas/visitasSite';
+} from '../apps/api/lib/visitaSite';
+import { configurarVisitasSite, registrarVisitasSite } from '../apps/api/lib/rotas/visitasSite';
 
 let falhas = 0;
 async function test(nome: string, fn: () => void | Promise<void>) {

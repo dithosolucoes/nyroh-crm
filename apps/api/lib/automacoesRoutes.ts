@@ -1,6 +1,6 @@
 import { aplicarMigracoesArquivo, MIGRACOES_AUTOMACOES_RESPOSTAS, MIGRACOES_AUTOMACOES_ESTADO, MIGRACOES_AUTOMACOES_FILA } from './migracoesArquivos.js';
 import { randomUUID } from 'crypto';
-import type { RespostaListaAutomacoes, RespostaAutomacaoSalva, RespostaExecucoesAutomacao, RespostaFilaAutomacao, RespostaRevisaoAutomacao, RespostaConfiguracaoAutomacao, RespostaPausaGeral, RespostaEnvioAutomacao, RespostaRemocaoAutomacao } from '../contracts/rotas.js';
+import type { RespostaListaAutomacoes, RespostaAutomacaoSalva, RespostaExecucoesAutomacao, RespostaFilaAutomacao, RespostaRevisaoAutomacao, RespostaConfiguracaoAutomacao, RespostaPausaGeral, RespostaEnvioAutomacao, RespostaRemocaoAutomacao } from '../../../shared/contracts/rotas.js';
 /**
  * Rotas de persistência das automações de resposta (só admin).
  *
@@ -14,11 +14,11 @@ import type { Express, Request, Response } from 'express';
 import type pg from 'pg';
 import { flagLigada } from './flagLigada';
 import { garantirAutomacaoPararPadrao } from './automacaoPararPadrao.js';
-import { validarAutomacao, type Automacao } from './automacoes';
+import { validarAutomacao, type Automacao } from '../../../shared/lib/automacoes';
 import { processarVencidos } from './automacoesWorker';
 import { criarExecutorAcoes, camposDoLead, tabelaExiste } from './automacoesExecutores';
 import { registrarEventoGeral } from './automacoesExecucao';
-import { proximaOcorrencia } from './automacoesEstado';
+import { proximaOcorrencia } from '../../../shared/lib/automacoesEstado';
 import type { ItemFila } from './automacoesExecucao';
 import type { RegistroAutomacao } from './automacoesExecucao';
 
@@ -91,7 +91,7 @@ export async function dispararAgendas(pool: pg.Pool, agora: Date, deps: { carreg
   return disparos;
 }
 import { pausaGeralAtiva, aplicarVersao } from './automacoesLimites';
-import { ENVIO_PADRAO, LIMITE_ENVIO_DIA_MAX, normalizarEnvio, somenteDigitos, type ConfigEnvio } from './automacoesEnvio';
+import { ENVIO_PADRAO, LIMITE_ENVIO_DIA_MAX, normalizarEnvio, somenteDigitos, type ConfigEnvio } from '../../../shared/lib/automacoesEnvio';
 
 interface AutomacoesDeps {
   getPool: () => pg.Pool | null;

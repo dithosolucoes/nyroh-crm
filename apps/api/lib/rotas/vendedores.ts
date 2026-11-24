@@ -4,8 +4,8 @@
 import type { Express } from 'express';
 
 import { hashPassword, isUserAdmin } from '../serverAuth.js';
-import type { CustomTag, QuickReply, Salesperson } from '../../types.js';
-import type { RespostaDistribuicaoRoleta, RespostaEtiquetaSalva, RespostaListaEtiquetas, RespostaListaRespostasRapidas, RespostaListaVendedores, RespostaLoteVendedores, RespostaOk, RespostaRespostaRapidaCriada, RespostaRespostaRapidaExcluida, RespostaRoletaConfig, RespostaSenhaVendedor, RespostaSucesso, RespostaVendedorAtualizado, RespostaVendedorCriado, RespostaVendedorStatus, RequisicaoDistribuicaoRoleta } from '../../contracts/rotas.js';
+import type { CustomTag, QuickReply, Salesperson } from '../../../../shared/types.js';
+import type { RespostaDistribuicaoRoleta, RespostaEtiquetaSalva, RespostaListaEtiquetas, RespostaListaRespostasRapidas, RespostaListaVendedores, RespostaLoteVendedores, RespostaOk, RespostaRespostaRapidaCriada, RespostaRespostaRapidaExcluida, RespostaRoletaConfig, RespostaSenhaVendedor, RespostaSucesso, RespostaVendedorAtualizado, RespostaVendedorCriado, RespostaVendedorStatus, RequisicaoDistribuicaoRoleta } from '../../../../shared/contracts/rotas.js';
 import { SQL_SELECT_CUSTOM_TAGS, SQL_INSERT_CUSTOM_TAGS, SQL_DELETE_CUSTOM_TAGS, SQL_SELECT_CALLS, SQL_INSERT_SALESPEOPLE, SQL_INSERT_USERS, SQL_INSERT_SALESPEOPLE_2, SQL_INSERT_USERS_2, SQL_UPDATE_SALESPEOPLE, SQL_UPDATE_LEADS, SQL_UPDATE_USERS, SQL_UPDATE_USERS_2, SQL_SELECT_SALESPEOPLE, SQL_SELECT_USERS, SQL_UPDATE_USERS_3, SQL_INSERT_USERS_3, SQL_UPDATE_SALESPEOPLE_2, SQL_UPDATE_USERS_4, SQL_UPDATE_SALESPEOPLE_3, SQL_UPDATE_SALESPEOPLE_4, SQL_UPDATE_LEADS_2, SQL_DELETE_USERS, SQL_DELETE_SALESPEOPLE, SQL_UPDATE_SALESPEOPLE_5, SQL_UPDATE_SALESPEOPLE_6, SQL_SELECT_LEADS, SQL_SELECT_QUICK_REPLIES, SQL_INSERT_QUICK_REPLIES, SQL_DELETE_QUICK_REPLIES } from './repo/vendedores.js';
 export interface DependenciasVendedores {
   readonly MIN_PASSWORD_LENGTH: number;

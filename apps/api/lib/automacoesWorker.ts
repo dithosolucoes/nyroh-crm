@@ -10,11 +10,11 @@
  *    se faltar algum dado do lead, cancela o passo e registra o motivo;
  *  - outras ações (opt-out, pausar, revisão...): registradas, sem aplicar nada nesta etapa.
  */
-import { resolveLeadTokens, type LeadTokenContext } from './leadTokens';
+import { resolveLeadTokens, type LeadTokenContext } from '../../../shared/lib/leadTokens';
 import type { ItemFila } from './automacoesExecucao';
-import { ENVIO_PADRAO, decidirEnvio, type ConfigEnvio } from './automacoesEnvio';
+import { ENVIO_PADRAO, decidirEnvio, type ConfigEnvio } from '../../../shared/lib/automacoesEnvio';
 import { dentroDosLimites, registroAuditoria, type LimitesLead, type RegistroAuditoria } from './automacoesLimites';
-import { avaliarCondicoes, type EventoLead, type ContextoAvaliacao } from './automacoesEstado';
+import { avaliarCondicoes, type EventoLead, type ContextoAvaliacao } from '../../../shared/lib/automacoesEstado';
 
 export interface ContextoLeadWorker extends LeadTokenContext {
   /** Lead que pediu para não receber mensagens. Lido de novo antes de cada passo. */

@@ -20,7 +20,7 @@ import type {
   RespostaDecisaoBloqueio, RespostaListaSelecoesCentral, RespostaAnaliseCentral,
   RespostaMarcaCriada, RespostaNumeroCriado, RespostaRegraCriada, RespostaRemessaCriada,
   RespostaSelecaoCriada, RespostaPedidoBloqueioCriado, RespostaSafraCriadaUx
-} from '../contracts/rotas.js';
+} from '../../../shared/contracts/rotas.js';
 
 export const TAMANHOS_BLOCO = [20, 50, 100, 300, 500, 1000, 5000, 10000, 50000, 100000] as const;
 

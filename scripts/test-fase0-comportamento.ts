@@ -9,7 +9,7 @@
  */
 import assert from 'node:assert/strict';
 import { detectOptOut, sanitizeTemplateVariable } from '../shared/lib/leadIntent';
-import { dispatchRpm, maxDispatchPerSecond } from '../shared/lib/dispatchRate';
+import { dispatchRpm, maxDispatchPerSecond } from '../apps/api/lib/dispatchRate';
 
 let passed = 0;
 let failed = 0;

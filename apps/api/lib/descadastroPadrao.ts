@@ -6,7 +6,7 @@
  *   Automações, pode ser editada (palavras extras), e faz o descadastro pela ação
  *   "marcar opt-out" (nenhum envio futuro).
  */
-import type { Automacao } from './automacoes';
+import type { Automacao } from '../../../shared/lib/automacoes';
 import { flagLigada } from './flagLigada.js';
 
 export const PALAVRAS_PARAR_FIXAS: readonly string[] = [

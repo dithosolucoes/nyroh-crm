@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { User, AuditLog } from '../types';
+import { User, AuditLog } from '../../../shared/types';
 
 export interface StoredUser extends User {
   passwordHash: string;

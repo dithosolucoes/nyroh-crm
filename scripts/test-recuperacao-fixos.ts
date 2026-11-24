@@ -3,7 +3,7 @@
  * Rodar: npm run test:recuperacao
  */
 import assert from 'node:assert/strict';
-import { recuperarFixosDescartados } from '../shared/lib/recuperacaoFixos';
+import { recuperarFixosDescartados } from '../apps/api/lib/recuperacaoFixos';
 
 let falhas = 0;
 function test(nome: string, fn: () => void) {

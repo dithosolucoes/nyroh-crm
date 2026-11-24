@@ -3,15 +3,15 @@
  */
 import type { Express } from 'express';
 
-import { TOKEN_NAMES, normalizeFieldKey } from '../leadTokens.js';
-import { buildLeadVariables } from '../templateCopy.js';
+import { TOKEN_NAMES, normalizeFieldKey } from '../../../../shared/lib/leadTokens.js';
+import { buildLeadVariables } from '../../../../shared/lib/templateCopy.js';
 import { dispatchRpm, effectiveSpeedPerSecond, maxDispatchPerSecond, planRpm } from '../dispatchRate.js';
 import { distributionByCount } from '../distribution.js';
 import { fluxoInstancePath } from '../fluxoClient.js';
 import { validarInstanciaEscolhida } from '../dispatchInstancia.js';
 import { regrasDeContatoSql, uxSchemaOn } from '../uxRoutes.js';
-import type { Lead } from '../../types.js';
-import type { LoteCampanha, ProgressoLote, RespostaAcaoLote, RespostaAcaoSimulada, RespostaAlteracaoVelocidade, RespostaCancelamentoLote, RespostaCopiaRemovida, RespostaCopiaSalva, RespostaDevolucaoLeads, RespostaDisparo, RespostaDistribuicaoCampanha, RespostaLiberacaoQuarentena, RespostaListaCopias, RespostaListaLotes, RespostaResetSafra, RespostaRetornoQuarentena, RespostaSincronizacaoWhatsApp, RespostaSucesso, RespostaVelocidadeDisparo } from '../../contracts/rotas.js';
+import type { Lead } from '../../../../shared/types.js';
+import type { LoteCampanha, ProgressoLote, RespostaAcaoLote, RespostaAcaoSimulada, RespostaAlteracaoVelocidade, RespostaCancelamentoLote, RespostaCopiaRemovida, RespostaCopiaSalva, RespostaDevolucaoLeads, RespostaDisparo, RespostaDistribuicaoCampanha, RespostaLiberacaoQuarentena, RespostaListaCopias, RespostaListaLotes, RespostaResetSafra, RespostaRetornoQuarentena, RespostaSincronizacaoWhatsApp, RespostaSucesso, RespostaVelocidadeDisparo } from '../../../../shared/contracts/rotas.js';
 import { SQL_SELECT_CAMPAIGN_LEADS, SQL_INSERT_CAMPAIGN_BATCHES, SQL_SELECT_CAMPAIGN_COPY_TEMPLATES, SQL_INSERT_CAMPAIGN_COPY_TEMPLATES, SQL_SELECT_CAMPAIGN_COPY_TEMPLATES_2, SQL_INSERT_CAMPAIGN_COPY_TEMPLATES_2, SQL_SELECT_CAMPAIGN_COPY_TEMPLATES_3, SQL_UPDATE_CAMPAIGN_COPY_TEMPLATES, SQL_SELECT_CAMPAIGN_COPY_TEMPLATES_4, SQL_DELETE_CAMPAIGN_COPY_TEMPLATES, SQL_SELECT_SALESPEOPLE, SQL_UPDATE_CAMPAIGN_BATCHES, SQL_UPDATE_CAMPAIGN_LEADS, SQL_UPDATE_CAMPAIGN_LEADS_2, SQL_INSERT_LEADS, SQL_UPDATE_CAMPAIGN_LEADS_3, SQL_UPDATE_CAMPAIGN_LEADS_4, SQL_INSERT_LEADS_2, SQL_UPDATE_CAMPAIGN_LEADS_5, SQL_UPDATE_CAMPAIGN_LEADS_6, SQL_UPDATE_CAMPAIGN_BATCHES_2, SQL_UPDATE_CAMPAIGN_BATCHES_3, SQL_SELECT_CAMPAIGN_LEADS_2, SQL_UPDATE_CAMPAIGN_LEADS_7, SQL_UPDATE_CAMPAIGN_BATCHES_4, SQL_UPDATE_CAMPAIGN_LEADS_8, SQL_UPDATE_CAMPAIGN_BATCHES_5, SQL_SELECT_CAMPAIGN_LEADS_3, SQL_UPDATE_CAMPAIGN_LEADS_9, SQL_UPDATE_CAMPAIGN_LEADS_10, SQL_UPDATE_CAMPAIGN_LEADS_11, SQL_UPDATE_CAMPAIGN_BATCHES_6, SQL_SELECT_CAMPAIGN_LEADS_4, SQL_DELETE_CAMPAIGN_LEADS, SQL_DELETE_ZIP_UPLOADS, SQL_DELETE_CAMPAIGN_BATCHES } from './repo/disparos.js';
 type StoredCampaignBatch = any;
 type StoredCampaignCopyTemplate = any;

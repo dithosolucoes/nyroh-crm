@@ -13,58 +13,57 @@ import JSZip from 'jszip';
 import pg from 'pg';
 import { Lead, CallLog, ColumnStatus, PIPELINE_COLUMNS, CustomTag, Salesperson, DistributeLeadsParams, User, AuditLog, QuickReply } from '../../shared/types.js';
 import { getLeadNiche } from '../../shared/lib/niche.js';
-import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regrasDeContatoSql, instanciaDaSafra } from '../../shared/lib/uxRoutes.js';
-import { validarInstanciaEscolhida, escolherInstanciaDisparo } from '../../shared/lib/dispatchInstancia.js';
-import { recuperarFixosDescartados } from '../../shared/lib/recuperacaoFixos.js';
-import { variaveisFaltando, mensagemFaltando } from '../../shared/lib/configObrigatoria.js';
-import { aplicarMigracoes } from '../../shared/lib/migracoes.js';
-import { optOutPorBotaoDoWebhook, confirmarDescadastroSeLigada, enviarTextoFluxo } from '../../shared/lib/descadastroPadrao.js';
-import { configurarRotasWebhooks, registrarRotasWebhooks, processWebhookEventAsync, instanceHealth } from '../../shared/lib/rotas/webhooks.js';
-import { configurarRotasUploads, registrarRotasUploads } from '../../shared/lib/rotas/uploads.js';
-import { configurarLeads, registrarLeads } from '../../shared/lib/rotas/leads.js';
-import { configurarDisparos, registrarDisparos } from '../../shared/lib/rotas/disparos.js';
-import { configurarConversas, registrarConversas } from '../../shared/lib/rotas/conversas.js';
-import { configurarVendedores, registrarVendedores } from '../../shared/lib/rotas/vendedores.js';
-import { configurarFluxoMeta, registrarFluxoMeta } from '../../shared/lib/rotas/fluxoMeta.js';
-import { configurarAuth, registrarAuth } from '../../shared/lib/rotas/auth.js';
-import { configurarLeadsRestantes, registrarLeadsRestantes } from '../../shared/lib/rotas/leadsRestantes.js';
-import { configurarDemais, registrarDemais } from '../../shared/lib/rotas/demais.js';
-import { configurarVisitasSite, registrarVisitasSite } from '../../shared/lib/rotas/visitasSite.js';
-import { ESQUEMA_BASE } from '../../shared/lib/esquemaBase.js';
-import { VIEWS_COMPATIBILIDADE } from '../../shared/lib/esquemaViews.js';
-import { NOTAS_E_RESOLVIDA } from '../../shared/lib/esquemaNotas.js';
-import { CAIXA_DE_ENTRADA } from '../../shared/lib/esquemaCaixa.js';
-import { BUSCA_MENSAGENS } from '../../shared/lib/esquemaBusca.js';
+import { registerUxRoutes, applyUxMigration, uxSchemaOn, abrirRemessa, regrasDeContatoSql, instanciaDaSafra } from './lib/uxRoutes.js';
+import { validarInstanciaEscolhida, escolherInstanciaDisparo } from './lib/dispatchInstancia.js';
+import { recuperarFixosDescartados } from './lib/recuperacaoFixos.js';
+import { variaveisFaltando, mensagemFaltando } from './lib/configObrigatoria.js';
+import { aplicarMigracoes } from './lib/migracoes.js';
+import { optOutPorBotaoDoWebhook, confirmarDescadastroSeLigada, enviarTextoFluxo } from './lib/descadastroPadrao.js';
+import { configurarRotasWebhooks, registrarRotasWebhooks, processWebhookEventAsync, instanceHealth } from './lib/rotas/webhooks.js';
+import { configurarRotasUploads, registrarRotasUploads } from './lib/rotas/uploads.js';
+import { configurarLeads, registrarLeads } from './lib/rotas/leads.js';
+import { configurarDisparos, registrarDisparos } from './lib/rotas/disparos.js';
+import { configurarConversas, registrarConversas } from './lib/rotas/conversas.js';
+import { configurarVendedores, registrarVendedores } from './lib/rotas/vendedores.js';
+import { configurarFluxoMeta, registrarFluxoMeta } from './lib/rotas/fluxoMeta.js';
+import { configurarAuth, registrarAuth } from './lib/rotas/auth.js';
+import { configurarLeadsRestantes, registrarLeadsRestantes } from './lib/rotas/leadsRestantes.js';
+import { configurarDemais, registrarDemais } from './lib/rotas/demais.js';
+import { configurarVisitasSite, registrarVisitasSite } from './lib/rotas/visitasSite.js';
+import { ESQUEMA_BASE } from './lib/esquemaBase.js';
+import { VIEWS_COMPATIBILIDADE } from './lib/esquemaViews.js';
+import { NOTAS_E_RESOLVIDA } from './lib/esquemaNotas.js';
+import { CAIXA_DE_ENTRADA } from './lib/esquemaCaixa.js';
+import { BUSCA_MENSAGENS } from './lib/esquemaBusca.js';
 import type { RespostaListaUploads, UploadZipRegistro, RespostaUploadZipOk, RespostaEnviarMensagem, StatusMensagemEnviada, RespostaLoginOk, RespostaSessaoAtual, RespostaSucesso, UsuarioAdmin, RespostaListaUsuarios, RespostaAuditLogs, RespostaLogsServidor, RespostaListaVendedores, RespostaVendedorCriado, RespostaLoteVendedores, RespostaVendedorAtualizado, RespostaSenhaVendedor, RespostaVendedorStatus, RespostaRoletaConfig, RespostaDistribuicaoRoleta, RespostaListaEtiquetas, RespostaEtiquetaSalva, RespostaOk, RespostaListaNotas, RespostaNotaCriada, RespostaResolucao, RespostaAuditoriaSite, RespostaAtualizacaoLead, RespostaResumoLead, RespostaListaLigacoes, RespostaLigacaoRegistrada, RespostaListaLigacoesGerais, RespostaListaLeads, RespostaListaRespostasRapidas, RespostaRespostaRapidaCriada, RespostaRespostaRapidaExcluida, RespostaStatusMeta, RespostaContasMeta, RespostaSincronizacaoConta, RespostaSincronizacaoTodas, RespostaMetaRemovida, RespostaConfigFluxo, RespostaStatusFluxo, RespostaEventosFluxo, RespostaModoInstancia, RespostaListaModelosFluxo, RespostaSincronizacaoModelos, RespostaModeloCriado, RespostaInstanciasFluxo, RespostaCadastroContaOk, RespostaConfigEmbeddedSignup, RespostaEmbeddedSignupConcluido, RespostaLeituraMeta, RespostaCriacaoInstancia, RespostaEnvioTesteSucesso, RespostaDistribuicaoLeads, RespostaEstatisticasVendedor, RespostaTransferenciaLote, RespostaListaCopias, RespostaCopiaSalva, RespostaCopiaRemovida, RespostaListaLotes, RespostaVelocidadeDisparo, RespostaAlteracaoVelocidade, RespostaAcaoLote, RespostaCancelamentoLote, RespostaLiberacaoQuarentena, RespostaDevolucaoLeads, RespostaRetornoQuarentena, RespostaResetSafra, LoteCampanha, ProgressoLote, RespostaDisparo, RespostaTesteDisparo, RespostaStatusTesteDisparo, RespostaSincronizacaoWhatsApp, RespostaListaLeadsCampanha, RespostaCamposLead, RespostaImportacaoIniciada, ProgressoImportacao, RespostaApagarZipsEmLote, RespostaApagarZip, RespostaInbox, RespostaBuscaMensagens, RespostaMensagensLead, RespostaRecuperacao, RespostaAtualizacaoLoteLeads, RespostaLoteLeads, RespostaExclusaoLote, RespostaCliquesLink, RespostaSalvarConfigFluxo, RespostaTesteConexaoFluxo, RespostaRuntimeConfig, RespostaEventoSimulado, RespostaJanelaLead, RespostaPresenca, RespostaLeituraMarcada, RespostaCatalogoModelosMeta, RespostaSimulacaoWebhook, RespostaLigacoesRecentesVendedor, RespostaImportacaoZipDireta, RespostaSementes, RespostaAcaoSimulada, RespostaDistribuicaoCampanha, RespostaRespostaSimulada, RespostaStatusInfraestrutura, RespostaSaudeBasica, RespostaSaudeSimples, RespostaWebhookJaProcessado, RespostaWebhookRecebido, RespostaZipEnfileirado, RespostaLeituraNaoMarcada, RequisicaoDistribuicaoRoleta } from '../../shared/contracts/rotas.js';
 import type { InboxConversation } from '../../shared/types.js';
-import { registerAutomacoesRoutes, applyAutomacoesMigration, applyAutomacoesEstadoMigration, applyAutomacoesFilaMigration, automacoesPersistenciaOn, iniciarWorkerAutomacoes } from '../../shared/lib/automacoesRoutes.js';
-import { registrarEventoCliente, registrarEventoGeral, pedidoDePararPelasRegras, pedidoDeAlertaPelasRegras, type ItemFila } from '../../shared/lib/automacoesExecucao.js';
+import { registerAutomacoesRoutes, applyAutomacoesMigration, applyAutomacoesEstadoMigration, applyAutomacoesFilaMigration, automacoesPersistenciaOn, iniciarWorkerAutomacoes } from './lib/automacoesRoutes.js';
+import { registrarEventoCliente, registrarEventoGeral, pedidoDePararPelasRegras, pedidoDeAlertaPelasRegras, type ItemFila } from './lib/automacoesExecucao.js';
 import type { EventoV } from '../../shared/lib/automacoes.js';
-import type { ContextoEvento } from '../../shared/lib/automacoesExecucao.js';
-import { registerBackupRoutes } from '../../shared/lib/backupRoutes.js';
-import { hashPassword, verifyPassword, generateSessionToken, DEFAULT_USERS, StoredUser, isUserAdmin } from '../../shared/lib/serverAuth.js';
-import { performWebsiteAudit } from '../../shared/lib/auditEngine.js';
-import { missingFluxoVars, summarizeFluxoInstance } from '../../shared/lib/fluxoInstanceStatus.js';
+import type { ContextoEvento } from './lib/automacoesExecucao.js';
+import { registerBackupRoutes } from './lib/backupRoutes.js';
+import { hashPassword, verifyPassword, generateSessionToken, DEFAULT_USERS, StoredUser, isUserAdmin } from './lib/serverAuth.js';
+import { performWebsiteAudit } from './lib/auditEngine.js';
+import { missingFluxoVars, summarizeFluxoInstance } from './lib/fluxoInstanceStatus.js';
 import { buildLeadVariables } from '../../shared/lib/templateCopy.js';
-import { buildFluxoAudioMedia, isFluxoAudioVoiceEnabled, uploadFluxoAudioMedia } from '../../shared/lib/fluxoAudio.js';
+import { buildFluxoAudioMedia, isFluxoAudioVoiceEnabled, uploadFluxoAudioMedia } from './lib/fluxoAudio.js';
 import { installLogBuffer, readLogs, logCategories } from '../../shared/lib/logBuffer.js';
 installLogBuffer();
-import { executeFluxoRequest, downloadFluxoMediaBinary, prepareOutboundMedia, fluxoInstancePath, hasFfmpeg } from '../../shared/lib/fluxoClient.js';
-import { setMetaRegistry, listMetaRegistry, encryptMetaToken, decryptMetaToken, metaDownloadMedia, metaSyncAccount, metaValidateToken, resolveMetaAccount, receivingPhoneNumberId, parseCoexistenceEchoes, getEmbeddedSignupConfig, metaExchangeSignupCode, metaSubscribeWaba, metaDiscoverWabaIds, type MetaAccountRecord, type MetaNumberRecord } from '../../shared/lib/metaClient.js';
-import type { FluxoApiResult } from '../../shared/lib/fluxoClient.js';
-import { verifyFluxoWebhook } from '../../shared/lib/webhookAuth.js';
+import { executeFluxoRequest, downloadFluxoMediaBinary, prepareOutboundMedia, fluxoInstancePath, hasFfmpeg, type FluxoApiResult } from './lib/fluxoClient.js';
+import { setMetaRegistry, listMetaRegistry, encryptMetaToken, decryptMetaToken, metaDownloadMedia, metaSyncAccount, metaValidateToken, resolveMetaAccount, receivingPhoneNumberId, parseCoexistenceEchoes, getEmbeddedSignupConfig, metaExchangeSignupCode, metaSubscribeWaba, metaDiscoverWabaIds, type MetaAccountRecord, type MetaNumberRecord, getMetaProvider, getMetaCredentials, verifyMetaSignature, metaSendText, metaSendTemplate, metaSendMedia, metaMarkRead, metaCreateTemplate, metaDeleteTemplate, metaListPhoneNumbers, metaListTemplates } from './lib/metaClient.js';
+import { verifyFluxoWebhook } from './lib/webhookAuth.js';
 import { sanitizeTemplateVariable, resolveManualInterest, SEM_INTERESSE_TAG } from '../../shared/lib/leadIntent.js';
-import { distributionByCount } from '../../shared/lib/distribution.js';
-import { getMetaProvider, getMetaCredentials, verifyMetaSignature, metaSendText, metaSendTemplate, metaSendMedia, metaMarkRead, metaCreateTemplate, metaDeleteTemplate, metaListPhoneNumbers, metaListTemplates } from '../../shared/lib/metaClient.js';
+import { distributionByCount } from './lib/distribution.js';
+import { caminhoFrontCompilado } from './lib/caminhoFront.js';
 import { listExtraFieldKeys, normalizeFieldKey, TOKEN_NAMES } from '../../shared/lib/leadTokens.js';
-import { validateTemplateCategory, buildMetaButtons, defaultExamples as neutralExamples, validateTemplateVariables } from '../../shared/lib/templateRules.js';
+import { validateTemplateCategory, buildMetaButtons, defaultExamples as neutralExamples, validateTemplateVariables } from './lib/templateRules.js';
 import { arePhonesEquivalent, normalizeE164Phone, phoneDigitVariants, formatAndValidateE164Phone } from '../../shared/lib/phone.js';
-import { getUploadsDir, getInboxDir, INBOX_SUBDIR, isUploadsDirDurable, publicBaseUrl, saveMediaBuffer, extensionFor } from '../../shared/lib/mediaStorage.js';
+import { getUploadsDir, getInboxDir, INBOX_SUBDIR, isUploadsDirDurable, publicBaseUrl, saveMediaBuffer, extensionFor } from './lib/mediaStorage.js';
 import { statusRank, shouldApplyStatus, normalizeStatus } from '../../shared/lib/fluxoStatus.js';
-import { describeFluxoError } from '../../shared/lib/fluxoErrors.js';
-import { buildTemplatePayload, type CatalogTemplate, type TemplateValues } from '../../shared/lib/fluxoTemplate.js';
-import { WINDOW_MS, windowExpiryFromInbound, latestExpiry, isWindowOpen } from '../../shared/lib/windowUtil.js';
-import { effectiveSpeedPerSecond, maxDispatchPerSecond, dispatchRpm, planRpm, FluxoRateLimitedError } from '../../shared/lib/dispatchRate.js';
+import { describeFluxoError } from './lib/fluxoErrors.js';
+import { buildTemplatePayload, type CatalogTemplate, type TemplateValues } from './lib/fluxoTemplate.js';
+import { WINDOW_MS, windowExpiryFromInbound, latestExpiry, isWindowOpen } from './lib/windowUtil.js';
+import { effectiveSpeedPerSecond, maxDispatchPerSecond, dispatchRpm, planRpm, FluxoRateLimitedError } from './lib/dispatchRate.js';
 import {
   initSocketServer,
   enqueueIncomingWebhook,
@@ -92,7 +91,7 @@ const PORT = Number(process.env.NYROH_PORT) || (process.env.RAILWAY_ENVIRONMENT 
   ? (Number(process.env.PORT) || 3000)
   : 3000);
 
-// Pasta de mídia (UPLOADS_DIR > volume da Railway > ./uploads). Ver shared/lib/mediaStorage.ts
+// Pasta de mídia (UPLOADS_DIR > volume da Railway > ./uploads). Ver apps/api/lib/mediaStorage.ts
 const UPLOADS_DIR = getUploadsDir();
 
 // Enable HTTP gzip/brotli compression for fast network payloads
@@ -149,7 +148,7 @@ app.get('/health', (req, res) => {
   res.status(200).send('OK');
 });
 
-import { configurarRastreioLinks, trackedLinkFor } from '../../shared/lib/rotas/rastreioLinks.js';
+import { configurarRastreioLinks, trackedLinkFor } from './lib/rotas/rastreioLinks.js';
 
 app.get('/r/:token', async (req: any, res) => {
   const token = String(req.params.token || '').replace(/[^A-Za-z0-9_-]/g, '');
@@ -787,7 +786,7 @@ async function initDatabase(retries = 5, delayMs = 3000) {
         const client = await pool.connect();
 
         // Auto-create tables if they don't exist & run migrations
-        // Esquema base (DDL) pelo runner de migrações (item 2.2a). Ver shared/lib/esquemaBase.ts.
+        // Esquema base (DDL) pelo runner de migrações (item 2.2a). Ver apps/api/lib/esquemaBase.ts.
         await aplicarMigracoes(client, [ESQUEMA_BASE]);
 
         // Dados e ajustes pontuais que continuam no boot (item 2.2b).
@@ -849,7 +848,7 @@ END $$;
           WHERE (phone_clean IS NULL OR phone_clean = '') AND phone_number IS NOT NULL;
         `);
 
-        // Views de compatibilidade pelo runner de migrações (item 2.2a-2 a). Ver shared/lib/esquemaViews.ts.
+        // Views de compatibilidade pelo runner de migrações (item 2.2a-2 a). Ver apps/api/lib/esquemaViews.ts.
         try {
           await aplicarMigracoes(client, [VIEWS_COMPATIBILIDADE]);
         } catch (viewErr: any) {
@@ -857,13 +856,13 @@ END $$;
         }
 
         // Notas internas da conversa (só a equipe vê; o cliente nunca) e marcação de "resolvida".
-        // Notas internas e "resolvida" pelo runner de migrações (item 2.2a-2 b). Ver shared/lib/esquemaNotas.ts.
+        // Notas internas e "resolvida" pelo runner de migrações (item 2.2a-2 b). Ver apps/api/lib/esquemaNotas.ts.
         try {
           await aplicarMigracoes(client, [NOTAS_E_RESOLVIDA]);
         } catch (notasErr: any) {
           console.warn('[PostgreSQL] Aviso ao aplicar notas/resolvida:', notasErr?.message);
         }
-        // Índice de busca no histórico de mensagens pelo runner (item 2.2a-2 d). Ver shared/lib/esquemaBusca.ts.
+        // Índice de busca no histórico de mensagens pelo runner (item 2.2a-2 d). Ver apps/api/lib/esquemaBusca.ts.
         try {
           await aplicarMigracoes(client, [BUSCA_MENSAGENS]);
         } catch (buscaErr: any) {
@@ -1592,7 +1591,7 @@ function registerLoginFailure(key: string) {
     for (const [k, v] of loginFailures.entries()) if (Date.now() - v.firstAt > LOGIN_WINDOW_MS) loginFailures.delete(k);
   }
 }
-// B6 Auth e usuários administrativos: rotas em shared/lib/rotas/auth.ts (item 4.1 f3).
+// B6 Auth e usuários administrativos: rotas em apps/api/lib/rotas/auth.ts (item 4.1 f3).
 configurarAuth({
     get IS_PRODUCTION() { return IS_PRODUCTION; },
     get LOGIN_WINDOW_MS() { return LOGIN_WINDOW_MS; },
@@ -1619,7 +1618,7 @@ registrarAuth(app);
 // 7.1 WHATSAPP CLOUD API OFICIAL (FLUXOAPI) - ENDPOINTS
 // --------------------------------------------------------------------------
 
-// B6 Fluxo e Meta administrativos: rotas em shared/lib/rotas/fluxoMeta.ts (item 4.1 f2).
+// B6 Fluxo e Meta administrativos: rotas em apps/api/lib/rotas/fluxoMeta.ts (item 4.1 f2).
 configurarFluxoMeta({
     get IS_PRODUCTION() { return IS_PRODUCTION; },
     get SIMULATORS_ENABLED() { return SIMULATORS_ENABLED; },
@@ -1756,7 +1755,7 @@ function normalizeMetaGraphTemplate(t: any) {
 
 
 // POST /api/campaign/test-dispatch - Ambiente de Teste de Disparo Individual vinculado ao Vendedor/Thomas
-// B6 demais rotas (campanha, exportação, seed, infraestrutura): rotas em shared/lib/rotas/demais.ts (item 4.1 f5).
+// B6 demais rotas (campanha, exportação, seed, infraestrutura): rotas em apps/api/lib/rotas/demais.ts (item 4.1 f5).
 configurarDemais({
     get broadcastSSE() { return broadcastSSE; },
     get buildWhatsAppReadiness() { return buildWhatsAppReadiness; },
@@ -2814,7 +2813,7 @@ async function processDeliveryStatusUpdate(params: {
 }
 
 // GET WEBHOOK META (Verificação oficial do Webhook com hub.challenge)
-// B1 webhooks: rotas em shared/lib/rotas/webhooks.ts (item 4.1 a).
+// B1 webhooks: rotas em apps/api/lib/rotas/webhooks.ts (item 4.1 a).
 configurarRotasWebhooks({
     get IS_PRODUCTION() { return IS_PRODUCTION; },
     get TransientProcessingError() { return TransientProcessingError; },
@@ -2844,7 +2843,7 @@ registrarRotasWebhooks(app);
 
 // API ROUTES
 
-// B5 conversas: rotas em shared/lib/rotas/conversas.ts (item 4.1 e).
+// B5 conversas: rotas em apps/api/lib/rotas/conversas.ts (item 4.1 e).
 configurarConversas({
     get applyPendingStatus() { return applyPendingStatus; },
     get broadcastPresenceIfChanged() { return broadcastPresenceIfChanged; },
@@ -2873,7 +2872,7 @@ configurarConversas({
 registrarConversas(app);
 
 
-// B3 leads: rotas em shared/lib/rotas/leads.ts (item 4.1 c).
+// B3 leads: rotas em apps/api/lib/rotas/leads.ts (item 4.1 c).
 configurarLeads({
     get emitirEventoLead() { return emitirEventoLead; },
     get memoryCallLogsMap() { return memoryCallLogsMap; },
@@ -2884,7 +2883,7 @@ configurarLeads({
 registrarLeads(app);
 
 
-// B6 vendedores, etiquetas e respostas rápidas: rotas em shared/lib/rotas/vendedores.ts (item 4.1 f).
+// B6 vendedores, etiquetas e respostas rápidas: rotas em apps/api/lib/rotas/vendedores.ts (item 4.1 f).
 configurarVendedores({
     get MIN_PASSWORD_LENGTH() { return MIN_PASSWORD_LENGTH; },
     get assignLeadViaRoulette() { return assignLeadViaRoulette; },
@@ -2916,7 +2915,7 @@ registrarVendedores(app);
 
 
 // 3.2.2 Live Website Audit Endpoint (Instantâneo, Sem IA)
-// B6 Leads restantes: rotas em shared/lib/rotas/leadsRestantes.ts (item 4.1 f4).
+// B6 Leads restantes: rotas em apps/api/lib/rotas/leadsRestantes.ts (item 4.1 f4).
 configurarLeadsRestantes({
     get emitirEventoLead() { return emitirEventoLead; },
     get extractLegacyWebsite() { return extractLegacyWebsite; },
@@ -3581,7 +3580,7 @@ async function processLeadItems(items: any[], remessaNome?: string) {
 // RECOVERY ENDPOINT: Varre o banco e recupera sites reais para leads sem site
 // --------------------------------------------------------------------------
 
-// B2 uploads e importação: rotas em shared/lib/rotas/uploads.ts (item 4.1 b).
+// B2 uploads e importação: rotas em apps/api/lib/rotas/uploads.ts (item 4.1 b).
 configurarRotasUploads({
     get broadcastSSE() { return broadcastSSE; },
     get bulkInsertCampaignLeads() { return bulkInsertCampaignLeads; },
@@ -3739,7 +3738,7 @@ function classifyPhoneNumber(phoneStr: string) {
   };
 }
 
-// B4 disparos e safras: rotas em shared/lib/rotas/disparos.ts (item 4.1 d).
+// B4 disparos e safras: rotas em apps/api/lib/rotas/disparos.ts (item 4.1 d).
 configurarDisparos({
     get COPY_VALUE_MAX() { return COPY_VALUE_MAX; },
     get broadcastSSE() { return broadcastSSE; },
@@ -4545,7 +4544,7 @@ async function main() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.resolve(process.cwd(), 'dist');
+    const distPath = caminhoFrontCompilado(process.cwd());
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));

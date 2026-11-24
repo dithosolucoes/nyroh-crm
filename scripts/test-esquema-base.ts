@@ -7,13 +7,13 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import pg from 'pg';
-import { aplicarMigracoes } from '../shared/lib/migracoes.js';
-import { ESQUEMA_BASE } from '../shared/lib/esquemaBase.js';
-import { VIEWS_COMPATIBILIDADE } from '../shared/lib/esquemaViews.js';
-import { NOTAS_E_RESOLVIDA } from '../shared/lib/esquemaNotas.js';
-import { CAIXA_DE_ENTRADA } from '../shared/lib/esquemaCaixa.js';
-import { BUSCA_MENSAGENS } from '../shared/lib/esquemaBusca.js';
-import { MIGRACOES_UX, MIGRACOES_AUTOMACOES_RESPOSTAS, MIGRACOES_AUTOMACOES_ESTADO, MIGRACOES_AUTOMACOES_FILA, lerMigracoesArquivo } from '../shared/lib/migracoesArquivos.js';
+import { aplicarMigracoes } from '../apps/api/lib/migracoes.js';
+import { ESQUEMA_BASE } from '../apps/api/lib/esquemaBase.js';
+import { VIEWS_COMPATIBILIDADE } from '../apps/api/lib/esquemaViews.js';
+import { NOTAS_E_RESOLVIDA } from '../apps/api/lib/esquemaNotas.js';
+import { CAIXA_DE_ENTRADA } from '../apps/api/lib/esquemaCaixa.js';
+import { BUSCA_MENSAGENS } from '../apps/api/lib/esquemaBusca.js';
+import { MIGRACOES_UX, MIGRACOES_AUTOMACOES_RESPOSTAS, MIGRACOES_AUTOMACOES_ESTADO, MIGRACOES_AUTOMACOES_FILA, lerMigracoesArquivo } from '../apps/api/lib/migracoesArquivos.js';
 
 const base = process.env.E2E_DATABASE_URL;
 if (!base) {

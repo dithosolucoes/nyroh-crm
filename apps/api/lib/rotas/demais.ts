@@ -1,15 +1,15 @@
 import type { Express } from 'express';
-import type { LeadChatMessage } from '../../types.js';
+import type { LeadChatMessage } from '../../../../shared/types.js';
 import path from 'path';
-import { Lead } from '../../types.js';
-import { getLeadNiche } from '../niche.js';
+import { Lead } from '../../../../shared/types.js';
+import { getLeadNiche } from '../../../../shared/lib/niche.js';
 import { recuperarFixosDescartados } from '../recuperacaoFixos.js';
-import { instanceHealth } from '../rotas/webhooks.js';
-import type { RespostaEstatisticasVendedor, RespostaTesteDisparo, RespostaStatusTesteDisparo, RespostaListaLeadsCampanha, RespostaCamposLead, RespostaLigacoesRecentesVendedor, RespostaSementes, RespostaStatusInfraestrutura } from '../../contracts/rotas.js';
+import { instanceHealth } from './webhooks.js';
+import type { RespostaEstatisticasVendedor, RespostaTesteDisparo, RespostaStatusTesteDisparo, RespostaListaLeadsCampanha, RespostaCamposLead, RespostaLigacoesRecentesVendedor, RespostaSementes, RespostaStatusInfraestrutura } from '../../../../shared/contracts/rotas.js';
 import { executeFluxoRequest, fluxoInstancePath } from '../fluxoClient.js';
 import { getMetaProvider, metaSendText } from '../metaClient.js';
 import { dispatchRpm, planRpm } from '../dispatchRate.js';
-import { getQueueSystemStatus } from '../../../server/redisQueue.js';
+import { getQueueSystemStatus } from '../../../../server/redisQueue.js';
 import { SQL_SELECT_SALESPEOPLE, SQL_INSERT_LEADS, SQL_INSERT_LEAD_MESSAGES, SQL_INSERT_LEADS_2, SQL_UPDATE_CAMPAIGN_LEADS } from './repo/demais.js';
 
 

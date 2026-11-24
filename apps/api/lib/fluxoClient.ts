@@ -5,7 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { saveMediaBuffer, publicBaseUrl, MEDIA_LIMITS } from './mediaStorage.js';
-export { formatAndValidateE164Phone, type PhoneValidationResult } from './phone.js';
+export { formatAndValidateE164Phone, type PhoneValidationResult } from '../../../shared/lib/phone.js';
 export { verifyFluxoWebhook } from './webhookAuth.js';
 
 const execFileAsync = promisify(execFile);

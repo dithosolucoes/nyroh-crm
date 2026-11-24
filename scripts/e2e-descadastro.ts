@@ -12,7 +12,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { startMockFluxo, signWebhook, MOCK_KEY, MOCK_SECRET, MOCK_INSTANCE } from './mock-fluxo';
 import { startNyrohServer } from './_proc';
-import { TEXTO_CONFIRMACAO_DESCADASTRO } from '../shared/lib/descadastroEnvio';
+import { TEXTO_CONFIRMACAO_DESCADASTRO } from '../apps/api/lib/descadastroEnvio';
 
 const E2E_PASSWORD = 'SenhaDoTesteE2E_2026';
 const NYROH_PORT = 3056;

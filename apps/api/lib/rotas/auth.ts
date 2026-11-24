@@ -1,8 +1,8 @@
 import type { Express } from 'express';
-import { User } from '../../types.js';
-import type { RespostaLoginOk, RespostaSessaoAtual, RespostaSucesso, UsuarioAdmin, RespostaListaUsuarios, RespostaAuditLogs, RespostaLogsServidor } from '../../contracts/rotas.js';
+import { User } from '../../../../shared/types.js';
+import type { RespostaLoginOk, RespostaSessaoAtual, RespostaSucesso, UsuarioAdmin, RespostaListaUsuarios, RespostaAuditLogs, RespostaLogsServidor } from '../../../../shared/contracts/rotas.js';
 import { hashPassword, verifyPassword, generateSessionToken, isUserAdmin } from '../serverAuth.js';
-import { readLogs, logCategories } from '../logBuffer.js';
+import { readLogs, logCategories } from '../../../../shared/lib/logBuffer.js';
 import { SQL_SELECT_USERS, SQL_INSERT_AUTH_SESSIONS, SQL_DELETE_AUTH_SESSIONS, SQL_UPDATE_USERS, SQL_DELETE_AUTH_SESSIONS_2, SQL_SELECT_USERS_2, SQL_SELECT_USERS_3, SQL_INSERT_USERS, SQL_UPDATE_USERS_2, SQL_UPDATE_USERS_3, SQL_UPDATE_USERS_4, SQL_UPDATE_USERS_5, SQL_UPDATE_USERS_6, SQL_SELECT_USERS_4, SQL_DELETE_USERS, SQL_SELECT_AUDIT_LOGS, SQL_ALTER_CAMPAIGN_LEADS } from './repo/auth.js';
 
 

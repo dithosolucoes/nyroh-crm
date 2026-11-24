@@ -3,7 +3,7 @@
  * Rodar: npm run test:config
  */
 import assert from 'node:assert/strict';
-import { variaveisFaltando, mensagemFaltando, VARIAVEIS_OBRIGATORIAS_PRODUCAO } from '../shared/lib/configObrigatoria';
+import { variaveisFaltando, mensagemFaltando, VARIAVEIS_OBRIGATORIAS_PRODUCAO } from '../apps/api/lib/configObrigatoria';
 
 let falhas = 0;
 function test(nome: string, fn: () => void) {

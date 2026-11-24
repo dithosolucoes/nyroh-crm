@@ -4,7 +4,7 @@
  * Cria o banco de teste "nyroh_migracoes_teste" (recria do zero a cada rodada).
  */
 import pg from 'pg';
-import { aplicarMigracoes, validarMigracoes, type Migracao } from '../shared/lib/migracoes.js';
+import { aplicarMigracoes, validarMigracoes, type Migracao } from '../apps/api/lib/migracoes.js';
 
 const base = process.env.E2E_DATABASE_URL;
 if (!base) {

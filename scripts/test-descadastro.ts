@@ -3,8 +3,8 @@
  * Rodar: npm run test:descadastro
  */
 import assert from 'node:assert/strict';
-import { pedidoDePararPelasRegras } from '../shared/lib/automacoesExecucao';
-import { AUTOMACAO_PARAR_PADRAO, PALAVRAS_PARAR_FIXAS, ehCliqueDescadastro, idsDescadastroBotao, optOutPorBotaoDoWebhook } from '../shared/lib/descadastroPadrao';
+import { pedidoDePararPelasRegras } from '../apps/api/lib/automacoesExecucao';
+import { AUTOMACAO_PARAR_PADRAO, PALAVRAS_PARAR_FIXAS, ehCliqueDescadastro, idsDescadastroBotao, optOutPorBotaoDoWebhook } from '../apps/api/lib/descadastroPadrao';
 import { validarAutomacao } from '../shared/lib/automacoes';
 
 let falhas = 0;

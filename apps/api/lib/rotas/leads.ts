@@ -6,10 +6,10 @@
  */
 import type { Express } from 'express';
 
-import { PIPELINE_COLUMNS, type ColumnStatus } from '../../types.js';
+import { PIPELINE_COLUMNS, type ColumnStatus } from '../../../../shared/types.js';
 import { uxSchemaOn } from '../uxRoutes.js';
 import { isUserAdmin } from '../serverAuth.js';
-import type { RespostaAtualizacaoLead, RespostaListaLeads, RespostaListaNotas, RespostaNotaCriada, RespostaResolucao, RespostaResumoLead } from '../../contracts/rotas.js';
+import type { RespostaAtualizacaoLead, RespostaListaLeads, RespostaListaNotas, RespostaNotaCriada, RespostaResolucao, RespostaResumoLead } from '../../../../shared/contracts/rotas.js';
 import { SQL_SELECT_LEAD_NOTES, SQL_INSERT_LEAD_NOTES, SQL_SELECT_LEADS, SQL_UPDATE_LEADS, SQL_UPDATE_LEADS_2, SQL_UPDATE_SITE_DO_CLIENTE, SQL_SELECT_SITE_EM_OUTRO_LEAD } from './repo/leads.js';
 import { normalizarSite } from '../visitaSite.js';
 export interface DependenciasLeads {

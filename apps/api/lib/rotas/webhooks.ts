@@ -4,7 +4,7 @@
  * As dependências do servidor entram por configurarRotasWebhooks, como getters, para ler o valor atual.
  */
 import type { Express } from 'express';
-import type { RespostaWebhookRecebido, RespostaWebhookJaProcessado, RespostaSimulacaoWebhook } from '../../contracts/rotas.js';
+import type { RespostaWebhookRecebido, RespostaWebhookJaProcessado, RespostaSimulacaoWebhook } from '../../../../shared/contracts/rotas.js';
 import { optOutPorBotaoDoWebhook } from '../descadastroPadrao.js';
 
 

@@ -1,7 +1,7 @@
 import type { Express } from 'express';
-import { Lead, CallLog, ColumnStatus, Salesperson } from '../../types.js';
+import { Lead, CallLog, ColumnStatus, Salesperson } from '../../../../shared/types.js';
 import { uxSchemaOn } from '../uxRoutes.js';
-import type { RespostaOk, RespostaAuditoriaSite, RespostaAtualizacaoLead, RespostaListaLigacoes, RespostaLigacaoRegistrada, RespostaListaLigacoesGerais, RespostaDistribuicaoLeads, RespostaTransferenciaLote, RespostaRecuperacao, RespostaAtualizacaoLoteLeads, RespostaLoteLeads, RespostaExclusaoLote } from '../../contracts/rotas.js';
+import type { RespostaOk, RespostaAuditoriaSite, RespostaAtualizacaoLead, RespostaListaLigacoes, RespostaLigacaoRegistrada, RespostaListaLigacoesGerais, RespostaDistribuicaoLeads, RespostaTransferenciaLote, RespostaRecuperacao, RespostaAtualizacaoLoteLeads, RespostaLoteLeads, RespostaExclusaoLote } from '../../../../shared/contracts/rotas.js';
 import { isUserAdmin } from '../serverAuth.js';
 import { performWebsiteAudit } from '../auditEngine.js';
 import { SQL_SELECT_LEADS, SQL_SELECT_SALESPEOPLE, SQL_UPDATE_LEADS, SQL_SELECT_SALESPEOPLE_2, SQL_UPDATE_LEADS_2, SQL_SELECT_SALESPEOPLE_3, SQL_UPDATE_LEADS_3, SQL_SELECT_CALLS, SQL_UPDATE_LEADS_4, SQL_SELECT_LEADS_2, SQL_UPDATE_LEADS_5, SQL_SELECT_LEADS_3, SQL_UPDATE_LEADS_6, SQL_SELECT_CALLS_2, SQL_UPDATE_LEADS_7, SQL_SELECT_LEADS_4, SQL_UPDATE_LEADS_8, SQL_UPDATE_LEADS_9, SQL_INSERT_CALLS, SQL_SELECT_CALLS_3, SQL_INSERT_CALLS_2, SQL_UPDATE_LEADS_10, SQL_UPDATE_LEADS_11, SQL_DELETE_LEADS, SQL_DELETE_LEADS_2 } from './repo/leadsRestantes.js';

@@ -2,7 +2,8 @@
  * Verificação de arquitetura do refactor (somente leitura do código; não toca banco, fila ou produção).
  *
  * O que checa:
- *  - Regras de fronteira (sem baseline): front não importa server; shared não importa front nem server.
+ *  - Regras de fronteira (sem baseline): front não importa server; shared não importa front nem server;
+ *    o fecho de imports do front só usa shared/ puro e pacotes de interface; shared/ só tem o que o front usa.
  *  - Contagens que só podem cair (cliquet, em scripts/verificacao-baseline.json):
  *      `any` e `unknown` em shared/contracts, `as any` no front, linhas de server.ts.
  *  - tsc da raiz e do front (com --rapido pula).
@@ -16,7 +17,7 @@
  * Sai com código 1 se alguma regra ou contagem piorou.
  */
 import { readFileSync, writeFileSync, readdirSync, statSync, existsSync } from 'node:fs';
-import { join, relative, sep } from 'node:path';
+import { join, relative, sep, dirname } from 'node:path';
 import { execSync } from 'node:child_process';
 
 const RAIZ = process.cwd();
@@ -65,6 +66,57 @@ for (const f of SHARED) {
 }
 (violShared.length ? falhas : oks).push(
   violShared.length ? `shared importa front ou servidor em ${violShared.length} lugar(es):\n      ${violShared.join('\n      ')}` : 'shared não importa front nem servidor',
+);
+
+
+// ---------- 1b. Fecho do front: o que o front importa, direta ou indiretamente ----------
+// Regra nova (24/11/2026): o front só pode depender de shared/ puro e de pacotes de interface.
+// Qualquer código de servidor dentro de shared/ quebra esta verificação.
+const PACOTES_DO_FRONT = new Set(['react', 'react-dom', 'jspdf', 'jszip', 'lucide-react', 'qrcode', 'tailwindcss']);
+const SHARED_DIR = join(RAIZ, 'shared');
+const FRONT_DIR = join(RAIZ, 'apps', 'web', 'src');
+const EXTS_RESOLUCAO = ['.ts', '.tsx', '.d.ts', '/index.ts', '/index.tsx'];
+function resolverImport(de, imp) {
+  let base;
+  if (imp.startsWith('@shared/')) base = join(SHARED_DIR, imp.slice(8));
+  else if (imp.startsWith('.')) base = join(dirname(de), imp);
+  else return null;
+  base = base.replace(/\.(js|jsx)$/, '');
+  for (const c of [base, ...EXTS_RESOLUCAO.map((e) => base + e)]) {
+    if (existsSync(c) && statSync(c).isFile()) return c;
+  }
+  return null;
+}
+const fecho = new Set();
+const pilha = [...arquivos(FRONT_DIR)];
+const violFecho = [];
+while (pilha.length) {
+  const f = pilha.pop();
+  if (fecho.has(f)) continue;
+  fecho.add(f);
+  if (!f.startsWith(FRONT_DIR + sep) && !f.startsWith(SHARED_DIR + sep)) {
+    violFecho.push(`${rel(f)} está fora de apps/web/src e shared/`);
+    continue;
+  }
+  for (const imp of importacoes(readFileSync(f, 'utf8'))) {
+    if (imp.startsWith('.') || imp.startsWith('@shared/')) {
+      const alvo = resolverImport(f, imp);
+      if (alvo) pilha.push(alvo);
+      else violFecho.push(`${rel(f)} -> ${imp} (não resolve)`);
+      continue;
+    }
+    const pacote = imp.startsWith('@') ? imp.split('/').slice(0, 2).join('/') : imp.split('/')[0];
+    if (!PACOTES_DO_FRONT.has(pacote)) violFecho.push(`${rel(f)} -> pacote ${imp} (fora dos pacotes de interface)`);
+  }
+}
+(violFecho.length ? falhas : oks).push(
+  violFecho.length ? `fecho do front tem ${violFecho.length} problema(s):\n      ${violFecho.join('\n      ')}` : 'fecho do front só usa shared/ puro e pacotes de interface',
+);
+const sharedSobrando = arquivos(SHARED_DIR).filter((f) => !fecho.has(f)).map(rel);
+(sharedSobrando.length ? falhas : oks).push(
+  sharedSobrando.length
+    ? `shared/ tem ${sharedSobrando.length} arquivo(s) que o front não usa (código de servidor; mover para apps/api/lib):\n      ${sharedSobrando.join('\n      ')}`
+    : 'shared/ só guarda código que o front usa',
 );
 
 // ---------- 2. Contagens com cliquet ----------

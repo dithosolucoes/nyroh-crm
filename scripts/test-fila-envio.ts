@@ -7,9 +7,9 @@
  * Uso: npm run test:fila-envio
  */
 import { Queue } from 'bullmq';
-import { executarLoteEmMemoria, intervaloEntreEnviosMemoria } from '../shared/lib/filaEnvioMemoria.js';
-import { modoFilaEnvio, escolherAdaptadorFila } from '../shared/lib/filaEnvio.js';
-import { dispatchRpm, maxDispatchPerSecond, effectiveSpeedPerSecond, delayForIndex } from '../shared/lib/dispatchRate.js';
+import { executarLoteEmMemoria, intervaloEntreEnviosMemoria } from '../apps/api/lib/filaEnvioMemoria.js';
+import { modoFilaEnvio, escolherAdaptadorFila } from '../apps/api/lib/filaEnvio.js';
+import { dispatchRpm, maxDispatchPerSecond, effectiveSpeedPerSecond, delayForIndex } from '../apps/api/lib/dispatchRate.js';
 
 let falhas = 0;
 let ok = 0;

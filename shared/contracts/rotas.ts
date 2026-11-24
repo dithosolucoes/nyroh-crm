@@ -1243,7 +1243,7 @@ export interface RespostaStatusInfraestrutura {
   [chave: string]: unknown;
 }
 
-/* ---------- Experiências de UX (shared/lib/uxRoutes.ts) ---------- */
+/* ---------- Experiências de UX (apps/api/lib/uxRoutes.ts) ---------- */
 
 /** GET /api/brands: marca com os números vinculados */
 export interface RespostaMarca {

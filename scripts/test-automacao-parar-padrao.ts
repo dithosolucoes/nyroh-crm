@@ -7,8 +7,8 @@
  */
 import assert from 'node:assert/strict';
 import pg from 'pg';
-import { garantirAutomacaoPararPadrao, ID_AUTOMACAO_PARAR_PADRAO } from '../shared/lib/automacaoPararPadrao';
-import { aplicarMigracoesArquivo, MIGRACOES_AUTOMACOES_RESPOSTAS } from '../shared/lib/migracoesArquivos';
+import { garantirAutomacaoPararPadrao, ID_AUTOMACAO_PARAR_PADRAO } from '../apps/api/lib/automacaoPararPadrao';
+import { aplicarMigracoesArquivo, MIGRACOES_AUTOMACOES_RESPOSTAS } from '../apps/api/lib/migracoesArquivos';
 
 let falhas = 0;
 const testes: Array<[string, () => Promise<void>]> = [];

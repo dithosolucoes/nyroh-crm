@@ -4,7 +4,7 @@
  * Rodar: npm run test:confirmacao-descadastro
  */
 import assert from 'node:assert/strict';
-import { confirmarDescadastroSeLigada, limparConfirmacoesDescadastro, TEXTO_CONFIRMACAO_DESCADASTRO } from '../shared/lib/descadastroEnvio';
+import { confirmarDescadastroSeLigada, limparConfirmacoesDescadastro, TEXTO_CONFIRMACAO_DESCADASTRO } from '../apps/api/lib/descadastroEnvio';
 
 let falhas = 0;
 async function test(nome: string, fn: () => Promise<void>) {

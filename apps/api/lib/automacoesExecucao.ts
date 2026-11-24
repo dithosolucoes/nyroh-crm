@@ -5,11 +5,11 @@
  * Ainda não está ligado a nenhum disparo real. Quando for ligado, a execução usa este plano
  * e continua atrás de uma flag própria (desligada por padrão).
  */
-import { renderPrevia, substituirVariaveis, type Automacao, type AcaoV, type EventoV } from './automacoes';
+import { renderPrevia, substituirVariaveis, type Automacao, type AcaoV, type EventoV } from '../../../shared/lib/automacoes';
 import { contemPalavra, quandoExecutar } from './automacoesFila';
 import { randomUUID } from 'crypto';
-import { normalizarCondicoes, proximaOcorrencia, type Condicoes, type Grupo, type AgendaHorario } from './automacoesEstado';
-import { detectOptOut } from './leadIntent';
+import { normalizarCondicoes, proximaOcorrencia, type Condicoes, type Grupo, type AgendaHorario } from '../../../shared/lib/automacoesEstado';
+import { detectOptOut } from '../../../shared/lib/leadIntent';
 import { PALAVRAS_PARAR_FIXAS } from './descadastroPadrao';
 
 export interface ContextoEvento {
