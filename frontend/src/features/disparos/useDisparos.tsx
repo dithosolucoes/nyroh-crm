@@ -1,3 +1,4 @@
+import { urlAdminFluxoInstances, urlAdminFluxoTemplates, urlBrands, urlCampaignBatches, urlCampaignBatchesCancelId, urlCampaignBatchesId, urlCampaignBatchesPauseId, urlCampaignBatchesProgressId, urlCampaignBatchesQuarantineConfigId, urlCampaignBatchesReleaseQuarantineId, urlCampaignBatchesResetStagingId, urlCampaignBatchesResumeId, urlCampaignBatchesReturnUnsentId, urlCampaignBatchesSyncWhatsappWebId, urlCampaignCopies, urlCampaignCopiesId, urlCampaignDispatch, urlCampaignDispatchSpeed, urlCampaignDistribute, urlCampaignImportProgressId, urlCampaignImportProgressInit, urlCampaignLeadFieldsId, urlCampaignLeadsSimulateReplyId, urlCampaignSimulateAction, urlCampaignTestDispatch, urlCampaignUploads, urlPhoneNumbers, urlRegrasContatoPrevia } from './api';
 import { apiFetch } from '../../api/client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { RespostaUploadZip, RespostaErroApi } from '@shared/contracts/rotas';
@@ -85,7 +86,7 @@ export function useDisparos({ salespeople, currentUser, onLeadsUpdated, onNaviga
   const [checkedBatchIds, setCheckedBatchIds] = useState<string[]>([]);
   const [brandOptions, setBrandOptions] = useState<Array<{ id: string; name: string }>>([]);
   useEffect(() => {
-    apiFetch('/api/brands').then(r => (r.ok ? r.json() : [])).then(d => { if (Array.isArray(d)) setBrandOptions(d); }).catch(() => {});
+    apiFetch(urlBrands).then(r => (r.ok ? r.json() : [])).then(d => { if (Array.isArray(d)) setBrandOptions(d); }).catch(() => {});
   }, []);
   const [selectedBatchId, setSelectedBatchId] = useState<string>('');
   const [leads, setLeads] = useState<CampaignLead[]>([]);
@@ -126,7 +127,7 @@ export function useDisparos({ salespeople, currentUser, onLeadsUpdated, onNaviga
   const [dispatchPhoneNumberId, setDispatchPhoneNumberId] = useState<string>('');
   const [dispatchNumbers, setDispatchNumbers] = useState<Array<{ id: string; name: string; phone: string }>>([]);
   useEffect(() => {
-    apiFetch('/api/admin/fluxo/instances')
+    apiFetch(urlAdminFluxoInstances)
       .then(r => r.json() as Promise<RespostaInstanciasFluxo>)
       .then(d => { if (d?.success && Array.isArray(d.instances)) setDispatchNumbers(d.instances); })
       .catch(() => { /* seletor é opcional */ });
@@ -233,7 +234,7 @@ export function useDisparos({ salespeople, currentUser, onLeadsUpdated, onNaviga
   const [camposLead, setCamposLead] = useState<string[]>([]);
   useEffect(() => {
     const qs = selectedBatchId ? `?batchId=${encodeURIComponent(selectedBatchId)}` : '';
-    apiFetch(`/api/campaign/lead-fields${qs}`)
+    apiFetch(urlCampaignLeadFieldsId(qs))
       .then(r => (r.ok ? r.json() : null))
       .then(d => setCamposLead(Array.isArray(d?.fields) ? d.fields : []))
       .catch(() => setCamposLead([]));
@@ -292,7 +293,7 @@ export function useDisparos({ salespeople, currentUser, onLeadsUpdated, onNaviga
     }
     setTestSending(true);
     try {
-      const r = await apiFetch('/api/campaign/test-dispatch', {
+      const r = await apiFetch(urlCampaignTestDispatch, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -398,7 +399,7 @@ export function useDisparos({ salespeople, currentUser, onLeadsUpdated, onNaviga
   const fetchMetaTemplates = async () => {
     try {
       setLoadingTemplates(true);
-      const res = await apiFetch('/api/admin/fluxo/templates');
+      const res = await apiFetch(urlAdminFluxoTemplates);
       if (res.ok) {
         const data = (await res.json()) as RespostaListaModelosFluxo;
         if (data.templates && Array.isArray(data.templates)) {
@@ -418,7 +419,7 @@ export function useDisparos({ salespeople, currentUser, onLeadsUpdated, onNaviga
   const fetchCopyTemplates = async () => {
     try {
       setLoadingCopies(true);
-      const res = await apiFetch('/api/campaign/copies');
+      const res = await apiFetch(urlCampaignCopies);
       if (res.ok) {
         const data = (await res.json()) as RespostaListaCopias;
         if (Array.isArray(data)) {
@@ -488,7 +489,7 @@ export function useDisparos({ salespeople, currentUser, onLeadsUpdated, onNaviga
     }
 
     try {
-      const res = await apiFetch(`/api/campaign/copies/${selectedCopyTemplateId}`, {
+      const res = await apiFetch(urlCampaignCopiesId(selectedCopyTemplateId), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -544,7 +545,7 @@ export function useDisparos({ salespeople, currentUser, onLeadsUpdated, onNaviga
     }
 
     try {
-      const res = await apiFetch('/api/campaign/copies', {
+      const res = await apiFetch(urlCampaignCopies, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -587,7 +588,7 @@ export function useDisparos({ salespeople, currentUser, onLeadsUpdated, onNaviga
     if (!confirm(`Deseja realmente excluir a copy "${copyName}" da biblioteca?`)) return;
 
     try {
-      const res = await apiFetch(`/api/campaign/copies/${copyId}`, { method: 'DELETE' });
+      const res = await apiFetch(urlCampaignCopiesId(copyId), { method: 'DELETE' });
       if (res.ok) {
         setCopyTemplates(prev => prev.filter(c => c.id !== copyId));
         if (selectedCopyTemplateId === copyId) {
@@ -656,7 +657,7 @@ export function useDisparos({ salespeople, currentUser, onLeadsUpdated, onNaviga
   const carregarHistoricoZips = async () => {
     setZipUploadsCarregando(true);
     try {
-      const r = await apiFetch('/api/campaign/uploads');
+      const r = await apiFetch(urlCampaignUploads);
       const d = (await r.json()) as RespostaListaUploads;
       setZipUploads(Array.isArray(d.uploads) ? d.uploads : []);
     } catch {
@@ -692,7 +693,7 @@ export function useDisparos({ salespeople, currentUser, onLeadsUpdated, onNaviga
   const fetchBatches = async () => {
     try {
       setLoading(true);
-      const res = await apiFetch('/api/campaign/batches');
+      const res = await apiFetch(urlCampaignBatches);
       if (res.ok) {
         const data = (await res.json()) as RespostaListaLotes;
         setBatches(data);
@@ -796,7 +797,7 @@ export function useDisparos({ salespeople, currentUser, onLeadsUpdated, onNaviga
   // Fetch initial speed from backend
   const fetchDispatchSpeed = async () => {
     try {
-      const res = await apiFetch('/api/campaign/dispatch/speed');
+      const res = await apiFetch(urlCampaignDispatchSpeed);
       if (res.ok) {
         const data = (await res.json()) as RespostaVelocidadeDisparo;
         if (data.currentSpeed) setDispatchSpeed(data.currentSpeed);
@@ -819,7 +820,7 @@ export function useDisparos({ salespeople, currentUser, onLeadsUpdated, onNaviga
     setDispatchSpeed(val);
     setIsUpdatingSpeed(true);
     try {
-      const res = await apiFetch('/api/campaign/dispatch/speed', {
+      const res = await apiFetch(urlCampaignDispatchSpeed, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ speed: val })
@@ -839,7 +840,7 @@ export function useDisparos({ salespeople, currentUser, onLeadsUpdated, onNaviga
   // Pause batch
   const handlePauseBatch = async (batchId: string) => {
     try {
-      const res = await apiFetch(`/api/campaign/batches/${batchId}/pause`, { method: 'POST' });
+      const res = await apiFetch(urlCampaignBatchesPauseId(batchId), { method: 'POST' });
       if (res.ok) {
         setLiveBatchProgress(prev => prev ? { ...prev, status: 'paused' } : null);
         showNotification('success', '⏸️ Esteira de disparo pausada.');
@@ -852,7 +853,7 @@ export function useDisparos({ salespeople, currentUser, onLeadsUpdated, onNaviga
   // Resume batch
   const handleResumeBatch = async (batchId: string) => {
     try {
-      const res = await apiFetch(`/api/campaign/batches/${batchId}/resume`, { method: 'POST' });
+      const res = await apiFetch(urlCampaignBatchesResumeId(batchId), { method: 'POST' });
       if (res.ok) {
         setLiveBatchProgress(prev => prev ? { ...prev, status: 'running' } : null);
         showNotification('success', '▶️ Esteira de disparo retomada.');
@@ -866,7 +867,7 @@ export function useDisparos({ salespeople, currentUser, onLeadsUpdated, onNaviga
   const handleCancelBatch = async (batchId: string) => {
     if (!confirm('Deseja realmente cancelar o disparo dos leads restantes deste lote?')) return;
     try {
-      const res = await apiFetch(`/api/campaign/batches/${batchId}/cancel`, { method: 'POST' });
+      const res = await apiFetch(urlCampaignBatchesCancelId(batchId), { method: 'POST' });
       if (res.ok) {
         setLiveBatchProgress(prev => prev ? { ...prev, status: 'cancelled' } : null);
         showNotification('success', '🛑 Disparo cancelado pelo gestor.');
@@ -925,7 +926,7 @@ export function useDisparos({ salespeople, currentUser, onLeadsUpdated, onNaviga
   const handleCreateBatch = async () => {
     if (!newBatchName.trim()) return;
     try {
-      const res = await apiFetch('/api/campaign/batches', {
+      const res = await apiFetch(urlCampaignBatches, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -952,7 +953,7 @@ export function useDisparos({ salespeople, currentUser, onLeadsUpdated, onNaviga
   const handleDeleteBatch = async (batchId: string) => {
     if (!confirm('Deseja realmente excluir esta safra e todos os seus leads de staging?')) return;
     try {
-      const res = await apiFetch(`/api/campaign/batches/${batchId}`, { method: 'DELETE' });
+      const res = await apiFetch(urlCampaignBatchesId(batchId), { method: 'DELETE' });
       if (res.ok) {
         setBatches(prev => prev.filter(b => b.id !== batchId));
         if (selectedBatchId === batchId) {
@@ -1026,7 +1027,7 @@ export function useDisparos({ salespeople, currentUser, onLeadsUpdated, onNaviga
 
     // 1. Notificar servidor e inicializar job de tracking
     try {
-      await apiFetch('/api/campaign/import-progress/init', {
+      await apiFetch(urlCampaignImportProgressInit, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1043,7 +1044,7 @@ export function useDisparos({ salespeople, currentUser, onLeadsUpdated, onNaviga
     // 2. Polling contínuo como garantia absoluta caso WebSockets sofram oscilações de rede
     const pollInterval = setInterval(async () => {
       try {
-        const pRes = await apiFetch(`/api/campaign/import-progress/${jobId}`);
+        const pRes = await apiFetch(urlCampaignImportProgressId(jobId));
         if (pRes.ok) {
           const pData: ImportProgressData = await pRes.json();
           setImportProgressData(prev => ({
@@ -1189,7 +1190,7 @@ export function useDisparos({ salespeople, currentUser, onLeadsUpdated, onNaviga
         setDispatchProgress(prev => (prev < 90 ? prev + 15 : prev));
       }, 300);
 
-      const res = await apiFetch('/api/campaign/dispatch', {
+      const res = await apiFetch(urlCampaignDispatch, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1232,7 +1233,7 @@ export function useDisparos({ salespeople, currentUser, onLeadsUpdated, onNaviga
   // Simulate positive response or opt-out
   const handleSimulateLeadReply = async (leadId: string, isInterested: boolean) => {
     try {
-      const res = await apiFetch(`/api/campaign/leads/${leadId}/simulate-reply`, {
+      const res = await apiFetch(urlCampaignLeadsSimulateReplyId(leadId), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isInterested })
@@ -1283,9 +1284,9 @@ export function useDisparos({ salespeople, currentUser, onLeadsUpdated, onNaviga
     setDispatchInfo(null);
     try {
       const [marcas, numeros, previa] = await Promise.all([
-        apiFetch('/api/brands').then(r => (r.ok ? r.json() : [])),
-        apiFetch('/api/phone-numbers').then(r => (r.ok ? r.json() : [])),
-        apiFetch('/api/regras-contato/previa', { method: 'POST' }).then(r => (r.ok ? r.json() : null)),
+        apiFetch(urlBrands).then(r => (r.ok ? r.json() : [])),
+        apiFetch(urlPhoneNumbers).then(r => (r.ok ? r.json() : [])),
+        apiFetch(urlRegrasContatoPrevia, { method: 'POST' }).then(r => (r.ok ? r.json() : null)),
       ]);
       const marcaId = (currentBatch as any)?.brandId as string | undefined;
       const marca = marcas.find((m: any) => m.id === marcaId);
@@ -1333,7 +1334,7 @@ export function useDisparos({ salespeople, currentUser, onLeadsUpdated, onNaviga
       const qtd = plano[batchId] ?? 0;
       if (qtd <= 0) continue;
       try {
-        const res = await apiFetch('/api/campaign/dispatch', {
+        const res = await apiFetch(urlCampaignDispatch, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1375,7 +1376,7 @@ export function useDisparos({ salespeople, currentUser, onLeadsUpdated, onNaviga
         tentativas++;
         await new Promise(resolve => setTimeout(resolve, 2000));
         try {
-          const progRes = await apiFetch(`/api/campaign/batches/${batchId}/progress`);
+          const progRes = await apiFetch(urlCampaignBatchesProgressId(batchId));
           if (!progRes.ok) { concluido = true; break; }
           const prog = await progRes.json();
           if (prog && prog.total > 0) {
@@ -1451,7 +1452,7 @@ export function useDisparos({ salespeople, currentUser, onLeadsUpdated, onNaviga
         ? dispatchSelectedClosers 
         : [dispatchSelectedCloser || 'seller-thomas'];
 
-      const res = await apiFetch('/api/campaign/dispatch', {
+      const res = await apiFetch(urlCampaignDispatch, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1499,7 +1500,7 @@ export function useDisparos({ salespeople, currentUser, onLeadsUpdated, onNaviga
         const pollInterval = setInterval(async () => {
           attempts++;
           try {
-            const progRes = await apiFetch(`/api/campaign/batches/${selectedBatchId}/progress`);
+            const progRes = await apiFetch(urlCampaignBatchesProgressId(selectedBatchId));
             if (progRes.ok) {
               const progData = await progRes.json();
               if (progData && progData.total > 0) {
@@ -1561,7 +1562,7 @@ export function useDisparos({ salespeople, currentUser, onLeadsUpdated, onNaviga
   // Move Lead to arbitrary Status in Kanban
   const handleMoveLeadStatus = async (leadId: string, newStatus: CampaignLeadStatus, note?: string) => {
     try {
-      const res = await apiFetch('/api/campaign/simulate-action', {
+      const res = await apiFetch(urlCampaignSimulateAction, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1596,7 +1597,7 @@ export function useDisparos({ salespeople, currentUser, onLeadsUpdated, onNaviga
         };
       }).filter(d => d.quota > 0);
 
-      const res = await apiFetch('/api/campaign/distribute', {
+      const res = await apiFetch(urlCampaignDistribute, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1629,7 +1630,7 @@ export function useDisparos({ salespeople, currentUser, onLeadsUpdated, onNaviga
   const handleReleaseQuarantine = async () => {
     if (!selectedBatchId) return;
     try {
-      const res = await apiFetch(`/api/campaign/batches/${selectedBatchId}/release-quarantine`, {
+      const res = await apiFetch(urlCampaignBatchesReleaseQuarantineId(selectedBatchId), {
         method: 'POST'
       });
       const data = (await res.json()) as RespostaLiberacaoQuarentena | RespostaErroApi;
@@ -1650,7 +1651,7 @@ export function useDisparos({ salespeople, currentUser, onLeadsUpdated, onNaviga
   const handleSaveQuarantineConfig = async () => {
     if (!selectedBatchId) return;
     try {
-      const res = await apiFetch(`/api/campaign/batches/${selectedBatchId}/quarantine-config`, {
+      const res = await apiFetch(urlCampaignBatchesQuarantineConfigId(selectedBatchId), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1679,7 +1680,7 @@ export function useDisparos({ salespeople, currentUser, onLeadsUpdated, onNaviga
     );
     if (!ok) return;
     try {
-      const res = await apiFetch(`/api/campaign/batches/${selectedBatchId}/return-unsent`, { method: 'POST' });
+      const res = await apiFetch(urlCampaignBatchesReturnUnsentId(selectedBatchId), { method: 'POST' });
       const data = (await res.json()) as RespostaDevolucaoLeads | RespostaErroApi;
       if (res.ok && 'returned' in data) {
         showNotification('success', data.message);
@@ -1702,7 +1703,7 @@ export function useDisparos({ salespeople, currentUser, onLeadsUpdated, onNaviga
     if (!confirmReset) return;
 
     try {
-      const res = await apiFetch(`/api/campaign/batches/${selectedBatchId}/reset-staging`, {
+      const res = await apiFetch(urlCampaignBatchesResetStagingId(selectedBatchId), {
         method: 'POST'
       });
       const data = await res.json();
@@ -1731,7 +1732,7 @@ export function useDisparos({ salespeople, currentUser, onLeadsUpdated, onNaviga
 
     try {
       setIsSyncingWhatsApp(true);
-      const res = await apiFetch(`/api/campaign/batches/${selectedBatchId}/sync-whatsapp-web`, {
+      const res = await apiFetch(urlCampaignBatchesSyncWhatsappWebId(selectedBatchId), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rawText: syncWhatsAppInput })

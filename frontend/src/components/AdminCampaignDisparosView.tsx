@@ -1,3 +1,4 @@
+import { urlCampaignBatchesBrandId } from '../features/disparos/api';
 import { apiFetch } from '../api/client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { RespostaUploadZip, RespostaErroApi } from '@shared/contracts/rotas';
@@ -146,7 +147,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
                 onChange={async (e) => {
                   const brandId = e.target.value || null;
                   try {
-                    const res = await apiFetch(`/api/campaign/batches/${currentBatch.id}/brand`, {
+                    const res = await apiFetch(urlCampaignBatchesBrandId(currentBatch.id), {
                       method: 'PUT',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ brandId }),
