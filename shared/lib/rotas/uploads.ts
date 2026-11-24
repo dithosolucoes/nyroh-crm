@@ -8,6 +8,7 @@ import type { Express } from 'express';
 import fs from 'fs';
 import JSZip from 'jszip';
 import type { ProgressoImportacao, RespostaApagarZip, RespostaApagarZipsEmLote, RespostaImportacaoIniciada, RespostaImportacaoZipDireta, RespostaListaUploads, RespostaUploadZipOk, RespostaZipEnfileirado, UploadZipRegistro } from '../../contracts/rotas.js';
+import { SQL_INSERT_CAMPAIGN_BATCHES, SQL_INSERT_CAMPAIGN_BATCHES_2, SQL_SELECT_CAMPAIGN_LEADS, SQL_UPDATE_CAMPAIGN_BATCHES, SQL_INSERT_ZIP_UPLOADS, SQL_SELECT_ZIP_UPLOADS, SQL_SELECT_ZIP_UPLOADS_2, SQL_SELECT_ZIP_UPLOADS_3, SQL_DELETE_CAMPAIGN_LEADS, SQL_DELETE_ZIP_UPLOADS, SQL_DELETE_CAMPAIGN_BATCHES, SQL_DELETE_ZIP_UPLOADS_2, SQL_SELECT_ZIP_UPLOADS_4, SQL_SELECT_CAMPAIGN_LEADS_2, SQL_SELECT_ZIP_UPLOADS_5, SQL_DELETE_CAMPAIGN_LEADS_2, SQL_DELETE_CAMPAIGN_BATCHES_2, SQL_DELETE_ZIP_UPLOADS_3 } from './repo/uploads.js';
 
 export interface DependenciasUploads {
   readonly broadcastSSE: any;
@@ -310,7 +311,7 @@ export function registrarRotasUploads(app: Express): void {
 
         if (D.usePostgres && D.pgPool) {
           await D.pgPool.query(
-            `INSERT INTO campaign_batches (id, name, created_at) VALUES ($1, $2, CURRENT_TIMESTAMP)`,
+            SQL_INSERT_CAMPAIGN_BATCHES,
             [targetBatchId, name]
           );
         } else {
@@ -338,7 +339,7 @@ export function registrarRotasUploads(app: Express): void {
         const name = safraName || `Safra ${targetBatchId}`;
         if (D.usePostgres && D.pgPool) {
           await D.pgPool.query(
-            `INSERT INTO campaign_batches (id, name, created_at) VALUES ($1, $2, CURRENT_TIMESTAMP) ON CONFLICT (id) DO NOTHING`,
+            SQL_INSERT_CAMPAIGN_BATCHES_2,
             [targetBatchId, name]
           );
         } else if (!D.memoryCampaignBatchesMap.has(targetBatchId)) {
@@ -451,11 +452,7 @@ export function registrarRotasUploads(app: Express): void {
         try {
           // Qualquer lead que já exista com esse telefone (qualquer safra, qualquer status, ou no CRM) não sobe de novo.
           const prev = await D.pgPool.query(
-            `SELECT regexp_replace(phone_number, '[^0-9]', '', 'g') AS d
-               FROM campaign_leads
-             UNION
-             SELECT regexp_replace(phone_number, '[^0-9]', '', 'g') AS d
-               FROM leads`
+            SQL_SELECT_CAMPAIGN_LEADS
           );
           for (const r of prev.rows) if (r.d) alreadyContacted.add(String(r.d));
         } catch (dedupErr: any) {
@@ -547,13 +544,7 @@ export function registrarRotasUploads(app: Express): void {
       // Atualização final dos contadores da Safra
       if (D.usePostgres && D.pgPool) {
         await D.pgPool.query(
-          `UPDATE campaign_batches 
-           SET total_leads = (SELECT COUNT(*) FROM campaign_leads WHERE batch_id = $1),
-               valid_mobiles = (SELECT COUNT(*) FROM campaign_leads WHERE batch_id = $1 AND is_mobile = TRUE),
-               landlines = (SELECT COUNT(*) FROM campaign_leads WHERE batch_id = $1 AND is_mobile = FALSE),
-               with_nyroh_url = (SELECT COUNT(*) FROM campaign_leads WHERE batch_id = $1 AND public_url != '' AND public_url IS NOT NULL),
-               with_website = (SELECT COUNT(*) FROM campaign_leads WHERE batch_id = $1 AND website != '' AND website IS NOT NULL)
-           WHERE id = $1`,
+          SQL_UPDATE_CAMPAIGN_BATCHES,
           [targetBatchId]
         );
       } else {
@@ -571,9 +562,7 @@ export function registrarRotasUploads(app: Express): void {
       if (D.usePostgres && D.pgPool) {
         try {
           await D.pgPool.query(
-            `INSERT INTO zip_uploads (id, batch_id, file_name, file_size_bytes, leads_in_zip, leads_saved, skipped_contacted, skipped_repeated, valid_mobiles, landlines)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-             ON CONFLICT (id) DO NOTHING`,
+            SQL_INSERT_ZIP_UPLOADS,
             [jobId, targetBatchId, req.file.originalname, req.file.size, rawLeads.length, savedLeadsCount, dedupSkippedContacted, dedupSkippedRepeated, validMobiles, landlines]
           );
         } catch (histErr: any) {
@@ -630,13 +619,7 @@ export function registrarRotasUploads(app: Express): void {
     if (!D.usePostgres || !D.pgPool) return res.json({ uploads: [] } satisfies RespostaListaUploads);
     try {
       const r = await D.pgPool.query(
-        `SELECT u.id, u.batch_id, u.file_name, u.file_size_bytes, u.leads_in_zip, u.leads_saved,
-                u.skipped_contacted, u.skipped_repeated, u.valid_mobiles, u.landlines, u.created_at,
-                b.name AS batch_name
-           FROM zip_uploads u
-           LEFT JOIN campaign_batches b ON b.id = u.batch_id
-          ORDER BY u.created_at DESC
-          LIMIT 200`
+        SQL_SELECT_ZIP_UPLOADS
       );
       const resposta: RespostaListaUploads = {
         uploads: r.rows.map((x: any): UploadZipRegistro => ({
@@ -667,15 +650,9 @@ export function registrarRotasUploads(app: Express): void {
     if (!D.usePostgres || !D.pgPool) return res.status(503).json({ error: 'Apagar exige o banco de dados.' });
     const dryRun = req.body?.dryRun !== false;
     try {
-      const r = await D.pgPool.query(`
-        SELECT b.id,
-               (SELECT COUNT(*)::int FROM zip_uploads u WHERE u.batch_id = b.id) AS zips,
-               (SELECT COUNT(*)::int FROM campaign_leads l WHERE l.batch_id = b.id AND l.status <> 'STAGING') AS nao_staging,
-               (SELECT COUNT(*)::int FROM campaign_leads l WHERE l.batch_id = b.id AND l.status = 'STAGING') AS staging
-          FROM campaign_batches b
-         WHERE EXISTS (SELECT 1 FROM zip_uploads u WHERE u.batch_id = b.id)`);
+      const r = await D.pgPool.query(SQL_SELECT_ZIP_UPLOADS_2);
       const orfaos = await D.pgPool.query(
-        `SELECT COUNT(*)::int AS n FROM zip_uploads WHERE batch_id IS NULL OR batch_id NOT IN (SELECT id FROM campaign_batches)`);
+        SQL_SELECT_ZIP_UPLOADS_3);
       const apagaveis = r.rows.filter((x: any) => x.nao_staging === 0);
       const bloqueadas = r.rows.filter((x: any) => x.nao_staging > 0);
       const resumo = {
@@ -688,11 +665,11 @@ export function registrarRotasUploads(app: Express): void {
       if (dryRun) return res.json({ dryRun: true, ...resumo } satisfies RespostaApagarZipsEmLote);
 
       for (const x of apagaveis) {
-        await D.pgPool.query('DELETE FROM campaign_leads WHERE batch_id = $1 AND status = $2', [x.id, 'STAGING']);
-        await D.pgPool.query('DELETE FROM zip_uploads WHERE batch_id = $1', [x.id]);
-        await D.pgPool.query('DELETE FROM campaign_batches WHERE id = $1', [x.id]);
+        await D.pgPool.query(SQL_DELETE_CAMPAIGN_LEADS, [x.id, 'STAGING']);
+        await D.pgPool.query(SQL_DELETE_ZIP_UPLOADS, [x.id]);
+        await D.pgPool.query(SQL_DELETE_CAMPAIGN_BATCHES, [x.id]);
       }
-      await D.pgPool.query(`DELETE FROM zip_uploads WHERE batch_id IS NULL OR batch_id NOT IN (SELECT id FROM campaign_batches)`);
+      await D.pgPool.query(SQL_DELETE_ZIP_UPLOADS_2);
       await D.logAudit('ZIPS_APAGADOS_EM_LOTE', `Apagou ${resumo.zips} ZIP(s) em ${resumo.safras} safra(s); ${resumo.leads} lead(s) em espera`, req);
       D.broadcastSSE('CAMPAIGN_BATCH_DELETED', { batchId: null });
       return res.json({ dryRun: false, ...resumo } satisfies RespostaApagarZipsEmLote);
@@ -707,29 +684,29 @@ export function registrarRotasUploads(app: Express): void {
     if (!D.usePostgres || !D.pgPool) return res.status(503).json({ error: 'Apagar ZIP exige o banco de dados.' });
     const { uploadId } = req.params;
     try {
-      const up = await D.pgPool.query('SELECT id, batch_id, file_name FROM zip_uploads WHERE id = $1', [uploadId]);
+      const up = await D.pgPool.query(SQL_SELECT_ZIP_UPLOADS_4, [uploadId]);
       if (up.rowCount === 0) return res.status(404).json({ error: 'ZIP não encontrado no histórico.' });
       const { batch_id: batchId, file_name: fileName } = up.rows[0];
 
       if (batchId) {
         const naoStaging = await D.pgPool.query(
-          `SELECT COUNT(*)::int AS n FROM campaign_leads WHERE batch_id = $1 AND status <> 'STAGING' AND (sent_at IS NOT NULL OR status <> 'DESCARTADO')`, [batchId]);
+          SQL_SELECT_CAMPAIGN_LEADS_2, [batchId]);
         if (naoStaging.rows[0].n > 0) {
           return res.status(409).json({
             error: `Não dá para apagar: ${naoStaging.rows[0].n} lead(s) desta safra já foram disparados ou têm resposta do cliente. Nada foi apagado.`
           });
         }
         const outrosZips = await D.pgPool.query(
-          'SELECT COUNT(*)::int AS n FROM zip_uploads WHERE batch_id = $1 AND id <> $2', [batchId, uploadId]);
+          SQL_SELECT_ZIP_UPLOADS_5, [batchId, uploadId]);
         if (outrosZips.rows[0].n > 0) {
           return res.status(409).json({
             error: 'Esta safra recebeu outros ZIPs, então este não pode ser apagado sozinho. Use “Apagar safra” para apagar a safra inteira. Nada foi apagado.'
           });
         }
-        await D.pgPool.query('DELETE FROM campaign_leads WHERE batch_id = $1 AND status = $2', [batchId, 'STAGING']);
-        await D.pgPool.query('DELETE FROM campaign_batches WHERE id = $1', [batchId]);
+        await D.pgPool.query(SQL_DELETE_CAMPAIGN_LEADS_2, [batchId, 'STAGING']);
+        await D.pgPool.query(SQL_DELETE_CAMPAIGN_BATCHES_2, [batchId]);
       }
-      await D.pgPool.query('DELETE FROM zip_uploads WHERE id = $1', [uploadId]);
+      await D.pgPool.query(SQL_DELETE_ZIP_UPLOADS_3, [uploadId]);
       await D.logAudit('ZIP_EXCLUIDO', `Excluiu ZIP ${fileName} (safra ${batchId || '—'})`, req);
       D.broadcastSSE('CAMPAIGN_BATCH_DELETED', { batchId });
       return res.json({ success: true, message: 'ZIP apagado.' } satisfies RespostaApagarZip);

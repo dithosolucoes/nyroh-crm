@@ -10,6 +10,7 @@ import { executeFluxoRequest, fluxoInstancePath } from '../fluxoClient.js';
 import { getMetaProvider, metaSendText } from '../metaClient.js';
 import { dispatchRpm, planRpm } from '../dispatchRate.js';
 import { getQueueSystemStatus } from '../../../server/redisQueue.js';
+import { SQL_SELECT_SALESPEOPLE, SQL_INSERT_LEADS, SQL_INSERT_LEAD_MESSAGES, SQL_INSERT_LEADS_2, SQL_UPDATE_CAMPAIGN_LEADS } from './repo/demais.js';
 
 
 export interface DependenciasDemais {
@@ -80,7 +81,7 @@ export function registrarDemais(app: Express): void {
     let resolvedSellerName = 'Thomas';
     if (D.usePostgres && D.pgPool) {
       try {
-        const spRes = await D.pgPool.query('SELECT name FROM salespeople WHERE id = $1', [salespersonId]);
+        const spRes = await D.pgPool.query(SQL_SELECT_SALESPEOPLE, [salespersonId]);
         if (spRes.rows.length > 0) resolvedSellerName = spRes.rows[0].name;
       } catch {
         resolvedSellerName = 'Thomas';
@@ -135,16 +136,7 @@ export function registrarDemais(app: Express): void {
     if (D.usePostgres && D.pgPool) {
       try {
         const insRes = await D.pgPool.query(
-          `INSERT INTO leads (
-            id, name, phone_number, public_url, website, niche, column_status, sub_status,
-            salesperson_id, salesperson_name, last_call_tag, call_count, notes, created_at, updated_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-          ON CONFLICT (id) DO UPDATE SET
-            sub_status = EXCLUDED.sub_status,
-            last_call_tag = EXCLUDED.last_call_tag,
-            call_count = leads.call_count + 1,
-            updated_at = CURRENT_TIMESTAMP
-          RETURNING id, name, phone_number AS "phoneNumber", public_url AS "publicUrl", website, niche, column_status AS "columnStatus", sub_status AS "subStatus", salesperson_id AS "salespersonId", salesperson_name AS "salespersonName", last_call_tag AS "lastCallTag", call_count AS "callCount", notes, created_at AS "createdAt", updated_at AS "updatedAt"`,
+          SQL_INSERT_LEADS,
           [
             leadId,
             effectiveLeadName,
@@ -212,9 +204,7 @@ export function registrarDemais(app: Express): void {
     if (D.usePostgres && D.pgPool) {
       try {
         await D.pgPool.query(
-          `INSERT INTO lead_messages (id, lead_id, phone_number, sender, sender_name, text, template_name, status, timestamp)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, 'delivered', CURRENT_TIMESTAMP)
-           ON CONFLICT (id) DO NOTHING`,
+          SQL_INSERT_LEAD_MESSAGES,
           [outgoingMessage.id, leadId, (createdLead?.phoneNumber || formattedE164 || '').replace(/\D/g, '') || null, outgoingMessage.sender, outgoingMessage.senderName, outgoingMessage.text, outgoingMessage.templateName || null]
         );
       } catch (testMsgErr: any) {
@@ -595,9 +585,7 @@ export function registrarDemais(app: Express): void {
     for (const s of samples) {
       if (D.usePostgres && D.pgPool) {
         const res = await D.pgPool.query(
-          `INSERT INTO leads (id, name, phone_number, public_url, column_status)
-           VALUES ($1, $2, $3, $4, 'Leads')
-           ON CONFLICT (id) DO NOTHING`,
+          SQL_INSERT_LEADS_2,
           [s.id, s.name, s.phoneNumber, s.publicUrl]
         );
         if (res.rowCount && res.rowCount > 0) insertedCount++;
@@ -633,11 +621,7 @@ export function registrarDemais(app: Express): void {
       recuperarFixosDescartados(D.memoryCampaignLeadsMap.values());
 
       if (D.usePostgres && D.pgPool) {
-        await D.pgPool.query(`
-          UPDATE campaign_leads
-          SET status = 'STAGING', response_preview = NULL
-          WHERE status = 'DESCARTADO' AND response_preview LIKE '%Telefone fixo%'
-        `).catch(() => {});
+        await D.pgPool.query(SQL_UPDATE_CAMPAIGN_LEADS).catch(() => {});
 
         // Tira da lista do disparo quem já foi contatado (CRM ou outra campanha)
         await D.cortarJaContatados();

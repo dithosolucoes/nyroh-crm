@@ -14,6 +14,7 @@ import { executeFluxoRequest, fluxoInstancePath } from '../fluxoClient.js';
 import { isUserAdmin } from '../serverAuth.js';
 import { missingFluxoVars, summarizeFluxoInstance } from '../fluxoInstanceStatus.js';
 import type { RespostaCadastroContaOk, RespostaCatalogoModelosMeta, RespostaConfigEmbeddedSignup, RespostaConfigFluxo, RespostaContasMeta, RespostaCriacaoInstancia, RespostaEmbeddedSignupConcluido, RespostaEnvioTesteSucesso, RespostaEventoSimulado, RespostaEventosFluxo, RespostaInstanciasFluxo, RespostaLeituraMeta, RespostaListaModelosFluxo, RespostaMetaRemovida, RespostaModeloCriado, RespostaModoInstancia, RespostaRuntimeConfig, RespostaSalvarConfigFluxo, RespostaSincronizacaoConta, RespostaSincronizacaoModelos, RespostaSincronizacaoTodas, RespostaStatusFluxo, RespostaStatusMeta, RespostaSucesso, RespostaTesteConexaoFluxo } from '../../contracts/rotas.js';
+import { SQL_INSERT_SYSTEM_SETTINGS, SQL_INSERT_SYSTEM_SETTINGS_2, SQL_INSERT_SYSTEM_SETTINGS_3, SQL_INSERT_SYSTEM_SETTINGS_4, SQL_INSERT_SYSTEM_SETTINGS_5, SQL_INSERT_SYSTEM_SETTINGS_6, SQL_INSERT_SYSTEM_SETTINGS_7, SQL_SELECT_META_TEMPLATES, SQL_INSERT_META_TEMPLATES, SQL_INSERT_META_TEMPLATES_2, SQL_INSERT_META_TEMPLATES_3, SQL_UPDATE_META_TEMPLATES, SQL_DELETE_META_TEMPLATES, SQL_UPDATE_META_TEMPLATES_2, SQL_INSERT_META_ACCOUNTS, SQL_SELECT_META_ACCOUNTS, SQL_UPDATE_META_ACCOUNTS, SQL_INSERT_META_ACCOUNTS_2, SQL_SELECT_META_NUMBERS, SQL_DELETE_META_ACCOUNTS, SQL_SELECT_META_TEMPLATES_2 } from './repo/fluxoMeta.js';
 export interface DependenciasFluxoMeta {
   readonly IS_PRODUCTION: boolean;
   readonly SIMULATORS_ENABLED: boolean;
@@ -112,51 +113,44 @@ export function registrarFluxoMeta(app: Express): void {
       try {
         if (apiKey !== undefined && String(apiKey).trim()) {
           await D.pgPool.query(
-            `INSERT INTO system_settings (key, value, updated_at) VALUES ('fluxo_api_key', $1, CURRENT_TIMESTAMP)
-             ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP`,
+            SQL_INSERT_SYSTEM_SETTINGS,
             [String(apiKey).trim()]
           );
         }
         if (apiSecret !== undefined && String(apiSecret).trim()) {
           await D.pgPool.query(
-            `INSERT INTO system_settings (key, value, updated_at) VALUES ('fluxo_api_secret', $1, CURRENT_TIMESTAMP)
-             ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP`,
+            SQL_INSERT_SYSTEM_SETTINGS_2,
             [String(apiSecret).trim()]
           );
         }
         if (instanceId !== undefined && String(instanceId).trim()) {
           await D.pgPool.query(
-            `INSERT INTO system_settings (key, value, updated_at) VALUES ('fluxo_instance_id', $1, CURRENT_TIMESTAMP)
-             ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP`,
+            SQL_INSERT_SYSTEM_SETTINGS_3,
             [String(instanceId).trim()]
           );
         }
 
         if (metaAccessToken !== undefined && String(metaAccessToken).trim()) {
           await D.pgPool.query(
-            `INSERT INTO system_settings (key, value, updated_at) VALUES ('meta_access_token', $1, CURRENT_TIMESTAMP)
-             ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP`,
+            SQL_INSERT_SYSTEM_SETTINGS_4,
             [String(metaAccessToken).trim()]
           );
         }
         if (metaWabaId !== undefined && String(metaWabaId).trim()) {
           await D.pgPool.query(
-            `INSERT INTO system_settings (key, value, updated_at) VALUES ('meta_waba_id', $1, CURRENT_TIMESTAMP)
-             ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP`,
+            SQL_INSERT_SYSTEM_SETTINGS_5,
             [String(metaWabaId).trim()]
           );
         }
         if (metaPhoneNumberId !== undefined && String(metaPhoneNumberId).trim()) {
           await D.pgPool.query(
-            `INSERT INTO system_settings (key, value, updated_at) VALUES ('meta_phone_number_id', $1, CURRENT_TIMESTAMP)
-             ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP`,
+            SQL_INSERT_SYSTEM_SETTINGS_6,
             [String(metaPhoneNumberId).trim()]
           );
         }
         if (metaVerifyToken !== undefined && String(metaVerifyToken).trim()) {
           await D.pgPool.query(
-            `INSERT INTO system_settings (key, value, updated_at) VALUES ('meta_verify_token', $1, CURRENT_TIMESTAMP)
-             ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP`,
+            SQL_INSERT_SYSTEM_SETTINGS_7,
             [String(metaVerifyToken).trim()]
           );
         }
@@ -651,9 +645,7 @@ export function registrarFluxoMeta(app: Express): void {
     if (D.usePostgres && D.pgPool) {
       try {
         const dbRes = await D.pgPool.query(
-          `SELECT id, name, category, language, status, components, usage_count, quality_score, rejected_reason, created_at 
-           FROM meta_templates 
-           ORDER BY created_at DESC`
+          SQL_SELECT_META_TEMPLATES
         );
         for (const r of dbRes.rows) {
           const comps = typeof r.components === 'string' ? JSON.parse(r.components) : (r.components || []);
@@ -702,15 +694,7 @@ export function registrarFluxoMeta(app: Express): void {
             if (D.usePostgres && D.pgPool) {
               try {
                 await D.pgPool.query(
-                  `INSERT INTO meta_templates (id, name, category, language, status, components, usage_count, quality_score, rejected_reason, created_at)
-                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
-                   ON CONFLICT (name) DO UPDATE SET
-                     status = EXCLUDED.status,
-                     category = EXCLUDED.category,
-                     language = EXCLUDED.language,
-                     components = EXCLUDED.components,
-                     quality_score = EXCLUDED.quality_score,
-                     rejected_reason = EXCLUDED.rejected_reason`,
+                  SQL_INSERT_META_TEMPLATES,
                   [
                     normalized.id,
                     normalized.name,
@@ -850,15 +834,7 @@ export function registrarFluxoMeta(app: Express): void {
         if (D.usePostgres && D.pgPool) {
           try {
             await D.pgPool.query(
-              `INSERT INTO meta_templates (id, name, category, language, status, components, usage_count, quality_score, rejected_reason, created_at)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP)
-               ON CONFLICT (name) DO UPDATE SET
-                 status = EXCLUDED.status,
-                 category = EXCLUDED.category,
-                 language = EXCLUDED.language,
-                 components = EXCLUDED.components,
-                 quality_score = EXCLUDED.quality_score,
-                 rejected_reason = EXCLUDED.rejected_reason`,
+              SQL_INSERT_META_TEMPLATES_2,
               [
                 normalized.id,
                 normalized.name,
@@ -1053,14 +1029,7 @@ export function registrarFluxoMeta(app: Express): void {
     if (D.usePostgres && D.pgPool) {
       try {
         await D.pgPool.query(
-          `INSERT INTO meta_templates (id, name, category, language, status, components, usage_count, quality_score, created_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)
-           ON CONFLICT (name) DO UPDATE SET
-             category = EXCLUDED.category,
-             language = EXCLUDED.language,
-             status = EXCLUDED.status,
-             components = EXCLUDED.components,
-             quality_score = EXCLUDED.quality_score`,
+          SQL_INSERT_META_TEMPLATES_3,
           [
             newTemplate.id,
             newTemplate.name,
@@ -1117,11 +1086,7 @@ export function registrarFluxoMeta(app: Express): void {
     if (D.usePostgres && D.pgPool) {
       try {
         await D.pgPool.query(
-          `UPDATE meta_templates SET 
-             status = $1, 
-             quality_score = COALESCE($2, quality_score), 
-             rejected_reason = COALESCE($3, rejected_reason) 
-           WHERE LOWER(name) = LOWER($4)`,
+          SQL_UPDATE_META_TEMPLATES,
           [targetStatus, qualityScore || null, rejectedReason || null, name]
         );
       } catch (err) {
@@ -1159,7 +1124,7 @@ export function registrarFluxoMeta(app: Express): void {
     // Remove from PostgreSQL
     if (D.usePostgres && D.pgPool) {
       try {
-        await D.pgPool.query(`DELETE FROM meta_templates WHERE LOWER(name) = LOWER($1) OR id = $1`, [name]);
+        await D.pgPool.query(SQL_DELETE_META_TEMPLATES, [name]);
       } catch (err) {
         console.warn('[PostgreSQL] Erro ao deletar template do banco:', err);
       }
@@ -1225,7 +1190,7 @@ export function registrarFluxoMeta(app: Express): void {
         if (D.usePostgres && D.pgPool) {
           try {
             await D.pgPool.query(
-              `UPDATE meta_templates SET usage_count = COALESCE(usage_count, 0) + 1 WHERE LOWER(name) = LOWER($1)`,
+              SQL_UPDATE_META_TEMPLATES_2,
               [templateName]
             );
           } catch (uErr) {
@@ -1308,7 +1273,7 @@ export function registrarFluxoMeta(app: Express): void {
       const id = `bm_${crypto.randomBytes(6).toString('hex')}`;
       const enc = encryptMetaToken(accessToken);
       await D.pgPool.query(
-        'INSERT INTO meta_accounts (id, name, waba_id, business_id, access_token_enc) VALUES ($1, $2, $3, $4, $5)',
+        SQL_INSERT_META_ACCOUNTS,
         [id, name, wabaId, businessId, enc]
       );
       const sync = await D.syncMetaAccountIntoDb(id);
@@ -1357,21 +1322,21 @@ export function registrarFluxoMeta(app: Express): void {
         wabaId = found[0];
       }
       const enc = encryptMetaToken(token);
-      const existing = await D.pgPool.query('SELECT id FROM meta_accounts WHERE waba_id = $1 LIMIT 1', [wabaId]);
+      const existing = await D.pgPool.query(SQL_SELECT_META_ACCOUNTS, [wabaId]);
       let accountId: string;
       if (existing.rows.length > 0) {
         accountId = String(existing.rows[0].id);
-        await D.pgPool.query('UPDATE meta_accounts SET access_token_enc = $1 WHERE id = $2', [enc, accountId]);
+        await D.pgPool.query(SQL_UPDATE_META_ACCOUNTS, [enc, accountId]);
       } else {
         accountId = `bm_${crypto.randomBytes(6).toString('hex')}`;
         await D.pgPool.query(
-          'INSERT INTO meta_accounts (id, name, waba_id, business_id, access_token_enc) VALUES ($1, $2, $3, $4, $5)',
+          SQL_INSERT_META_ACCOUNTS_2,
           [accountId, `WABA ${wabaId}`, wabaId, null, enc]
         );
       }
       const sub = await metaSubscribeWaba(wabaId, token);
       const sync = await D.syncMetaAccountIntoDb(accountId);
-      const phoneOk = !phoneNumberId || (sync.success && (await D.pgPool.query('SELECT 1 FROM meta_numbers WHERE phone_number_id = $1', [phoneNumberId])).rows.length > 0);
+      const phoneOk = !phoneNumberId || (sync.success && (await D.pgPool.query(SQL_SELECT_META_NUMBERS, [phoneNumberId])).rows.length > 0);
       return res.json({
         success: sync.success && phoneOk,
         accountId,
@@ -1398,7 +1363,7 @@ export function registrarFluxoMeta(app: Express): void {
   // Remove a BM do CRM (apaga o token guardado; os números somem junto)
   app.delete('/api/admin/meta/accounts/:id', async (req: any, res) => {
     if (!D.pgPool || !D.usePostgres) return res.status(503).json({ success: false, error: 'Banco indisponível.' });
-    await D.pgPool.query('DELETE FROM meta_accounts WHERE id = $1', [String(req.params.id)]);
+    await D.pgPool.query(SQL_DELETE_META_ACCOUNTS, [String(req.params.id)]);
     await D.loadMetaRegistryFromDb();
     return res.json({ success: true } satisfies RespostaMetaRemovida);
   });
@@ -1510,10 +1475,7 @@ export function registrarFluxoMeta(app: Express): void {
 
       if (D.usePostgres && D.pgPool) {
         const dbRes = await D.pgPool.query(
-          `SELECT id, name, category, language, status, components, usage_count, quality_score, created_at
-           FROM meta_templates
-           WHERE status = 'APPROVED'
-           ORDER BY usage_count DESC, created_at DESC`
+          SQL_SELECT_META_TEMPLATES_2
         );
         for (const r of dbRes.rows) {
           const comps = typeof r.components === 'string' ? JSON.parse(r.components) : (r.components || []);

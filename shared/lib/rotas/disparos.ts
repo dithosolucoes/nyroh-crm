@@ -12,6 +12,7 @@ import { validarInstanciaEscolhida } from '../dispatchInstancia.js';
 import { regrasDeContatoSql, uxSchemaOn } from '../uxRoutes.js';
 import type { Lead } from '../../types.js';
 import type { LoteCampanha, ProgressoLote, RespostaAcaoLote, RespostaAcaoSimulada, RespostaAlteracaoVelocidade, RespostaCancelamentoLote, RespostaCopiaRemovida, RespostaCopiaSalva, RespostaDevolucaoLeads, RespostaDisparo, RespostaDistribuicaoCampanha, RespostaLiberacaoQuarentena, RespostaListaCopias, RespostaListaLotes, RespostaResetSafra, RespostaRetornoQuarentena, RespostaSincronizacaoWhatsApp, RespostaSucesso, RespostaVelocidadeDisparo } from '../../contracts/rotas.js';
+import { SQL_SELECT_CAMPAIGN_LEADS, SQL_INSERT_CAMPAIGN_BATCHES, SQL_SELECT_CAMPAIGN_COPY_TEMPLATES, SQL_INSERT_CAMPAIGN_COPY_TEMPLATES, SQL_SELECT_CAMPAIGN_COPY_TEMPLATES_2, SQL_INSERT_CAMPAIGN_COPY_TEMPLATES_2, SQL_SELECT_CAMPAIGN_COPY_TEMPLATES_3, SQL_UPDATE_CAMPAIGN_COPY_TEMPLATES, SQL_SELECT_CAMPAIGN_COPY_TEMPLATES_4, SQL_DELETE_CAMPAIGN_COPY_TEMPLATES, SQL_SELECT_SALESPEOPLE, SQL_UPDATE_CAMPAIGN_BATCHES, SQL_UPDATE_CAMPAIGN_LEADS, SQL_UPDATE_CAMPAIGN_LEADS_2, SQL_INSERT_LEADS, SQL_UPDATE_CAMPAIGN_LEADS_3, SQL_UPDATE_CAMPAIGN_LEADS_4, SQL_INSERT_LEADS_2, SQL_UPDATE_CAMPAIGN_LEADS_5, SQL_UPDATE_CAMPAIGN_LEADS_6, SQL_UPDATE_CAMPAIGN_BATCHES_2, SQL_UPDATE_CAMPAIGN_BATCHES_3, SQL_SELECT_CAMPAIGN_LEADS_2, SQL_UPDATE_CAMPAIGN_LEADS_7, SQL_UPDATE_CAMPAIGN_BATCHES_4, SQL_UPDATE_CAMPAIGN_LEADS_8, SQL_UPDATE_CAMPAIGN_BATCHES_5, SQL_SELECT_CAMPAIGN_LEADS_3, SQL_UPDATE_CAMPAIGN_LEADS_9, SQL_UPDATE_CAMPAIGN_LEADS_10, SQL_UPDATE_CAMPAIGN_LEADS_11, SQL_UPDATE_CAMPAIGN_BATCHES_6, SQL_SELECT_CAMPAIGN_LEADS_4, SQL_DELETE_CAMPAIGN_LEADS, SQL_DELETE_ZIP_UPLOADS, SQL_DELETE_CAMPAIGN_BATCHES } from './repo/disparos.js';
 type StoredCampaignBatch = any;
 type StoredCampaignCopyTemplate = any;
 type StoredCampaignLead = any;
@@ -58,45 +59,7 @@ export function registrarDisparos(app: Express): void {
   app.get('/api/campaign/batches', async (req, res) => {
     try {
       if (D.usePostgres && D.pgPool) {
-        const result = await D.pgPool.query(`
-          SELECT 
-            b.id,
-            b.name,
-            b.total_leads AS "totalLeads",
-            b.valid_mobiles AS "validMobiles",
-            b.landlines AS "landlines",
-            b.with_nyroh_url AS "withNyrohUrl",
-            b.with_website AS "withWebsite",
-            b.status,
-            b.template_name AS "templateName",
-            b.quarantine_hours AS "quarantineHours",
-            b.quarantine_started_at AS "quarantineStartedAt",
-            b.quarantine_ends_at AS "quarantineEndsAt",
-            b.allowed_closers AS "allowedClosers",
-            b.hot_retained_by_admin AS "hotLeadsRetainedByAdmin",
-            b.quarantine_on_reply AS "onReplyAction",
-            b.quarantine_on_expire AS "onExpireAction",
-            b.dispatched_count AS "dispatchedCount",
-            (SELECT COUNT(*) FROM campaign_leads cl
-               WHERE cl.batch_id = b.id AND cl.whatsapp_message_id IS NOT NULL)::int AS "acceptedCount",
-            (SELECT COUNT(*) FROM campaign_leads cl
-               WHERE cl.batch_id = b.id AND cl.whatsapp_message_id IS NOT NULL
-                 AND EXISTS (
-                   SELECT 1 FROM lead_messages m
-                   WHERE m.whatsapp_message_id = cl.whatsapp_message_id
-                     AND m.status IN ('delivered', 'read')
-                 ))::int AS "deliveredCount",
-            (SELECT COUNT(*) FROM campaign_leads cl
-               WHERE cl.batch_id = b.id AND cl.status = 'FALHA')::int AS "failedCount",
-            b.hot_count AS "hotCount",
-            b.cold_count AS "coldCount",
-            b.opt_out_count AS "optOutCount",
-            (SELECT COUNT(*) FROM campaign_leads cl
-               WHERE cl.batch_id = b.id AND cl.status = 'STAGING')::int AS "stagingCount",
-            b.created_at AS "createdAt"
-          FROM campaign_batches b
-          ORDER BY b.created_at DESC
-        `);
+        const result = await D.pgPool.query(SQL_SELECT_CAMPAIGN_LEADS);
         return res.json(result.rows satisfies RespostaListaLotes);
       } else {
         const batches = Array.from(D.memoryCampaignBatchesMap.values()).sort(
@@ -125,14 +88,7 @@ export function registrarDisparos(app: Express): void {
     try {
       if (D.usePostgres && D.pgPool) {
         const result = await D.pgPool.query(
-          `INSERT INTO campaign_batches (id, name, template_name, quarantine_hours, created_at)
-           VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
-           RETURNING id, name, total_leads AS "totalLeads", valid_mobiles AS "validMobiles", 
-                     landlines, with_nyroh_url AS "withNyrohUrl", with_website AS "withWebsite",
-                     status, template_name AS "templateName", quarantine_hours AS "quarantineHours",
-                     allowed_closers AS "allowedClosers", hot_retained_by_admin AS "hotLeadsRetainedByAdmin",
-                     dispatched_count AS "dispatchedCount", hot_count AS "hotCount", 
-                     cold_count AS "coldCount", opt_out_count AS "optOutCount", created_at AS "createdAt"`,
+          SQL_INSERT_CAMPAIGN_BATCHES,
           [batchId, cleanName, templateName, hours]
         );
         await D.logAudit('CAMPANHA_SAFRA_CRIADA', `Criou safra: ${cleanName}`, req);
@@ -176,12 +132,7 @@ export function registrarDisparos(app: Express): void {
         try {
           await D.garantirSchemaCopias();
 
-          const result = await D.pgPool.query(`
-            SELECT id, name, description, category, var1, var2, var3, meta_template_name AS "metaTemplateName", values_json AS "values", 
-                   created_at AS "createdAt", updated_at AS "updatedAt", is_default AS "isDefault"
-            FROM campaign_copy_templates
-            ORDER BY is_default DESC, created_at DESC
-          `);
+          const result = await D.pgPool.query(SQL_SELECT_CAMPAIGN_COPY_TEMPLATES);
 
           if (result.rows.length > 0) {
             // Sincronizar com o mapa em memória
@@ -206,18 +157,11 @@ export function registrarDisparos(app: Express): void {
             // Se a tabela estiver vazia, semear com os padrões e retornar
             for (const defTpl of Array.from(D.memoryCampaignCopyTemplatesMap.values())) {
               await D.pgPool.query(
-                `INSERT INTO campaign_copy_templates (id, name, description, category, var1, var2, var3, is_default)
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-                 ON CONFLICT (id) DO NOTHING`,
+                SQL_INSERT_CAMPAIGN_COPY_TEMPLATES,
                 [defTpl.id, defTpl.name, defTpl.description, defTpl.category, defTpl.var1, defTpl.var2, defTpl.var3, defTpl.isDefault]
               );
             }
-            const seeded = await D.pgPool.query(`
-              SELECT id, name, description, category, var1, var2, var3, meta_template_name AS "metaTemplateName", values_json AS "values", 
-                     created_at AS "createdAt", updated_at AS "updatedAt", is_default AS "isDefault"
-              FROM campaign_copy_templates
-              ORDER BY is_default DESC, created_at DESC
-            `);
+            const seeded = await D.pgPool.query(SQL_SELECT_CAMPAIGN_COPY_TEMPLATES_2);
             if (seeded.rows.length > 0) {
               return res.json(seeded.rows.map((r: any) => ({ ...r, values: D.valoresDaLinhaCopy(r) })) satisfies RespostaListaCopias);
             }
@@ -264,12 +208,7 @@ export function registrarDisparos(app: Express): void {
       if (D.usePostgres && D.pgPool) {
         await D.garantirSchemaCopias();
         await D.pgPool.query(
-          `INSERT INTO campaign_copy_templates (id, name, description, category, var1, var2, var3, meta_template_name, values_json, created_at, is_default)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, FALSE)
-           ON CONFLICT (id) DO UPDATE
-           SET name = EXCLUDED.name, description = EXCLUDED.description, category = EXCLUDED.category,
-               var1 = EXCLUDED.var1, var2 = EXCLUDED.var2, var3 = EXCLUDED.var3,
-               meta_template_name = EXCLUDED.meta_template_name, values_json = EXCLUDED.values_json, updated_at = CURRENT_TIMESTAMP`,
+          SQL_INSERT_CAMPAIGN_COPY_TEMPLATES_2,
           [id, newTemplate.name, newTemplate.description, newTemplate.category, newTemplate.var1, newTemplate.var2, newTemplate.var3, newTemplate.metaTemplateName || null, JSON.stringify(valoresNovos), now]
         );
         console.log(`[Campaign Copies] Template "${newTemplate.name}" salvo no PostgreSQL com id ${id}`);
@@ -295,7 +234,7 @@ export function registrarDisparos(app: Express): void {
 
       if (D.usePostgres && D.pgPool) {
         try {
-          const checkRes = await D.pgPool.query(`SELECT * FROM campaign_copy_templates WHERE id = $1`, [id]);
+          const checkRes = await D.pgPool.query(SQL_SELECT_CAMPAIGN_COPY_TEMPLATES_3, [id]);
           if (checkRes.rows.length > 0) {
             const row = checkRes.rows[0];
             existing = {
@@ -344,10 +283,7 @@ export function registrarDisparos(app: Express): void {
 
       if (D.usePostgres && D.pgPool) {
         await D.pgPool.query(
-          `UPDATE campaign_copy_templates
-           SET name = $1, description = $2, category = $3, var1 = $4, var2 = $5, var3 = $6,
-               meta_template_name = $8, values_json = $9::jsonb, updated_at = CURRENT_TIMESTAMP
-           WHERE id = $7`,
+          SQL_UPDATE_CAMPAIGN_COPY_TEMPLATES,
           [updated.name, updated.description, updated.category, updated.var1, updated.var2, updated.var3, id, updated.metaTemplateName || null, JSON.stringify(updated.values || {})]
         );
       }
@@ -367,7 +303,7 @@ export function registrarDisparos(app: Express): void {
 
       if (D.usePostgres && D.pgPool) {
         try {
-          const checkRes = await D.pgPool.query(`SELECT * FROM campaign_copy_templates WHERE id = $1`, [id]);
+          const checkRes = await D.pgPool.query(SQL_SELECT_CAMPAIGN_COPY_TEMPLATES_4, [id]);
           if (checkRes.rows.length > 0) {
             existing = {
               id: checkRes.rows[0].id,
@@ -389,7 +325,7 @@ export function registrarDisparos(app: Express): void {
       D.memoryCampaignCopyTemplatesMap.delete(id);
 
       if (D.usePostgres && D.pgPool) {
-        await D.pgPool.query(`DELETE FROM campaign_copy_templates WHERE id = $1`, [id]);
+        await D.pgPool.query(SQL_DELETE_CAMPAIGN_COPY_TEMPLATES, [id]);
       }
 
       await D.logAudit('COPY_TEMPLATE_EXCLUIDO', `Excluído template de copy "${existing.name}"`, req);
@@ -461,7 +397,7 @@ export function registrarDisparos(app: Express): void {
     const sellerMap = new Map<string, { id: string; name: string }>();
     if (D.usePostgres && D.pgPool) {
       try {
-        const spRes = await D.pgPool.query('SELECT id, name FROM salespeople WHERE id = ANY($1::text[])', [rawSellerIds]);
+        const spRes = await D.pgPool.query(SQL_SELECT_SALESPEOPLE, [rawSellerIds]);
         for (const row of spRes.rows) {
           sellerMap.set(row.id, { id: row.id, name: row.name });
         }
@@ -577,17 +513,7 @@ export function registrarDisparos(app: Express): void {
 
         // Update batch stats
         await D.pgPool.query(
-          `UPDATE campaign_batches
-           SET status = 'quarantine',
-               template_name = COALESCE($1, template_name),
-               quarantine_hours = $2,
-               quarantine_started_at = CURRENT_TIMESTAMP,
-               quarantine_ends_at = $3,
-               dispatched_count = dispatched_count + $4,
-               copy_var1 = $6,
-               copy_var2 = $7,
-               copy_var3 = $8
-           WHERE id = $5`,
+          SQL_UPDATE_CAMPAIGN_BATCHES,
           [templateName, hours, quarantineEnds, dispatchedCount, batchId, variableValues?.var1 || '', variableValues?.var2 || '', variableValues?.var3 || '']
         );
 
@@ -604,9 +530,7 @@ export function registrarDisparos(app: Express): void {
 
           // Atualizar vendedor atribuído no campaign_leads
           await D.pgPool.query(
-            `UPDATE campaign_leads
-             SET assigned_salesperson_id = $1, assigned_salesperson_name = $2
-             WHERE id = $3`,
+            SQL_UPDATE_CAMPAIGN_LEADS,
             [sellerId, sellerName, dLead.id]
           ).catch(() => {});
 
@@ -627,7 +551,7 @@ export function registrarDisparos(app: Express): void {
             const motivo = problemas.join('; ');
             console.warn(`[Disparo] lead ${dLead.id}: ${motivo}. Não enfileirado.`);
             if (D.usePostgres && D.pgPool) {
-              await D.pgPool.query(`UPDATE campaign_leads SET status = 'ERRO_VARIAVEL', notes = $2 WHERE id = $1`, [dLead.id, `Não enviado: ${motivo}`]).catch(() => {});
+              await D.pgPool.query(SQL_UPDATE_CAMPAIGN_LEADS_2, [dLead.id, `Não enviado: ${motivo}`]).catch(() => {});
             } else {
               const m = D.memoryCampaignLeadsMap.get(dLead.id);
               if (m) m.status = 'ERRO_VARIAVEL' as any;
@@ -665,16 +589,7 @@ export function registrarDisparos(app: Express): void {
           // Sincronizar lead com o CRM para aparecer no Kanban e no WhatsApp do vendedor atribuído
           try {
             await D.pgPool.query(
-              `INSERT INTO leads (
-                id, name, phone_number, public_url, website, niche, column_status, sub_status,
-                salesperson_id, salesperson_name, last_call_tag, call_count, created_at, updated_at
-              ) VALUES ($1, $2, $3, $4, $5, $6, 'Leads', 'Disparo WhatsApp Realizado (Aguardando Resposta)', $7, $8, 'WhatsApp Enviado', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-              ON CONFLICT (id) DO UPDATE SET
-                sub_status = 'Disparo WhatsApp Realizado (Aguardando Resposta)',
-                salesperson_id = EXCLUDED.salesperson_id,
-                salesperson_name = EXCLUDED.salesperson_name,
-                last_call_tag = 'WhatsApp Enviado',
-                updated_at = CURRENT_TIMESTAMP`,
+              SQL_INSERT_LEADS,
               [dLead.id, dLead.name || 'Cliente', formattedE164 || dLead.phoneNumber || '', dLead.publicUrl || null, dLead.website || null, dLead.niche || null, sellerId, sellerName]
             );
           } catch (dbErr: any) {
@@ -767,7 +682,7 @@ export function registrarDisparos(app: Express): void {
             const motivo = problemas.join('; ');
             console.warn(`[Disparo] lead ${lead.id}: ${motivo}. Não enfileirado.`);
             if (D.usePostgres && D.pgPool) {
-              await D.pgPool.query(`UPDATE campaign_leads SET status = 'ERRO_VARIAVEL', notes = $2 WHERE id = $1`, [lead.id, `Não enviado: ${motivo}`]).catch(() => {});
+              await D.pgPool.query(SQL_UPDATE_CAMPAIGN_LEADS_3, [lead.id, `Não enviado: ${motivo}`]).catch(() => {});
             } else {
               const m = D.memoryCampaignLeadsMap.get(lead.id);
               if (m) m.status = 'ERRO_VARIAVEL' as any;
@@ -993,12 +908,7 @@ export function registrarDisparos(app: Express): void {
 
       if (D.usePostgres && D.pgPool) {
         const result = await D.pgPool.query(
-          `UPDATE campaign_leads
-           SET status = $1,
-               responded_at = CASE WHEN $1 = 'INTERESSADO' THEN CURRENT_TIMESTAMP ELSE responded_at END,
-               response_preview = $2
-           WHERE id = $3
-           RETURNING *`,
+          SQL_UPDATE_CAMPAIGN_LEADS_4,
           [newStatus, preview, leadId]
         );
         if (result.rowCount === 0) {
@@ -1108,26 +1018,12 @@ export function registrarDisparos(app: Express): void {
           // Inserir / Atualizar na tabela oficial de CRM de Leads com flag para ligação telefônica
           if (D.usePostgres && D.pgPool) {
             await D.pgPool.query(
-              `INSERT INTO leads (
-                id, name, phone_number, public_url, website, column_status, sub_status,
-                salesperson_id, salesperson_name, niche, last_call_tag, call_count, created_at, updated_at
-              ) VALUES (
-                $1, $2, $3, $4, $5, 'Leads', 'Distribuído para Ligação Ativa (Campanha)',
-                $6, $7, $8, 'Aguardando Ligação', 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
-              )
-              ON CONFLICT (id) DO UPDATE SET
-                salesperson_id = EXCLUDED.salesperson_id,
-                salesperson_name = EXCLUDED.salesperson_name,
-                sub_status = 'Distribuído para Ligação Ativa (Campanha)',
-                last_call_tag = 'Aguardando Ligação',
-                updated_at = CURRENT_TIMESTAMP`,
+              SQL_INSERT_LEADS_2,
               [lead.id, lead.name, lead.phone_number || lead.phoneNumber, lead.public_url || lead.publicUrl, lead.website, salespersonId, salespersonName, lead.niche]
             );
 
             await D.pgPool.query(
-              `UPDATE campaign_leads
-               SET assigned_salesperson_id = $1, assigned_salesperson_name = $2, status = 'FRIO'
-               WHERE id = $3`,
+              SQL_UPDATE_CAMPAIGN_LEADS_5,
               [salespersonId, salespersonName, lead.id]
             );
           } else {
@@ -1186,21 +1082,13 @@ export function registrarDisparos(app: Express): void {
       let releasedCount = 0;
       if (D.usePostgres && D.pgPool) {
         const result = await D.pgPool.query(
-          `UPDATE campaign_leads
-           SET status = 'FRIO',
-               quarantine_expires_at = CURRENT_TIMESTAMP
-           WHERE batch_id = $1 AND status IN ('QUARENTENA', 'DISPARADO')
-           RETURNING id`,
+          SQL_UPDATE_CAMPAIGN_LEADS_6,
           [batchId]
         );
         releasedCount = result.rowCount || 0;
 
         await D.pgPool.query(
-          `UPDATE campaign_batches
-           SET status = 'completed',
-               quarantine_ends_at = CURRENT_TIMESTAMP,
-               cold_count = cold_count + $1
-           WHERE id = $2`,
+          SQL_UPDATE_CAMPAIGN_BATCHES_2,
           [releasedCount, batchId]
         );
       } else {
@@ -1250,13 +1138,7 @@ export function registrarDisparos(app: Express): void {
     try {
       if (D.usePostgres && D.pgPool) {
         await D.pgPool.query(
-          `UPDATE campaign_batches
-           SET quarantine_hours = $1,
-               allowed_closers = COALESCE($2, allowed_closers),
-               hot_retained_by_admin = COALESCE($3, hot_retained_by_admin),
-               quarantine_on_reply = COALESCE($5, quarantine_on_reply),
-               quarantine_on_expire = COALESCE($6, quarantine_on_expire)
-           WHERE id = $4`,
+          SQL_UPDATE_CAMPAIGN_BATCHES_3,
           [hours, allowedClosers ? JSON.stringify(allowedClosers) : null, typeof hotRetainedByAdmin === 'boolean' ? hotRetainedByAdmin : null, batchId, onReplyAction ?? null, onExpireAction ?? null]
         );
       } else {
@@ -1303,7 +1185,7 @@ export function registrarDisparos(app: Express): void {
         return res.status(400).json({ success: false, error: 'Informe expectedCount (quantos leads devolver).' });
       }
       const atualRes = await D.pgPool.query(
-        `SELECT COUNT(*)::int AS n FROM campaign_leads WHERE batch_id = $1 AND status = 'QUARENTENA'`,
+        SQL_SELECT_CAMPAIGN_LEADS_2,
         [batchId]
       );
       const atual = Number(atualRes.rows[0]?.n || 0);
@@ -1312,17 +1194,12 @@ export function registrarDisparos(app: Express): void {
       }
       const removedFromQueue = await D.removeBatchWaitingJobs(batchId);
       const upd = await D.pgPool.query(
-        `UPDATE campaign_leads
-            SET status = 'STAGING', sent_at = NULL, quarantine_expires_at = NULL
-          WHERE batch_id = $1 AND status = 'QUARENTENA'`,
+        SQL_UPDATE_CAMPAIGN_LEADS_7,
         [batchId]
       );
       const returned = upd.rowCount || 0;
       await D.pgPool.query(
-        `UPDATE campaign_batches
-            SET dispatched_count = (SELECT COUNT(*) FROM campaign_leads
-                                     WHERE batch_id = $1 AND status IN ('QUARENTENA', 'INTERESSADO'))
-          WHERE id = $1`,
+        SQL_UPDATE_CAMPAIGN_BATCHES_4,
         [batchId]
       );
       D.broadcastSocketEvent('LEAD_UPDATED', { batchId, count: returned });
@@ -1345,27 +1222,13 @@ export function registrarDisparos(app: Express): void {
       let resetCount = 0;
       if (D.usePostgres && D.pgPool) {
         const result = await D.pgPool.query(
-          `UPDATE campaign_leads
-           SET status = 'STAGING',
-               sent_at = NULL,
-               quarantine_expires_at = NULL,
-               responded_at = NULL,
-               response_preview = NULL
-           WHERE batch_id = $1 AND is_mobile = TRUE
-           RETURNING id`,
+          SQL_UPDATE_CAMPAIGN_LEADS_8,
           [batchId]
         );
         resetCount = result.rowCount || 0;
 
         await D.pgPool.query(
-          `UPDATE campaign_batches
-           SET status = 'draft',
-               dispatched_count = 0,
-               hot_count = 0,
-               cold_count = 0,
-               quarantine_started_at = NULL,
-               quarantine_ends_at = NULL
-           WHERE id = $1`,
+          SQL_UPDATE_CAMPAIGN_BATCHES_5,
           [batchId]
         );
       } else {
@@ -1472,9 +1335,7 @@ export function registrarDisparos(app: Express): void {
     try {
       if (D.usePostgres && D.pgPool) {
         const leadsRes = await D.pgPool.query(
-          `SELECT id, name, phone_number, is_mobile, status, notes
-           FROM campaign_leads
-           WHERE batch_id = $1`,
+          SQL_SELECT_CAMPAIGN_LEADS_3,
           [batchId]
         );
         const leads = leadsRes.rows || [];
@@ -1536,46 +1397,28 @@ export function registrarDisparos(app: Express): void {
         // Executar atualizações em lote no Postgres
         if (leadsToStaging.length > 0) {
           await D.pgPool.query(
-            `UPDATE campaign_leads
-             SET status = 'STAGING',
-                 is_mobile = TRUE,
-                 sent_at = NULL,
-                 quarantine_expires_at = NULL,
-                 notes = COALESCE(notes, '') || ' [Reciclado: Não constava no WhatsApp Web]'
-             WHERE id = ANY($1::text[])`,
+            SQL_UPDATE_CAMPAIGN_LEADS_9,
             [leadsToStaging]
           );
         }
 
         if (leadsToLandline.length > 0) {
           await D.pgPool.query(
-            `UPDATE campaign_leads
-             SET status = 'DESCARTADO',
-                 is_mobile = FALSE,
-                 response_preview = 'Telefone fixo comercial (Sem WhatsApp) - Destinado a ligação ativa',
-                 notes = COALESCE(notes, '') || ' [Fixo Comercial: Ligação Telefônica]'
-             WHERE id = ANY($1::text[])`,
+            SQL_UPDATE_CAMPAIGN_LEADS_10,
             [leadsToLandline]
           );
         }
 
         if (leadsToConfirm.length > 0) {
           await D.pgPool.query(
-            `UPDATE campaign_leads
-             SET status = 'QUARENTENA',
-                 notes = COALESCE(notes, '') || ' [Confirmado WhatsApp Web]'
-             WHERE id = ANY($1::text[]) AND status != 'INTERESSADO'`,
+            SQL_UPDATE_CAMPAIGN_LEADS_11,
             [leadsToConfirm]
           );
         }
 
         // Atualizar métricas da safra
         await D.pgPool.query(
-          `UPDATE campaign_batches
-           SET dispatched_count = (SELECT COUNT(*) FROM campaign_leads WHERE batch_id = $1 AND status IN ('QUARENTENA', 'INTERESSADO')),
-               valid_mobiles = (SELECT COUNT(*) FROM campaign_leads WHERE batch_id = $1 AND is_mobile = TRUE),
-               landlines = (SELECT COUNT(*) FROM campaign_leads WHERE batch_id = $1 AND is_mobile = FALSE)
-           WHERE id = $1`,
+          SQL_UPDATE_CAMPAIGN_BATCHES_6,
           [batchId]
         );
       } else {
@@ -1657,15 +1500,15 @@ export function registrarDisparos(app: Express): void {
     try {
       if (D.usePostgres && D.pgPool) {
         const naoStaging = await D.pgPool.query(
-          `SELECT COUNT(*)::int AS n FROM campaign_leads WHERE batch_id = $1 AND status <> 'STAGING' AND (sent_at IS NOT NULL OR status <> 'DESCARTADO')`, [batchId]);
+          SQL_SELECT_CAMPAIGN_LEADS_4, [batchId]);
         if (naoStaging.rows[0].n > 0) {
           return res.status(409).json({
             error: `Não dá para apagar esta safra: ${naoStaging.rows[0].n} lead(s) já foram disparados ou têm resposta do cliente. Nada foi apagado.`
           });
         }
-        await D.pgPool.query('DELETE FROM campaign_leads WHERE batch_id = $1', [batchId]);
-        await D.pgPool.query('DELETE FROM zip_uploads WHERE batch_id = $1', [batchId]);
-        await D.pgPool.query('DELETE FROM campaign_batches WHERE id = $1', [batchId]);
+        await D.pgPool.query(SQL_DELETE_CAMPAIGN_LEADS, [batchId]);
+        await D.pgPool.query(SQL_DELETE_ZIP_UPLOADS, [batchId]);
+        await D.pgPool.query(SQL_DELETE_CAMPAIGN_BATCHES, [batchId]);
       } else {
         D.memoryCampaignBatchesMap.delete(batchId);
         for (const [id, lead] of D.memoryCampaignLeadsMap.entries()) {

@@ -3,6 +3,7 @@ import { User } from '../../types.js';
 import type { RespostaLoginOk, RespostaSessaoAtual, RespostaSucesso, UsuarioAdmin, RespostaListaUsuarios, RespostaAuditLogs, RespostaLogsServidor } from '../../contracts/rotas.js';
 import { hashPassword, verifyPassword, generateSessionToken, isUserAdmin } from '../serverAuth.js';
 import { readLogs, logCategories } from '../logBuffer.js';
+import { SQL_SELECT_USERS, SQL_INSERT_AUTH_SESSIONS, SQL_DELETE_AUTH_SESSIONS, SQL_UPDATE_USERS, SQL_DELETE_AUTH_SESSIONS_2, SQL_SELECT_USERS_2, SQL_SELECT_USERS_3, SQL_INSERT_USERS, SQL_UPDATE_USERS_2, SQL_UPDATE_USERS_3, SQL_UPDATE_USERS_4, SQL_UPDATE_USERS_5, SQL_UPDATE_USERS_6, SQL_SELECT_USERS_4, SQL_DELETE_USERS, SQL_SELECT_AUDIT_LOGS, SQL_ALTER_CAMPAIGN_LEADS } from './repo/auth.js';
 
 
 export interface DependenciasAuth {
@@ -56,9 +57,7 @@ export function registrarAuth(app: Express): void {
 
       if (D.usePostgres && D.pgPool) {
         const uRes = await D.pgPool.query(
-          `SELECT id, name, email, password_hash AS "passwordHash", password_salt AS "passwordSalt", role, salesperson_id AS "salespersonId", active
-           FROM users
-           WHERE LOWER(email) = $1`,
+          SQL_SELECT_USERS,
           [cleanEmail]
         );
         if (uRes.rows.length > 0) {
@@ -99,8 +98,7 @@ export function registrarAuth(app: Express): void {
 
       if (D.usePostgres && D.pgPool) {
         await D.pgPool.query(
-          `INSERT INTO auth_sessions (token, user_id, expires_at)
-           VALUES ($1, $2, $3)`,
+          SQL_INSERT_AUTH_SESSIONS,
           [D.hashSessionToken(token), foundUser.id, expiresAt]
         );
       } else {
@@ -147,7 +145,7 @@ export function registrarAuth(app: Express): void {
     const token = req.cookies?.crm_session || req.headers.authorization?.replace(/^Bearer\s+/i, '');
     if (token) {
       if (D.usePostgres && D.pgPool) {
-        await D.pgPool.query(`DELETE FROM auth_sessions WHERE token = $1`, [D.hashSessionToken(token)]).catch(() => {});
+        await D.pgPool.query(SQL_DELETE_AUTH_SESSIONS, [D.hashSessionToken(token)]).catch(() => {});
       } else {
         D.memorySessionsMap.delete(D.hashSessionToken(token));
       }
@@ -193,11 +191,11 @@ export function registrarAuth(app: Express): void {
     try {
       if (D.usePostgres && D.pgPool) {
         await D.pgPool.query(
-          `UPDATE users SET password_hash = $1, password_salt = $2 WHERE id = $3`,
+          SQL_UPDATE_USERS,
           [creds.hash, creds.salt, userId]
         );
         // Quem já estava logado com a senha antiga (outro aparelho, alguém que descobriu a senha) perde o acesso
-        await D.pgPool.query(`DELETE FROM auth_sessions WHERE user_id = $1 AND token <> $2`, [userId, currentToken ? D.hashSessionToken(currentToken) : '']);
+        await D.pgPool.query(SQL_DELETE_AUTH_SESSIONS_2, [userId, currentToken ? D.hashSessionToken(currentToken) : '']);
       } else {
         const currentHashed = currentToken ? D.hashSessionToken(currentToken) : '';
         for (const [tok, s] of D.memorySessionsMap.entries()) {
@@ -244,9 +242,7 @@ export function registrarAuth(app: Express): void {
     try {
       if (D.usePostgres && D.pgPool) {
         const result = await D.pgPool.query(
-          `SELECT id, name, email, role, salesperson_id AS "salespersonId", active, created_at AS "createdAt"
-           FROM users
-           ORDER BY created_at ASC`
+          SQL_SELECT_USERS_2
         );
         const listaBanco: RespostaListaUsuarios = result.rows;
         return res.json(listaBanco);
@@ -286,14 +282,13 @@ export function registrarAuth(app: Express): void {
 
     try {
       if (D.usePostgres && D.pgPool) {
-        const existing = await D.pgPool.query(`SELECT id FROM users WHERE LOWER(email) = $1`, [cleanEmail]);
+        const existing = await D.pgPool.query(SQL_SELECT_USERS_3, [cleanEmail]);
         if (existing.rows.length > 0) {
           return res.status(400).json({ error: 'Já existe um usuário cadastrado com este e-mail.' });
         }
 
         await D.pgPool.query(
-          `INSERT INTO users (id, name, email, password_hash, password_salt, role, salesperson_id, active, created_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE, CURRENT_TIMESTAMP)`,
+          SQL_INSERT_USERS,
           [newId, String(name).trim(), cleanEmail, creds.hash, creds.salt, userRole, salespersonId || null]
         );
       } else {
@@ -362,20 +357,20 @@ export function registrarAuth(app: Express): void {
     try {
       if (D.usePostgres && D.pgPool) {
         if (typeof active === 'boolean') {
-          await D.pgPool.query(`UPDATE users SET active = $1 WHERE id = $2`, [active, id]);
+          await D.pgPool.query(SQL_UPDATE_USERS_2, [active, id]);
         }
         if (name) {
-          await D.pgPool.query(`UPDATE users SET name = $1 WHERE id = $2`, [String(name).trim(), id]);
+          await D.pgPool.query(SQL_UPDATE_USERS_3, [String(name).trim(), id]);
         }
         if (role) {
-          await D.pgPool.query(`UPDATE users SET role = $1 WHERE id = $2`, [role, id]);
+          await D.pgPool.query(SQL_UPDATE_USERS_4, [role, id]);
         }
         if (salespersonId !== undefined) {
-          await D.pgPool.query(`UPDATE users SET salesperson_id = $1 WHERE id = $2`, [salespersonId || null, id]);
+          await D.pgPool.query(SQL_UPDATE_USERS_5, [salespersonId || null, id]);
         }
         if (newPassword) {
           const creds = hashPassword(String(newPassword));
-          await D.pgPool.query(`UPDATE users SET password_hash = $1, password_salt = $2 WHERE id = $3`, [creds.hash, creds.salt, id]);
+          await D.pgPool.query(SQL_UPDATE_USERS_6, [creds.hash, creds.salt, id]);
         }
       } else {
         const u = D.memoryUsersMap.get(id);
@@ -413,11 +408,11 @@ export function registrarAuth(app: Express): void {
 
     try {
       if (D.usePostgres && D.pgPool) {
-        const uRes = await D.pgPool.query('SELECT name, email, role FROM users WHERE id = $1', [id]);
+        const uRes = await D.pgPool.query(SQL_SELECT_USERS_4, [id]);
         if (uRes.rowCount === 0) {
           return res.status(404).json({ error: 'Usuário não encontrado.' });
         }
-        await D.pgPool.query(`DELETE FROM users WHERE id = $1`, [id]);
+        await D.pgPool.query(SQL_DELETE_USERS, [id]);
         await D.logAudit('USUARIO_EXCLUIDO', `Admin excluiu o usuário ${uRes.rows[0].name} (${uRes.rows[0].email})`, req);
       } else {
         const u = D.memoryUsersMap.get(id);
@@ -461,10 +456,7 @@ export function registrarAuth(app: Express): void {
     try {
       if (D.usePostgres && D.pgPool) {
         const result = await D.pgPool.query(
-          `SELECT id, user_id AS "userId", user_name AS "userName", user_role AS "userRole", action, details, ip, created_at AS "createdAt"
-           FROM audit_logs
-           ORDER BY created_at DESC
-           LIMIT 100`
+          SQL_SELECT_AUDIT_LOGS
         );
         const auditoriaBanco: RespostaAuditLogs = result.rows;
         return res.json(auditoriaBanco);
@@ -489,16 +481,7 @@ export function registrarAuth(app: Express): void {
     }
 
     try {
-      await D.pgPool.query(`
-        ALTER TABLE campaign_leads ADD COLUMN IF NOT EXISTS whatsapp_message_id VARCHAR(255);
-        ALTER TABLE campaign_leads ADD COLUMN IF NOT EXISTS notes TEXT;
-        ALTER TABLE leads ADD COLUMN IF NOT EXISTS last_call_tag VARCHAR(100);
-        ALTER TABLE leads ADD COLUMN IF NOT EXISTS call_count INT DEFAULT 0;
-        ALTER TABLE leads ADD COLUMN IF NOT EXISTS notes TEXT;
-        ALTER TABLE leads ADD COLUMN IF NOT EXISTS public_url TEXT;
-        ALTER TABLE leads ADD COLUMN IF NOT EXISTS niche VARCHAR(255);
-        ALTER TABLE leads ADD COLUMN IF NOT EXISTS website TEXT;
-      `);
+      await D.pgPool.query(SQL_ALTER_CAMPAIGN_LEADS);
       console.log('✅ [Postgres Migration] Colunas sincronizadas com sucesso via /api/admin/db/migrate');
       return res.json({ success: true, message: 'Migração de colunas concluída com sucesso no PostgreSQL.' } satisfies RespostaSucesso);
     } catch (err: any) {

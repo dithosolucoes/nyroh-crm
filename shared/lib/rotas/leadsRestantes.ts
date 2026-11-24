@@ -4,6 +4,7 @@ import { uxSchemaOn } from '../uxRoutes.js';
 import type { RespostaOk, RespostaAuditoriaSite, RespostaAtualizacaoLead, RespostaListaLigacoes, RespostaLigacaoRegistrada, RespostaListaLigacoesGerais, RespostaDistribuicaoLeads, RespostaTransferenciaLote, RespostaRecuperacao, RespostaAtualizacaoLoteLeads, RespostaLoteLeads, RespostaExclusaoLote } from '../../contracts/rotas.js';
 import { isUserAdmin } from '../serverAuth.js';
 import { performWebsiteAudit } from '../auditEngine.js';
+import { SQL_SELECT_LEADS, SQL_SELECT_SALESPEOPLE, SQL_UPDATE_LEADS, SQL_SELECT_SALESPEOPLE_2, SQL_UPDATE_LEADS_2, SQL_SELECT_SALESPEOPLE_3, SQL_UPDATE_LEADS_3, SQL_SELECT_CALLS, SQL_UPDATE_LEADS_4, SQL_SELECT_LEADS_2, SQL_UPDATE_LEADS_5, SQL_SELECT_LEADS_3, SQL_UPDATE_LEADS_6, SQL_SELECT_CALLS_2, SQL_UPDATE_LEADS_7, SQL_SELECT_LEADS_4, SQL_UPDATE_LEADS_8, SQL_UPDATE_LEADS_9, SQL_INSERT_CALLS, SQL_SELECT_CALLS_3, SQL_INSERT_CALLS_2, SQL_UPDATE_LEADS_10, SQL_UPDATE_LEADS_11, SQL_DELETE_LEADS, SQL_DELETE_LEADS_2 } from './repo/leadsRestantes.js';
 
 
 export interface DependenciasLeadsRestantes {
@@ -35,7 +36,7 @@ export function registrarLeadsRestantes(app: Express): void {
       let websiteUrl = '';
 
       if (D.usePostgres && D.pgPool) {
-        const leadRes = await D.pgPool.query('SELECT name, website FROM leads WHERE id = $1', [id]);
+        const leadRes = await D.pgPool.query(SQL_SELECT_LEADS, [id]);
         if (leadRes.rowCount === 0) {
           return res.status(404).json({ error: 'Lead não encontrado.' });
         }
@@ -75,7 +76,7 @@ export function registrarLeadsRestantes(app: Express): void {
       let resolvedName = targetSalespersonName;
       if (!resolvedName) {
         if (D.usePostgres && D.pgPool) {
-          const spRes = await D.pgPool.query('SELECT name FROM salespeople WHERE id = $1', [targetSalespersonId]);
+          const spRes = await D.pgPool.query(SQL_SELECT_SALESPEOPLE, [targetSalespersonId]);
           if (spRes.rows.length > 0) resolvedName = spRes.rows[0].name;
         } else {
           const sp = D.memorySalespeopleMap.get(targetSalespersonId);
@@ -86,9 +87,7 @@ export function registrarLeadsRestantes(app: Express): void {
 
       if (D.usePostgres && D.pgPool) {
         await D.pgPool.query(
-          `UPDATE leads 
-           SET salesperson_id = $1, salesperson_name = $2, updated_at = CURRENT_TIMESTAMP 
-           WHERE id = ANY($3::varchar[])`,
+          SQL_UPDATE_LEADS,
           [targetSalespersonId, resolvedName, leadIds]
         );
         return res.json({
@@ -137,7 +136,7 @@ export function registrarLeadsRestantes(app: Express): void {
       let resolvedName = salespersonName;
       if (!resolvedName) {
         if (D.usePostgres && D.pgPool) {
-          const spRes = await D.pgPool.query('SELECT name FROM salespeople WHERE id = $1', [salespersonId]);
+          const spRes = await D.pgPool.query(SQL_SELECT_SALESPEOPLE_2, [salespersonId]);
           if (spRes.rows.length > 0) resolvedName = spRes.rows[0].name;
         } else {
           const sp = D.memorySalespeopleMap.get(salespersonId);
@@ -148,7 +147,7 @@ export function registrarLeadsRestantes(app: Express): void {
 
       if (D.usePostgres && D.pgPool) {
         const result = await D.pgPool.query(
-          `UPDATE leads SET salesperson_id = $1, salesperson_name = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING id, name, phone_number AS "phoneNumber", column_status AS "columnStatus", sub_status AS "subStatus", loss_reason AS "lossReason", salesperson_id AS "salespersonId", salesperson_name AS "salespersonName", created_at AS "createdAt", updated_at AS "updatedAt"`,
+          SQL_UPDATE_LEADS_2,
           [salespersonId, resolvedName, id]
         );
         if (result.rowCount === 0) {
@@ -200,7 +199,7 @@ export function registrarLeadsRestantes(app: Express): void {
       let targetSalesperson: Salesperson | undefined;
 
       if (D.usePostgres && D.pgPool) {
-        const spRes = await D.pgPool.query(`SELECT id, name, color, bg_color AS "bgColor" FROM salespeople WHERE id = $1`, [targetSalespersonId]);
+        const spRes = await D.pgPool.query(SQL_SELECT_SALESPEOPLE_3, [targetSalespersonId]);
         if (spRes.rows.length > 0) {
           targetSalesperson = spRes.rows[0];
         }
@@ -272,9 +271,7 @@ export function registrarLeadsRestantes(app: Express): void {
 
       if (D.usePostgres && D.pgPool) {
         await D.pgPool.query(
-          `UPDATE leads 
-           SET salesperson_id = $1, salesperson_name = $2, updated_at = CURRENT_TIMESTAMP
-           WHERE id = ANY($3::text[])`,
+          SQL_UPDATE_LEADS_3,
           [targetSalesperson.id, targetSalesperson.name, idsToTransfer]
         );
       } else {
@@ -308,12 +305,7 @@ export function registrarLeadsRestantes(app: Express): void {
 
       if (D.usePostgres && D.pgPool) {
         // 1. Procura em registros de chamadas anteriores
-        const callsWithComments = await D.pgPool.query(`
-          SELECT c.lead_id, c.comment, c.tag, l.phone_number AS current_phone
-          FROM calls c
-          JOIN leads l ON c.lead_id = l.id
-          WHERE l.phone_number = '(Sem telefone)' OR l.phone_number = '' OR l.phone_number IS NULL
-        `);
+        const callsWithComments = await D.pgPool.query(SQL_SELECT_CALLS);
 
         for (const row of callsWithComments.rows) {
           const text = `${row.comment || ''} ${row.tag || ''}`;
@@ -321,7 +313,7 @@ export function registrarLeadsRestantes(app: Express): void {
           if (match && match[0]) {
             const cleanPhone = match[0].trim();
             await D.pgPool.query(
-              `UPDATE leads SET phone_number = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+              SQL_UPDATE_LEADS_4,
               [cleanPhone, row.lead_id]
             );
             recoveredCount++;
@@ -329,10 +321,7 @@ export function registrarLeadsRestantes(app: Express): void {
         }
 
         // 2. Extrai telefone se o ID, Nome ou link contiver números válidos
-        const leadsWithoutPhone = await D.pgPool.query(`
-          SELECT id, name, public_url FROM leads 
-          WHERE phone_number = '(Sem telefone)' OR phone_number = '' OR phone_number IS NULL
-        `);
+        const leadsWithoutPhone = await D.pgPool.query(SQL_SELECT_LEADS_2);
 
         for (const lead of leadsWithoutPhone.rows) {
           const textToSearch = `${lead.id} ${lead.name} ${lead.public_url || ''}`;
@@ -341,7 +330,7 @@ export function registrarLeadsRestantes(app: Express): void {
             const foundNumber = phoneMatch[0].trim();
             if (foundNumber.replace(/\D/g, '').length >= 8) {
               await D.pgPool.query(
-                `UPDATE leads SET phone_number = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+                SQL_UPDATE_LEADS_5,
                 [foundNumber, lead.id]
               );
               recoveredCount++;
@@ -386,11 +375,7 @@ export function registrarLeadsRestantes(app: Express): void {
 
       if (D.usePostgres && D.pgPool) {
         // 1. Procura leads onde website está vazio mas public_url ou categories tem link externo
-        const candidatesRes = await D.pgPool.query(`
-          SELECT id, public_url, categories, niche 
-          FROM leads 
-          WHERE website IS NULL OR website = '' OR website = '-'
-        `);
+        const candidatesRes = await D.pgPool.query(SQL_SELECT_LEADS_3);
 
         for (const row of candidatesRes.rows) {
           let foundSite = '';
@@ -427,7 +412,7 @@ export function registrarLeadsRestantes(app: Express): void {
 
           if (foundSite) {
             await D.pgPool.query(
-              `UPDATE leads SET website = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+              SQL_UPDATE_LEADS_6,
               [foundSite, row.id]
             );
             recoveredCount++;
@@ -435,12 +420,7 @@ export function registrarLeadsRestantes(app: Express): void {
         }
 
         // 2. Procura em registros de chamadas se algum vendedor ou bot anotou o site do cliente no comentário
-        const callsRes = await D.pgPool.query(`
-          SELECT c.lead_id, c.comment, l.website
-          FROM calls c
-          JOIN leads l ON c.lead_id = l.id
-          WHERE l.website IS NULL OR l.website = '' OR l.website = '-'
-        `);
+        const callsRes = await D.pgPool.query(SQL_SELECT_CALLS_2);
 
         for (const row of callsRes.rows) {
           if (row.comment && typeof row.comment === 'string') {
@@ -455,7 +435,7 @@ export function registrarLeadsRestantes(app: Express): void {
               let cleanSite = urlMatch[0].trim();
               if (!cleanSite.startsWith('http')) cleanSite = `https://${cleanSite}`;
               await D.pgPool.query(
-                `UPDATE leads SET website = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+                SQL_UPDATE_LEADS_7,
                 [cleanSite, row.lead_id]
               );
               recoveredCount++;
@@ -619,7 +599,7 @@ export function registrarLeadsRestantes(app: Express): void {
       // Load existing leads from DB/memory to perform matching
       let allLeads: Lead[] = [];
       if (D.usePostgres && D.pgPool) {
-        const dbRes = await D.pgPool.query(`SELECT id, name, phone_number AS "phoneNumber", column_status AS "columnStatus" FROM leads`);
+        const dbRes = await D.pgPool.query(SQL_SELECT_LEADS_4);
         allLeads = dbRes.rows;
       } else {
         allLeads = Array.from(D.memoryLeadsMap.values());
@@ -658,12 +638,12 @@ export function registrarLeadsRestantes(app: Express): void {
           if (D.usePostgres && D.pgPool) {
             if (task.website) {
               await D.pgPool.query(
-                `UPDATE leads SET column_status = $1, website = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3`,
+                SQL_UPDATE_LEADS_8,
                 [newStatus, task.website, matched.id]
               );
             } else {
               await D.pgPool.query(
-                `UPDATE leads SET column_status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+                SQL_UPDATE_LEADS_9,
                 [newStatus, matched.id]
               );
             }
@@ -673,8 +653,7 @@ export function registrarLeadsRestantes(app: Express): void {
               const commentText = task.comment || `Atualizado em lote para "${newStatus}" via JSON.`;
               const tagText = task.tag || 'Atualização via JSON';
               await D.pgPool.query(
-                `INSERT INTO calls (id, lead_id, tag, comment, duration_seconds, created_at)
-                 VALUES ($1, $2, $3, $4, 0, CURRENT_TIMESTAMP)`,
+                SQL_INSERT_CALLS,
                 [callId, matched.id, tagText, commentText]
               );
             }
@@ -751,10 +730,7 @@ export function registrarLeadsRestantes(app: Express): void {
     try {
       if (D.usePostgres && D.pgPool) {
         const result = await D.pgPool.query(
-          `SELECT id, lead_id AS "leadId", tag, comment, duration_seconds AS "durationSeconds", follow_up_at AS "followUpAt", created_at AS "createdAt"
-           FROM calls
-           WHERE lead_id = $1
-           ORDER BY created_at DESC`,
+          SQL_SELECT_CALLS_3,
           [id]
         );
         return res.json(result.rows satisfies RespostaListaLigacoes);
@@ -784,8 +760,7 @@ export function registrarLeadsRestantes(app: Express): void {
     try {
       if (D.usePostgres && D.pgPool) {
         await D.pgPool.query(
-          `INSERT INTO calls (id, lead_id, tag, comment, duration_seconds, follow_up_at, created_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          SQL_INSERT_CALLS_2,
           [callId, id, tag, comment || '', duration, followUp, createdAt]
         );
 
@@ -793,9 +768,9 @@ export function registrarLeadsRestantes(app: Express): void {
 
         // Touch lead updated_at and update next_follow_up_at
         if (followUp) {
-          await D.pgPool.query(`UPDATE leads SET updated_at = CURRENT_TIMESTAMP, next_follow_up_at = $2 WHERE id = $1`, [id, followUp]);
+          await D.pgPool.query(SQL_UPDATE_LEADS_10, [id, followUp]);
         } else {
-          await D.pgPool.query(`UPDATE leads SET updated_at = CURRENT_TIMESTAMP WHERE id = $1`, [id]);
+          await D.pgPool.query(SQL_UPDATE_LEADS_11, [id]);
         }
 
         return res.json({
@@ -849,7 +824,7 @@ export function registrarLeadsRestantes(app: Express): void {
     try {
       await D.logAudit('EXCLUIR_LEAD', `Excluiu lead ID: ${id}`, req);
       if (D.usePostgres && D.pgPool) {
-        await D.pgPool.query(`DELETE FROM leads WHERE id = $1`, [id]);
+        await D.pgPool.query(SQL_DELETE_LEADS, [id]);
         return res.json({ success: true } satisfies RespostaOk);
       } else {
         D.memoryLeadsMap.delete(id);
@@ -871,7 +846,7 @@ export function registrarLeadsRestantes(app: Express): void {
     try {
       await D.logAudit('EXCLUIR_LEADS_LOTE', `Excluiu ${ids.length} leads em lote`, req);
       if (D.usePostgres && D.pgPool) {
-        await D.pgPool.query(`DELETE FROM leads WHERE id = ANY($1::varchar[])`, [ids]);
+        await D.pgPool.query(SQL_DELETE_LEADS_2, [ids]);
         return res.json({ success: true, count: ids.length, message: `${ids.length} lead(s) excluído(s) com sucesso!` } satisfies RespostaExclusaoLote);
       } else {
         for (const id of ids) {

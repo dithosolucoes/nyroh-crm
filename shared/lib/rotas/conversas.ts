@@ -17,6 +17,7 @@ import { getMetaProvider, metaMarkRead } from '../metaClient.js';
 import type { InboxConversation, LeadChatMessage } from '../../types.js';
 import type { TemplateValues } from '../fluxoTemplate.js';
 import type { RespostaBuscaMensagens, RespostaEnviarMensagem, RespostaInbox, RespostaJanelaLead, RespostaLeituraMarcada, RespostaLeituraNaoMarcada, RespostaMensagensLead, RespostaPresenca, RespostaRespostaSimulada, StatusMensagemEnviada } from '../../contracts/rotas.js';
+import { SQL_SELECT_LEAD_MESSAGES, SQL_INSERT_LEAD_MESSAGES, SQL_UPDATE_LEAD_MESSAGES, SQL_UPDATE_LEAD_MESSAGES_2, SQL_UPDATE_LEADS, SQL_UPDATE_LEADS_2, SQL_SELECT_LEADS, SQL_SELECT_CAMPAIGN_LEADS } from './repo/conversas.js';
 export interface DependenciasConversas {
   readonly applyPendingStatus: any;
   readonly broadcastPresenceIfChanged: any;
@@ -328,7 +329,7 @@ export function registrarConversas(app: Express): void {
       let existing: any = (D.memoryLeadMessagesMap.get(leadId) || []).find(m => m.id === messageLocalId);
       if (!existing && D.usePostgres && D.pgPool) {
         const r = await D.pgPool.query(
-          `SELECT id, status, COALESCE(status_rank, -1) AS "statusRank", whatsapp_message_id AS "remoteMessageId", error_message, error_code FROM lead_messages WHERE id = $1`,
+          SQL_SELECT_LEAD_MESSAGES,
           [messageLocalId]
         );
         if (r.rows.length > 0) existing = { ...r.rows[0], leadId };
@@ -434,9 +435,7 @@ export function registrarConversas(app: Express): void {
       if (D.usePostgres && D.pgPool) {
         try {
           await D.pgPool.query(
-            `INSERT INTO lead_messages (id, lead_id, phone_number, sender, sender_name, text, template_name, status, status_rank, is_audio, audio_url, audio_duration, media_type, media_url, media_name, timestamp)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, 'sending', -1, $8, $9, $10, $11, $12, $13, CURRENT_TIMESTAMP)
-             ON CONFLICT (id) DO NOTHING`,
+            SQL_INSERT_LEAD_MESSAGES,
             [
               newMessage.id,
               leadId,
@@ -471,7 +470,7 @@ export function registrarConversas(app: Express): void {
 
         if (D.usePostgres && D.pgPool) {
           await D.pgPool.query(
-            `UPDATE lead_messages SET status = 'failed', status_rank = 9, error_message = $1, error_code = $2 WHERE id = $3`,
+            SQL_UPDATE_LEAD_MESSAGES,
             [info.message, info.code, newMessage.id]
           ).catch((e: any) => console.warn('[PostgreSQL] Erro ao gravar falha de envio:', e.message));
         }
@@ -615,11 +614,7 @@ export function registrarConversas(app: Express): void {
 
       if (D.usePostgres && D.pgPool) {
         await D.pgPool.query(
-          `UPDATE lead_messages
-              SET whatsapp_message_id = COALESCE($1, whatsapp_message_id),
-                  status = CASE WHEN COALESCE(status_rank, -1) < 0 THEN 'queued' ELSE status END,
-                  status_rank = GREATEST(COALESCE(status_rank, -1), 0)
-            WHERE id = $2`,
+          SQL_UPDATE_LEAD_MESSAGES_2,
           [remoteId || null, newMessage.id]
         ).catch((e: any) => console.warn('[PostgreSQL] Erro ao gravar id remoto da mensagem:', e.message));
       }
@@ -686,7 +681,7 @@ export function registrarConversas(app: Express): void {
     // conversa é aberta. Antes ficava depois da trava de 20s abaixo, então reabrir a conversa
     // dentro desse intervalo deixava o contador aceso para sempre.
     if (D.usePostgres && D.pgPool) {
-      D.pgPool.query(`UPDATE leads SET unread_count = 0 WHERE id = $1`, [leadId]).catch(() => {});
+      D.pgPool.query(SQL_UPDATE_LEADS, [leadId]).catch(() => {});
     }
 
     // no máx. 1 marcação a cada 20s por lead: abrir/fechar conversa não consome o limite da API
@@ -711,7 +706,7 @@ export function registrarConversas(app: Express): void {
       }
     }
     if (D.usePostgres && D.pgPool) {
-      D.pgPool.query(`UPDATE leads SET unread_count = 0 WHERE id = $1`, [leadId]).catch(() => {});
+      D.pgPool.query(SQL_UPDATE_LEADS_2, [leadId]).catch(() => {});
     }
     if (!wamid) return res.json({ success: true, marked: false, reason: 'no_inbound' } satisfies RespostaLeituraMarcada);
     if (getMetaProvider() !== 'meta' && (!D.memoryFluxoConfig.apiKey || !D.memoryFluxoConfig.apiSecret)) return res.json({ success: true, marked: false, reason: 'not_configured' } satisfies RespostaLeituraMarcada);
@@ -739,10 +734,10 @@ export function registrarConversas(app: Express): void {
 
     let leadTarget: any = null;
     if (D.usePostgres && D.pgPool) {
-      const lRes = await D.pgPool.query('SELECT * FROM leads WHERE id = $1', [leadId]);
+      const lRes = await D.pgPool.query(SQL_SELECT_LEADS, [leadId]);
       if (lRes.rows.length > 0) leadTarget = lRes.rows[0];
       else {
-        const cRes = await D.pgPool.query('SELECT * FROM campaign_leads WHERE id = $1', [leadId]);
+        const cRes = await D.pgPool.query(SQL_SELECT_CAMPAIGN_LEADS, [leadId]);
         if (cRes.rows.length > 0) leadTarget = cRes.rows[0];
       }
     } else {

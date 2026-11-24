@@ -6,6 +6,7 @@ import type { Express } from 'express';
 import { hashPassword, isUserAdmin } from '../serverAuth.js';
 import type { CustomTag, QuickReply, Salesperson } from '../../types.js';
 import type { RespostaDistribuicaoRoleta, RespostaEtiquetaSalva, RespostaListaEtiquetas, RespostaListaRespostasRapidas, RespostaListaVendedores, RespostaLoteVendedores, RespostaOk, RespostaRespostaRapidaCriada, RespostaRespostaRapidaExcluida, RespostaRoletaConfig, RespostaSenhaVendedor, RespostaSucesso, RespostaVendedorAtualizado, RespostaVendedorCriado, RespostaVendedorStatus, RequisicaoDistribuicaoRoleta } from '../../contracts/rotas.js';
+import { SQL_SELECT_CUSTOM_TAGS, SQL_INSERT_CUSTOM_TAGS, SQL_DELETE_CUSTOM_TAGS, SQL_SELECT_CALLS, SQL_INSERT_SALESPEOPLE, SQL_INSERT_USERS, SQL_INSERT_SALESPEOPLE_2, SQL_INSERT_USERS_2, SQL_UPDATE_SALESPEOPLE, SQL_UPDATE_LEADS, SQL_UPDATE_USERS, SQL_UPDATE_USERS_2, SQL_SELECT_SALESPEOPLE, SQL_SELECT_USERS, SQL_UPDATE_USERS_3, SQL_INSERT_USERS_3, SQL_UPDATE_SALESPEOPLE_2, SQL_UPDATE_USERS_4, SQL_UPDATE_SALESPEOPLE_3, SQL_UPDATE_SALESPEOPLE_4, SQL_UPDATE_LEADS_2, SQL_DELETE_USERS, SQL_DELETE_SALESPEOPLE, SQL_UPDATE_SALESPEOPLE_5, SQL_UPDATE_SALESPEOPLE_6, SQL_SELECT_LEADS, SQL_SELECT_QUICK_REPLIES, SQL_INSERT_QUICK_REPLIES, SQL_DELETE_QUICK_REPLIES } from './repo/vendedores.js';
 export interface DependenciasVendedores {
   readonly MIN_PASSWORD_LENGTH: number;
   readonly assignLeadViaRoulette: any;
@@ -35,9 +36,7 @@ export function registrarVendedores(app: Express): void {
     try {
       if (D.usePostgres && D.pgPool) {
         const result = await D.pgPool.query(
-          `SELECT id, name, color, bg_color AS "bgColor", created_at AS "createdAt"
-           FROM custom_tags
-           ORDER BY created_at ASC`
+          SQL_SELECT_CUSTOM_TAGS
         );
         return res.json(result.rows satisfies RespostaListaEtiquetas);
       } else {
@@ -63,10 +62,7 @@ export function registrarVendedores(app: Express): void {
     try {
       if (D.usePostgres && D.pgPool) {
         const result = await D.pgPool.query(
-          `INSERT INTO custom_tags (id, name, color, bg_color)
-           VALUES ($1, $2, $3, $4)
-           ON CONFLICT (name) DO UPDATE SET color = EXCLUDED.color, bg_color = EXCLUDED.bg_color
-           RETURNING id, name, color, bg_color AS "bgColor", created_at AS "createdAt"`,
+          SQL_INSERT_CUSTOM_TAGS,
           [tagId, nameTrim, tagColor, tagBgColor]
         );
         return res.status(201).json(result.rows[0] satisfies RespostaEtiquetaSalva);
@@ -97,7 +93,7 @@ export function registrarVendedores(app: Express): void {
     const { id } = req.params;
     try {
       if (D.usePostgres && D.pgPool) {
-        await D.pgPool.query(`DELETE FROM custom_tags WHERE id = $1`, [id]);
+        await D.pgPool.query(SQL_DELETE_CUSTOM_TAGS, [id]);
         return res.json({ success: true } satisfies RespostaOk);
       } else {
         D.memoryTagsMap.delete(id);
@@ -113,30 +109,7 @@ export function registrarVendedores(app: Express): void {
   app.get('/api/salespeople', async (req, res) => {
     try {
       if (D.usePostgres && D.pgPool) {
-        const spRes = await D.pgPool.query(`
-          SELECT 
-            s.id, 
-            s.name, 
-            s.email, 
-            s.phone, 
-            s.color, 
-            s.bg_color AS "bgColor", 
-            s.is_default AS "isDefault", 
-            s.slug,
-            COALESCE(s.active, TRUE) AS "active",
-            COALESCE(s.can_generate_audit_pdf, TRUE) AS "canGenerateAuditPdf",
-            COALESCE(s.whatsapp_type, 'business') AS "whatsappType",
-            s.created_at AS "createdAt",
-            COUNT(l.id)::int AS "totalLeads",
-            COUNT(CASE WHEN l.column_status = 'Leads' AND (SELECT COUNT(*) FROM calls WHERE lead_id = l.id) = 0 THEN 1 END)::int AS "uncontactedLeads",
-            COUNT(CASE WHEN l.column_status IN ('Ligação 1', 'Ligação 2', 'Ligação 3', 'Ligação 4', 'Interessado') THEN 1 END)::int AS "inProgressLeads",
-            COUNT(CASE WHEN l.column_status = 'Fechado' THEN 1 END)::int AS "closedLeads",
-            COUNT(CASE WHEN l.column_status = 'Recusado' THEN 1 END)::int AS "refusedLeads"
-          FROM salespeople s
-          LEFT JOIN leads l ON (l.salesperson_id = s.id OR (s.is_default = TRUE AND l.salesperson_id IS NULL))
-          GROUP BY s.id, s.name, s.email, s.phone, s.color, s.bg_color, s.is_default, s.slug, s.active, s.can_generate_audit_pdf, s.whatsapp_type, s.created_at
-          ORDER BY s.is_default DESC, s.created_at ASC
-        `);
+        const spRes = await D.pgPool.query(SQL_SELECT_CALLS);
         const listaBancoVendedores: RespostaListaVendedores = spRes.rows;
         return res.json(listaBancoVendedores);
       } else {
@@ -197,18 +170,13 @@ export function registrarVendedores(app: Express): void {
     try {
       if (D.usePostgres && D.pgPool) {
         const result = await D.pgPool.query(
-          `INSERT INTO salespeople (id, name, email, phone, color, bg_color, is_default, slug, active, whatsapp_type, created_at)
-           VALUES ($1, $2, $3, $4, $5, $6, FALSE, $7, TRUE, $8, CURRENT_TIMESTAMP)
-           RETURNING id, name, email, phone, color, bg_color AS "bgColor", is_default AS "isDefault", slug, active, COALESCE(whatsapp_type, 'business') AS "whatsappType", created_at AS "createdAt"`,
+          SQL_INSERT_SALESPEOPLE,
           [sellerId, nameTrim, sellerEmail, sellerPhone, sellerColor, sellerBgColor, cleanSlug, sellerWhatsAppType]
         );
 
         // Auto-cria conta de acesso de login do vendedor
         await D.pgPool.query(
-          `INSERT INTO users (id, name, email, password_hash, password_salt, role, salesperson_id, active, created_at)
-           VALUES ($1, $2, $3, $4, $5, 'salesperson', $6, TRUE, CURRENT_TIMESTAMP)
-           ON CONFLICT (email) DO UPDATE
-           SET name = $2, salesperson_id = $6, active = TRUE`,
+          SQL_INSERT_USERS,
           [userId, nameTrim, sellerEmail, hashedPass.hash, hashedPass.salt, sellerId]
         );
 
@@ -329,18 +297,13 @@ export function registrarVendedores(app: Express): void {
 
         if (D.usePostgres && D.pgPool) {
           const result = await D.pgPool.query(
-            `INSERT INTO salespeople (id, name, email, phone, color, bg_color, is_default, slug, active, created_at)
-             VALUES ($1, $2, $3, $4, $5, $6, FALSE, $7, TRUE, CURRENT_TIMESTAMP)
-             RETURNING id, name, email, phone, color, bg_color AS "bgColor", is_default AS "isDefault", slug, active, created_at AS "createdAt"`,
+            SQL_INSERT_SALESPEOPLE_2,
             [sellerId, sellerName, sellerEmail, sellerPhone, finalColor, finalBgColor, cleanSlug]
           );
 
           // Auto-cria conta de login para este vendedor
           await D.pgPool.query(
-            `INSERT INTO users (id, name, email, password_hash, password_salt, role, salesperson_id, active, created_at)
-             VALUES ($1, $2, $3, $4, $5, 'salesperson', $6, TRUE, CURRENT_TIMESTAMP)
-             ON CONFLICT (email) DO UPDATE
-             SET name = $2, password_hash = $4, password_salt = $5, salesperson_id = $6, active = TRUE`,
+            SQL_INSERT_USERS_2,
             [userId, sellerName, sellerEmail, hashedPass.hash, hashedPass.salt, sellerId]
           );
 
@@ -432,11 +395,7 @@ export function registrarVendedores(app: Express): void {
     try {
       if (D.usePostgres && D.pgPool) {
         const result = await D.pgPool.query(
-          `UPDATE salespeople 
-           SET name = $1, email = $2, phone = $3, color = $4, bg_color = $5, slug = $6, active = $7,
-               whatsapp_type = COALESCE($8, whatsapp_type, 'business')
-           WHERE id = $9
-           RETURNING id, name, email, phone, color, bg_color AS "bgColor", is_default AS "isDefault", slug, active, COALESCE(can_generate_audit_pdf, TRUE) AS "canGenerateAuditPdf", COALESCE(whatsapp_type, 'business') AS "whatsappType", created_at AS "createdAt"`,
+          SQL_UPDATE_SALESPEOPLE,
           [nameTrim, sellerEmail, sellerPhone, sellerColor, sellerBgColor, sellerSlug, sellerActive, sellerWhatsAppType, id]
         );
         if (result.rowCount === 0) {
@@ -444,16 +403,16 @@ export function registrarVendedores(app: Express): void {
         }
 
         // Update salesperson_name in leads table
-        await D.pgPool.query(`UPDATE leads SET salesperson_name = $1 WHERE salesperson_id = $2`, [nameTrim, id]);
+        await D.pgPool.query(SQL_UPDATE_LEADS, [nameTrim, id]);
 
         // Sync active state, name, and email with users table if a user exists
         if (sellerEmail) {
           await D.pgPool.query(
-            `UPDATE users SET active = $1, name = $2, email = $3 WHERE salesperson_id = $4`,
+            SQL_UPDATE_USERS,
             [sellerActive, nameTrim, sellerEmail.toLowerCase(), id]
           );
         } else {
-          await D.pgPool.query(`UPDATE users SET active = $1, name = $2 WHERE salesperson_id = $3`, [sellerActive, nameTrim, id]);
+          await D.pgPool.query(SQL_UPDATE_USERS_2, [sellerActive, nameTrim, id]);
         }
 
         const vendedorAtualizado: RespostaVendedorAtualizado = result.rows[0];
@@ -524,18 +483,18 @@ export function registrarVendedores(app: Express): void {
     try {
       if (D.usePostgres && D.pgPool) {
         // Find salesperson info
-        const spRes = await D.pgPool.query('SELECT name, email, slug FROM salespeople WHERE id = $1', [id]);
+        const spRes = await D.pgPool.query(SQL_SELECT_SALESPEOPLE, [id]);
         if (spRes.rowCount === 0) {
           return res.status(404).json({ error: 'Vendedor não encontrado.' });
         }
         const seller = spRes.rows[0];
 
         // Check if user already exists for this salesperson
-        const userRes = await D.pgPool.query('SELECT id, email FROM users WHERE salesperson_id = $1', [id]);
+        const userRes = await D.pgPool.query(SQL_SELECT_USERS, [id]);
         if (userRes.rowCount && userRes.rowCount > 0) {
           const userId = userRes.rows[0].id;
           await D.pgPool.query(
-            `UPDATE users SET password_hash = $1, password_salt = $2, active = TRUE WHERE id = $3`,
+            SQL_UPDATE_USERS_3,
             [creds.hash, creds.salt, userId]
           );
           const respostaSenhaAtualizada: RespostaSenhaVendedor = {
@@ -550,8 +509,7 @@ export function registrarVendedores(app: Express): void {
           const email = credsInfo.email;
           const newUserId = `user-${id}`;
           await D.pgPool.query(
-            `INSERT INTO users (id, name, email, password_hash, password_salt, role, salesperson_id, active, created_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+            SQL_INSERT_USERS_3,
             [newUserId, seller.name, email.toLowerCase(), creds.hash, creds.salt, 'salesperson', id, true, now]
           );
           const respostaCredencialCriada: RespostaSenhaVendedor = {
@@ -624,13 +582,13 @@ export function registrarVendedores(app: Express): void {
     try {
       if (D.usePostgres && D.pgPool) {
         const result = await D.pgPool.query(
-          `UPDATE salespeople SET active = $1 WHERE id = $2 RETURNING id, name, active, COALESCE(can_generate_audit_pdf, TRUE) AS "canGenerateAuditPdf"`,
+          SQL_UPDATE_SALESPEOPLE_2,
           [active, id]
         );
         if (result.rowCount === 0) {
           return res.status(404).json({ error: 'Vendedor não encontrado.' });
         }
-        await D.pgPool.query(`UPDATE users SET active = $1 WHERE salesperson_id = $2`, [active, id]);
+        await D.pgPool.query(SQL_UPDATE_USERS_4, [active, id]);
         const respostaStatus: RespostaVendedorStatus = { success: true, salesperson: result.rows[0] };
         return res.json(respostaStatus);
       } else {
@@ -665,7 +623,7 @@ export function registrarVendedores(app: Express): void {
     try {
       if (D.usePostgres && D.pgPool) {
         const result = await D.pgPool.query(
-          `UPDATE salespeople SET can_generate_audit_pdf = $1 WHERE id = $2 RETURNING id, name, active, COALESCE(can_generate_audit_pdf, TRUE) AS "canGenerateAuditPdf"`,
+          SQL_UPDATE_SALESPEOPLE_3,
           [canGenerateAuditPdf, id]
         );
         if (result.rowCount === 0) {
@@ -697,10 +655,7 @@ export function registrarVendedores(app: Express): void {
     try {
       if (D.usePostgres && D.pgPool) {
         const result = await D.pgPool.query(
-          `UPDATE salespeople 
-           SET whatsapp_type = $1 
-           WHERE id = $2 
-           RETURNING id, name, active, COALESCE(whatsapp_type, 'business') AS "whatsappType"`,
+          SQL_UPDATE_SALESPEOPLE_4,
           [cleanType, id]
         );
         if (result.rowCount === 0) {
@@ -738,13 +693,13 @@ export function registrarVendedores(app: Express): void {
       if (D.usePostgres && D.pgPool) {
         // Reassign leads to Thomas
         await D.pgPool.query(
-          `UPDATE leads SET salesperson_id = 'seller-thomas', salesperson_name = 'Thomas' WHERE salesperson_id = $1`,
+          SQL_UPDATE_LEADS_2,
           [id]
         );
         // Delete associated user login
-        await D.pgPool.query(`DELETE FROM users WHERE salesperson_id = $1`, [id]);
+        await D.pgPool.query(SQL_DELETE_USERS, [id]);
         // Delete salesperson
-        await D.pgPool.query(`DELETE FROM salespeople WHERE id = $1`, [id]);
+        await D.pgPool.query(SQL_DELETE_SALESPEOPLE, [id]);
         await D.logAudit('VENDEDOR_EXCLUIDO', `Excluiu vendedor ID ${id} e removeu suas credenciais de login`, req);
         const respostaExclusao: RespostaSucesso = { success: true, message: 'Vendedor e sua conta de acesso foram excluídos, e seus leads foram transferidos para Thomas.' };
         return res.json(respostaExclusao);
@@ -783,9 +738,7 @@ export function registrarVendedores(app: Express): void {
     if (D.usePostgres && D.pgPool) {
       try {
         await D.pgPool.query(
-          `UPDATE salespeople 
-           SET pct_interessados = $1, pct_nao_interessados = $2, limite_leads_diario = $3
-           WHERE id = $4`,
+          SQL_UPDATE_SALESPEOPLE_5,
           [pctWarm, pctCold, limit, id]
         );
       } catch (err: any) {
@@ -810,7 +763,7 @@ export function registrarVendedores(app: Express): void {
   app.post('/api/salespeople/reset-daily-leads', async (req, res) => {
     if (D.usePostgres && D.pgPool) {
       try {
-        await D.pgPool.query('UPDATE salespeople SET leads_recebidos_hoje = 0');
+        await D.pgPool.query(SQL_UPDATE_SALESPEOPLE_6);
       } catch (err: any) {
         return res.status(500).json({ error: `Erro ao resetar: ${err.message}` });
       }
@@ -834,10 +787,7 @@ export function registrarVendedores(app: Express): void {
     let leadIds: string[] = [];
     if (D.usePostgres && D.pgPool) {
       const qRes = await D.pgPool.query(
-        `SELECT id FROM leads 
-         WHERE column_status = 'Leads'
-         ORDER BY created_at DESC 
-         LIMIT $1`,
+        SQL_SELECT_LEADS,
         [limite]
       );
       leadIds = qRes.rows.map(r => r.id);
@@ -875,9 +825,7 @@ export function registrarVendedores(app: Express): void {
     if (D.usePostgres && D.pgPool) {
       try {
         const qRes = await D.pgPool.query(
-          `SELECT id, salesperson_id AS "salespersonId", shortcut, title, type, content, media_url AS "mediaUrl", created_at AS "createdAt"
-           FROM quick_replies
-           ORDER BY created_at ASC`
+          SQL_SELECT_QUICK_REPLIES
         );
         return res.json({ success: true, quickReplies: qRes.rows } satisfies RespostaListaRespostasRapidas);
       } catch (err: any) {
@@ -916,8 +864,7 @@ export function registrarVendedores(app: Express): void {
     if (D.usePostgres && D.pgPool) {
       try {
         await D.pgPool.query(
-          `INSERT INTO quick_replies (id, salesperson_id, shortcut, title, type, content, media_url, created_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, CURRENT_TIMESTAMP)`,
+          SQL_INSERT_QUICK_REPLIES,
           [id, salespersonId || null, cleanShortcut, newQR.title, type, newQR.content, mediaUrl || null]
         );
       } catch (err: any) {
@@ -935,7 +882,7 @@ export function registrarVendedores(app: Express): void {
 
     if (D.usePostgres && D.pgPool) {
       try {
-        await D.pgPool.query('DELETE FROM quick_replies WHERE id = $1', [id]);
+        await D.pgPool.query(SQL_DELETE_QUICK_REPLIES, [id]);
       } catch (err: any) {
         console.warn('[PostgreSQL] Erro ao excluir quick_reply:', err.message);
       }
