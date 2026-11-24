@@ -1,3 +1,4 @@
+import { apiFetch } from '../api/client';
 import React, { useState, useEffect } from 'react';
 import { isUiFlagOn } from '@shared/lib/uiFlags';
 // Ligada por padrão. Só some se VITE_MOSTRAR_AUTOMACOES=false.
@@ -132,7 +133,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
       return;
     }
     try {
-      const res = await fetch(`/api/salespeople/${seller.id}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/salespeople/${seller.id}`, { method: 'DELETE' });
       const data = (await res.json()) as RespostaSucesso | RespostaErroApi;
       if (res.ok) {
         onShowToast(('message' in data && data.message) || `Vendedor "${seller.name}" excluído.`);
@@ -159,7 +160,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
       return;
     }
     try {
-      const res = await fetch(`/api/admin/users/${userToDelete.id}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/admin/users/${userToDelete.id}`, { method: 'DELETE' });
       const data = (await res.json()) as RespostaSucesso | RespostaErroApi;
       if (res.ok) {
         onShowToast(('message' in data && data.message) || `Usuário "${userToDelete.name}" excluído com sucesso.`);
@@ -195,7 +196,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
   const fetchUsers = async () => {
     setLoadingUsers(true);
     try {
-      const res = await fetch('/api/admin/users');
+      const res = await apiFetch('/api/admin/users');
       if (res.ok) {
         const data = (await res.json()) as RespostaListaUsuarios;
         setUsers(Array.isArray(data) ? (data as User[]) : []);
@@ -210,7 +211,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
   const fetchAuditLogs = async () => {
     setLoadingLogs(true);
     try {
-      const res = await fetch('/api/admin/audit-logs');
+      const res = await apiFetch('/api/admin/audit-logs');
       if (res.ok) {
         const data = (await res.json()) as RespostaAuditLogs;
         setAuditLogs(Array.isArray(data) ? data : []);
@@ -231,7 +232,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
 
     setSubmittingUser(true);
     try {
-      const res = await fetch('/api/admin/users', {
+      const res = await apiFetch('/api/admin/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -270,7 +271,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
     }
 
     try {
-      const res = await fetch(`/api/admin/users/${user.id}`, {
+      const res = await apiFetch(`/api/admin/users/${user.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ active: !user.active })
@@ -297,7 +298,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
 
     setSubmittingReset(true);
     try {
-      const res = await fetch(`/api/admin/users/${resettingUser.id}`, {
+      const res = await apiFetch(`/api/admin/users/${resettingUser.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ newPassword: resetNewPassword.trim() })
@@ -330,7 +331,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
 
     setDistributingLeads(true);
     try {
-      const res = await fetch('/api/leads/distribute', {
+      const res = await apiFetch('/api/leads/distribute', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1192,7 +1193,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
                     try {
                       await Promise.all(
                         salespeople.map(s => 
-                          fetch(`/api/salespeople/${s.id}/toggle-audit-pdf`, {
+                          apiFetch(`/api/salespeople/${s.id}/toggle-audit-pdf`, {
                             method: 'PATCH',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ canGenerateAuditPdf: true })
@@ -1216,7 +1217,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
                     try {
                       await Promise.all(
                         salespeople.map(s => 
-                          fetch(`/api/salespeople/${s.id}/toggle-audit-pdf`, {
+                          apiFetch(`/api/salespeople/${s.id}/toggle-audit-pdf`, {
                             method: 'PATCH',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ canGenerateAuditPdf: false })
@@ -1337,7 +1338,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
                           e.stopPropagation();
                           const nextVal = seller.canGenerateAuditPdf === false ? true : false;
                           try {
-                            const res = await fetch(`/api/salespeople/${seller.id}/toggle-audit-pdf`, {
+                            const res = await apiFetch(`/api/salespeople/${seller.id}/toggle-audit-pdf`, {
                               method: 'PATCH',
                               headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify({ canGenerateAuditPdf: nextVal })

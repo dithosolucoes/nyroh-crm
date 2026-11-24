@@ -1,3 +1,4 @@
+import { apiFetch } from '../api/client';
 import React, { useEffect, useState } from 'react';
 import { X, Ban } from 'lucide-react';
 
@@ -28,7 +29,7 @@ export const BlockRequestDialog: React.FC<Props> = ({ leadId, leadName, onClose,
     if (code === 'outro' && !text.trim()) { setError('Descreva o motivo em "Outro".'); return; }
     setSending(true); setError(null);
     try {
-      const res = await fetch(`/api/leads/${leadId}/block-requests`, {
+      const res = await apiFetch(`/api/leads/${leadId}/block-requests`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reasonCode: code, reasonText: text }),
@@ -83,7 +84,7 @@ export const BlockHistory: React.FC<{ leadId: string; refreshKey?: number }> = (
   const [items, setItems] = useState<BlockHistoryItem[]>([]);
   useEffect(() => {
     let alive = true;
-    fetch(`/api/leads/${leadId}/block-requests`)
+    apiFetch(`/api/leads/${leadId}/block-requests`)
       .then(r => (r.ok ? r.json() : []))
       .then(d => { if (alive && Array.isArray(d)) setItems(d); })
       .catch(() => {});

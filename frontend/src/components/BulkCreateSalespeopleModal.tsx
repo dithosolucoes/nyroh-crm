@@ -1,3 +1,4 @@
+import { apiFetch } from '../api/client';
 import React, { useState, useMemo } from 'react';
 import { X, Code2, Sparkles, CheckCircle2, AlertCircle, RefreshCw, Copy, Check } from 'lucide-react';
 import type { RespostaLoteVendedores, RespostaErroApi } from '@shared/contracts/rotas';
@@ -107,7 +108,7 @@ export const BulkCreateSalespeopleModal: React.FC<BulkCreateSalespeopleModalProp
 
     setLoading(true);
     try {
-      const res = await fetch('/api/salespeople/batch', {
+      const res = await apiFetch('/api/salespeople/batch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(parseResult.items)

@@ -1,3 +1,4 @@
+import { apiFetch } from '../api/client';
 import React, { useState, useMemo, useEffect } from 'react';
 import { onRealtime } from '@shared/lib/realtime';
 import {
@@ -153,7 +154,7 @@ export const AdminDispatchTestSandbox: React.FC<AdminDispatchTestSandboxProps> =
   const [sendingNumbers, setSendingNumbers] = useState<Array<{ id: string; name: string; phone: string; accountId?: string }>>([]);
   const [selectedPhoneNumberId, setSelectedPhoneNumberId] = useState<string>('');
   useEffect(() => {
-    fetch('/api/admin/fluxo/instances')
+    apiFetch('/api/admin/fluxo/instances')
       .then(r => r.json() as Promise<RespostaInstanciasFluxo>)
       .then(d => { if (d?.success && Array.isArray(d.instances)) setSendingNumbers(d.instances); })
       .catch(() => { /* seletor é opcional */ });
@@ -192,7 +193,7 @@ export const AdminDispatchTestSandbox: React.FC<AdminDispatchTestSandboxProps> =
 
     const fetchChat = async () => {
       try {
-        const res = await fetch(`/api/leads/${leadId}/messages`);
+        const res = await apiFetch(`/api/leads/${leadId}/messages`);
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data.messages)) {
@@ -231,7 +232,7 @@ export const AdminDispatchTestSandbox: React.FC<AdminDispatchTestSandboxProps> =
     setReplyInputText('');
 
     try {
-      const res = await fetch(`/api/leads/${lastDispatchedLead.id}/messages`, {
+      const res = await apiFetch(`/api/leads/${lastDispatchedLead.id}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -240,7 +241,7 @@ export const AdminDispatchTestSandbox: React.FC<AdminDispatchTestSandboxProps> =
         })
       });
       if (res.ok) {
-        const fetchRes = await fetch(`/api/leads/${lastDispatchedLead.id}/messages`);
+        const fetchRes = await apiFetch(`/api/leads/${lastDispatchedLead.id}/messages`);
         if (fetchRes.ok) {
           const data = await fetchRes.json();
           setConversationMessages(data.messages || []);
@@ -365,7 +366,7 @@ export const AdminDispatchTestSandbox: React.FC<AdminDispatchTestSandboxProps> =
     const interval = setInterval(async () => {
       attempts++;
       try {
-        const sRes = await fetch(`/api/campaign/test-dispatch/status/${encodeURIComponent(messageId)}`);
+        const sRes = await apiFetch(`/api/campaign/test-dispatch/status/${encodeURIComponent(messageId)}`);
         if (sRes.ok) {
           const sData = await sRes.json();
           if (sData.deliveryStatus === 'failed') {
@@ -417,7 +418,7 @@ export const AdminDispatchTestSandbox: React.FC<AdminDispatchTestSandboxProps> =
 
     try {
       // Registrar o lead no CRM imediatamente
-      const res = await fetch('/api/campaign/test-dispatch', {
+      const res = await apiFetch('/api/campaign/test-dispatch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -466,7 +467,7 @@ export const AdminDispatchTestSandbox: React.FC<AdminDispatchTestSandboxProps> =
 
       const cleanLeadName = testLeadName.trim() || `Lead Teste (${formatPhoneInput(cleanDigits)})`;
 
-      const res = await fetch('/api/campaign/test-dispatch', {
+      const res = await apiFetch('/api/campaign/test-dispatch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

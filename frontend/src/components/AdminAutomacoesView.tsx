@@ -1,3 +1,4 @@
+import { apiFetch } from '../api/client';
 import { useEffect, useState } from 'react';
 import {
   ACOES,
@@ -54,7 +55,7 @@ function useLista<T>(url: string, inicial: T[] = []): { dados: T[]; real: boolea
   const [real, setReal] = useState(false);
   useEffect(() => {
     let vivo = true;
-    fetch(url)
+    apiFetch(url)
       .then(async (r) => {
         if (!r.ok) return;
         const j = (await r.json()) as T[];
@@ -96,7 +97,7 @@ export default function AdminAutomacoesView() {
 
   async function alternarPausa() {
     setPausaMsg('');
-    const r = await fetch('/api/admin/automacoes/configuracoes', {
+    const r = await apiFetch('/api/admin/automacoes/configuracoes', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pausaGeral: !pausaAtual }),
@@ -110,7 +111,7 @@ export default function AdminAutomacoesView() {
   // Carrega as regras salvas no servidor. Sem persistência, a tela fica vazia.
   useEffect(() => {
     let vivo = true;
-    fetch('/api/admin/automacoes')
+    apiFetch('/api/admin/automacoes')
       .then(async (r) => {
         if (!vivo) return;
         if (r.status === 503) {
@@ -137,7 +138,7 @@ export default function AdminAutomacoesView() {
   /** Grava no servidor quando a persistência está ligada. Devolve false se o servidor recusar. */
   const gravar = async (id: string, status: Status, def: Automacao): Promise<boolean> => {
     if (!persistido) return true;
-    const r = await fetch(`/api/admin/automacoes/${encodeURIComponent(id)}`, {
+    const r = await apiFetch(`/api/admin/automacoes/${encodeURIComponent(id)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status, def }),
@@ -309,7 +310,7 @@ export default function AdminAutomacoesView() {
 
   const excluir = async () => {
     if (persistido) {
-      const r = await fetch(`/api/admin/automacoes/${encodeURIComponent(sel.id)}`, { method: 'DELETE' });
+      const r = await apiFetch(`/api/admin/automacoes/${encodeURIComponent(sel.id)}`, { method: 'DELETE' });
       if (!r.ok) {
         setAviso('Não foi possível excluir a automação.');
         return;
@@ -614,7 +615,7 @@ function BlocoEnvio({ automacoes }: { automacoes: Array<{ id: string; nome: stri
 
   useEffect(() => {
     let vivo = true;
-    fetch('/api/admin/automacoes/envio')
+    apiFetch('/api/admin/automacoes/envio')
       .then(async (r) => {
         if (!r.ok || !vivo) return;
         const j = (await r.json()) as EnvioTela;
@@ -632,7 +633,7 @@ function BlocoEnvio({ automacoes }: { automacoes: Array<{ id: string; nome: stri
   const salvar = async (ligado: boolean) => {
     setSalvando(true);
     setMsg(null);
-    const r = await fetch('/api/admin/automacoes/envio', {
+    const r = await apiFetch('/api/admin/automacoes/envio', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ligado, numeroTeste: numero, limitePorDia: limite, automacoesLiberadas: liberadas }),

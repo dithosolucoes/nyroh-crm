@@ -1,3 +1,4 @@
+import { apiFetch } from '../api/client';
 import React, { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Upload, CheckCircle2, AlertTriangle, RefreshCw, FolderOpen } from 'lucide-react';
 import type { ImportProgressData } from './ZipImportProgressModal';
@@ -197,7 +198,7 @@ export const TabelaHistoricoZips: React.FC<TabelaProps> = ({ historico, carregan
           disabled={historico.length === 0}
           onClick={async () => {
             try {
-              const pre = await fetch('/api/campaign/uploads/apagar-todos', {
+              const pre = await apiFetch('/api/campaign/uploads/apagar-todos', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dryRun: true }),
               }).then(r => r.json());
               if (pre.error) return window.alert(pre.error);
@@ -206,7 +207,7 @@ export const TabelaHistoricoZips: React.FC<TabelaProps> = ({ historico, carregan
                 ? `\n\n${pre.bloqueadas} safra(s) NÃO serão apagadas: ${pre.leadsBloqueados} lead(s) delas já foram disparados.`
                 : '';
               if (!window.confirm(`Apagar ${pre.zips} ZIP(s) de ${pre.safras} safra(s), com ${pre.leads} lead(s) ainda em espera?${aviso}\n\nNão dá para desfazer.`)) return;
-              const r = await fetch('/api/campaign/uploads/apagar-todos', {
+              const r = await apiFetch('/api/campaign/uploads/apagar-todos', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dryRun: false }),
               });
               const d = await r.json().catch(() => ({}));
@@ -289,7 +290,7 @@ export const TabelaHistoricoZips: React.FC<TabelaProps> = ({ historico, carregan
                       onClick={async () => {
                         if (!window.confirm(`Apagar a safra "${h.batchName || ''}" inteira, com os ${zipsDaSafra} ZIPs dela? Só os leads ainda em espera são apagados. Não dá para desfazer.`)) return;
                         try {
-                          const r = await fetch(`/api/campaign/batches/${h.batchId}`, { method: 'DELETE' });
+                          const r = await apiFetch(`/api/campaign/batches/${h.batchId}`, { method: 'DELETE' });
                           const d = await r.json().catch(() => ({}));
                           if (!r.ok) window.alert(d.error || 'Não consegui apagar esta safra.');
                           await onAtualizar();
@@ -307,7 +308,7 @@ export const TabelaHistoricoZips: React.FC<TabelaProps> = ({ historico, carregan
                       onClick={async () => {
                         if (!window.confirm(`Apagar o ZIP "${h.fileName}"? Se ele for a única carga da safra e nenhum lead tiver sido disparado, a safra também é apagada. Não dá para desfazer.`)) return;
                         try {
-                          const r = await fetch(`/api/campaign/uploads/${h.id}`, { method: 'DELETE' });
+                          const r = await apiFetch(`/api/campaign/uploads/${h.id}`, { method: 'DELETE' });
                           const d = await r.json().catch(() => ({}));
                           if (!r.ok) window.alert(d.error || 'Não consegui apagar este ZIP.');
                           await onAtualizar();
@@ -340,7 +341,7 @@ export const HistoricoZipsAutoCarregado: React.FC<{ chave?: string; onAbrirSafra
   const carregar = async () => {
     setCarregando(true);
     try {
-      const r = await fetch('/api/campaign/uploads');
+      const r = await apiFetch('/api/campaign/uploads');
       const d = (await r.json()) as RespostaListaUploads;
       setHistorico(Array.isArray(d.uploads) ? d.uploads : []);
     } catch {

@@ -1,3 +1,4 @@
+import { apiFetch } from '../api/client';
 import React, { useState, useEffect, useRef } from 'react';
 import { Lead, CallLog, CustomTag, PIPELINE_COLUMNS, ColumnStatus, Salesperson, User as UserType, MasterColumnId } from '@shared/types';
 import { 
@@ -101,7 +102,7 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
       if (clean && !clean.startsWith('http://') && !clean.startsWith('https://')) {
         clean = `https://${clean}`;
       }
-      const res = await fetch(`/api/leads/${lead.id}`, {
+      const res = await apiFetch(`/api/leads/${lead.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ website: clean })
@@ -172,7 +173,7 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
   const fetchWebsiteAudit = async (leadId: string) => {
     setLoadingAudit(true);
     try {
-      const res = await fetch(`/api/leads/${leadId}/audit`, {
+      const res = await apiFetch(`/api/leads/${leadId}/audit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
@@ -281,7 +282,7 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
   const fetchCallHistory = async (leadId: string) => {
     setLoadingCalls(true);
     try {
-      const res = await fetch(`/api/leads/${leadId}/calls`);
+      const res = await apiFetch(`/api/leads/${leadId}/calls`);
       const contentType = res.headers.get('content-type') || '';
       if (res.ok && contentType.includes('application/json')) {
         const data = (await res.json()) as RespostaListaLigacoes;
@@ -925,7 +926,7 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                           setSelectedColumn(targetCol);
                           if (lead) {
                             try {
-                              await fetch(`/api/leads/${lead.id}/status`, {
+                              await apiFetch(`/api/leads/${lead.id}/status`, {
                                 method: 'PUT',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({
@@ -977,7 +978,7 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                               if (lead) {
                                 lead.subStatus = subOption;
                                 try {
-                                  await fetch(`/api/leads/${lead.id}/status`, {
+                                  await apiFetch(`/api/leads/${lead.id}/status`, {
                                     method: 'PUT',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ subStatus: subOption })
@@ -1062,7 +1063,7 @@ export const LeadDetailModal: React.FC<LeadDetailModalProps> = ({
                               if (lead) {
                                 lead.lossReason = reason;
                                 try {
-                                  await fetch(`/api/leads/${lead.id}/status`, {
+                                  await apiFetch(`/api/leads/${lead.id}/status`, {
                                     method: 'PUT',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ lossReason: reason })

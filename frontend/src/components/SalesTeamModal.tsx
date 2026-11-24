@@ -1,3 +1,4 @@
+import { apiFetch } from '../api/client';
 import React, { useState, useEffect } from 'react';
 import { Salesperson, Lead, CustomTag } from '@shared/types';
 import { 
@@ -97,7 +98,7 @@ export const SalesTeamModal: React.FC<SalesTeamModalProps> = ({
           limiteLeadsDiario: 100,
           ativoRoleta: true
         };
-        return fetch(`/api/salespeople/${s.id}`, {
+        return apiFetch(`/api/salespeople/${s.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -124,7 +125,7 @@ export const SalesTeamModal: React.FC<SalesTeamModalProps> = ({
     if (!confirm('Deseja zerar os contadores de leads recebidos hoje para todos os vendedores?')) return;
     setResettingDaily(true);
     try {
-      const res = await fetch('/api/salespeople/reset-daily-leads', { method: 'POST' });
+      const res = await apiFetch('/api/salespeople/reset-daily-leads', { method: 'POST' });
       if (res.ok) {
         await onRefreshSalespeople();
         onShowToast('Contadores diários zerados com sucesso!');
@@ -141,7 +142,7 @@ export const SalesTeamModal: React.FC<SalesTeamModalProps> = ({
   const handleRunBatchRoulette = async () => {
     setRunningBatchRoulette(true);
     try {
-      const res = await fetch('/api/salespeople/distribute-roulette', {
+      const res = await apiFetch('/api/salespeople/distribute-roulette', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -197,7 +198,7 @@ export const SalesTeamModal: React.FC<SalesTeamModalProps> = ({
     setSavingSeller(true);
     try {
       const palette = COLOR_PALETTES[selectedPaletteIndex] || COLOR_PALETTES[0];
-      const res = await fetch('/api/salespeople', {
+      const res = await apiFetch('/api/salespeople', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -242,7 +243,7 @@ export const SalesTeamModal: React.FC<SalesTeamModalProps> = ({
     }
 
     try {
-      const res = await fetch(`/api/salespeople/${seller.id}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/salespeople/${seller.id}`, { method: 'DELETE' });
       if (!res.ok) {
         const data = (await res.json()) as RespostaErroApi;
         throw new Error(data.error || 'Erro ao remover vendedor.');
@@ -273,7 +274,7 @@ export const SalesTeamModal: React.FC<SalesTeamModalProps> = ({
 
     setDistributing(true);
     try {
-      const res = await fetch('/api/leads/distribute', {
+      const res = await apiFetch('/api/leads/distribute', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -474,7 +475,7 @@ export const SalesTeamModal: React.FC<SalesTeamModalProps> = ({
                                 e.stopPropagation();
                                 const nextVal = seller.canGenerateAuditPdf === false ? true : false;
                                 try {
-                                  const res = await fetch(`/api/salespeople/${seller.id}/toggle-audit-pdf`, {
+                                  const res = await apiFetch(`/api/salespeople/${seller.id}/toggle-audit-pdf`, {
                                     method: 'PATCH',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ canGenerateAuditPdf: nextVal })
@@ -507,7 +508,7 @@ export const SalesTeamModal: React.FC<SalesTeamModalProps> = ({
                                 const current = seller.whatsappType || 'business';
                                 const nextVal: WhatsAppAppType = current === 'business' ? 'normal' : current === 'normal' ? 'ask' : 'business';
                                 try {
-                                  const res = await fetch(`/api/salespeople/${seller.id}/whatsapp-type`, {
+                                  const res = await apiFetch(`/api/salespeople/${seller.id}/whatsapp-type`, {
                                     method: 'PATCH',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ whatsappType: nextVal })

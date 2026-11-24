@@ -1,3 +1,4 @@
+import { apiFetch } from './api/client';
 import { onRealtime, prepararNotificacoes, notificarSeEmSegundoPlano } from '@shared/lib/realtime';
 import React, { useState, useEffect, useCallback, useMemo, useDeferredValue, useRef } from 'react';
 import { Lead, ColumnStatus, CustomTag, Salesperson, User } from '@shared/types';
@@ -86,7 +87,7 @@ export default function App() {
   const fetchCurrentUser = async () => {
     setIsAuthChecking(true);
     try {
-      const res = await fetch('/api/auth/me');
+      const res = await apiFetch('/api/auth/me');
       const contentType = res.headers.get('content-type') || '';
       if (res.ok && contentType.includes('application/json')) {
         const data = (await res.json()) as RespostaSessaoAtual;
@@ -122,7 +123,7 @@ export default function App() {
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await apiFetch('/api/auth/logout', { method: 'POST' });
     } catch (err) {
       console.error('Erro ao sair:', err);
     } finally {
@@ -229,7 +230,7 @@ export default function App() {
 
   const fetchSalespeople = async () => {
     try {
-      const res = await fetch('/api/salespeople');
+      const res = await apiFetch('/api/salespeople');
       const contentType = res.headers.get('content-type') || '';
       if (res.ok && contentType.includes('application/json')) {
         const data = await res.json();
@@ -293,7 +294,7 @@ export default function App() {
       const novos: Lead[] = [];
       for (const id of ids.slice(0, 20)) {
         try {
-          const r = await fetch(`/api/leads/${encodeURIComponent(id)}/summary`);
+          const r = await apiFetch(`/api/leads/${encodeURIComponent(id)}/summary`);
           // O resumo é um subconjunto (ResumoLead). Entra no estado pela conversão explícita para Lead.
           if (r.ok) novos.push(resumoParaLead((await r.json()) as RespostaResumoLead));
         } catch {
@@ -419,7 +420,7 @@ export default function App() {
     setLoadingLeads(true);
     try {
       // If a specific salesperson route is active, we can fetch their isolated leads or full list
-      const res = await fetch('/api/leads');
+      const res = await apiFetch('/api/leads');
       const contentType = res.headers.get('content-type') || '';
       if (res.ok && contentType.includes('application/json')) {
         // A listagem vem como LeadListado (campos com null). Convertida para Lead pela função explícita, sem cast.
@@ -439,7 +440,7 @@ export default function App() {
 
   const fetchTags = async () => {
     try {
-      const res = await fetch('/api/tags');
+      const res = await apiFetch('/api/tags');
       const contentType = res.headers.get('content-type') || '';
       if (res.ok && contentType.includes('application/json')) {
         const data = (await res.json()) as RespostaListaEtiquetas;
@@ -465,7 +466,7 @@ export default function App() {
     );
 
     try {
-      const res = await fetch(`/api/leads/${leadId}/status`, {
+      const res = await apiFetch(`/api/leads/${leadId}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ columnStatus: newColumn })
@@ -492,7 +493,7 @@ export default function App() {
     }
 
     try {
-      const res = await fetch(`/api/leads/${leadId}/status`, {
+      const res = await apiFetch(`/api/leads/${leadId}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subStatus })
@@ -520,7 +521,7 @@ export default function App() {
     }
 
     try {
-      const res = await fetch(`/api/leads/${leadId}/assign`, {
+      const res = await apiFetch(`/api/leads/${leadId}/assign`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ salespersonId, salespersonName })
@@ -539,7 +540,7 @@ export default function App() {
 
   // Registrar ligação para o lead
   const handleAddCallLog = async (leadId: string, tag: string, comment: string, durationSeconds?: number, followUpAt?: string) => {
-    const res = await fetch(`/api/leads/${leadId}/calls`, {
+    const res = await apiFetch(`/api/leads/${leadId}/calls`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tag, comment, durationSeconds, followUpAt })
@@ -557,7 +558,7 @@ export default function App() {
   const handleDeleteLead = async (leadId: string) => {
     if (window.confirm('Tem certeza que deseja excluir este lead e todo seu histórico?')) {
       try {
-        const res = await fetch(`/api/leads/${leadId}`, { method: 'DELETE' });
+        const res = await apiFetch(`/api/leads/${leadId}`, { method: 'DELETE' });
         if (res.ok) {
           setLeads((prev) => prev.filter((l) => l.id !== leadId));
           showToast('Lead removido com sucesso!');
@@ -577,7 +578,7 @@ export default function App() {
       return;
     }
     try {
-      const res = await fetch('/api/leads/bulk-delete', {
+      const res = await apiFetch('/api/leads/bulk-delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids: leadIds })
@@ -595,7 +596,7 @@ export default function App() {
   // Semear leads de exemplo para teste rápido
   const handleSeedSamples = async () => {
     try {
-      const res = await fetch('/api/seed-samples', { method: 'POST' });
+      const res = await apiFetch('/api/seed-samples', { method: 'POST' });
       const contentType = res.headers.get('content-type') || '';
       if (res.ok && contentType.includes('application/json')) {
         const data = await res.json();

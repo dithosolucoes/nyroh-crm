@@ -1,3 +1,4 @@
+import { apiFetch } from '../api/client';
 import React, { useState, useEffect } from 'react';
 import { isUiFlagOn } from '@shared/lib/uiFlags';
 const SHOW_LAB = isUiFlagOn(import.meta.env.VITE_MOSTRAR_LAB);
@@ -184,7 +185,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
   const [bmAccounts, setBmAccounts] = useState<Array<{ id: string; name: string }>>([]);
   const fetchBmAccounts = async () => {
     try {
-      const res = await fetch('/api/admin/meta/accounts');
+      const res = await apiFetch('/api/admin/meta/accounts');
       const data = await res.json();
       if (res.ok && data.success) setBmAccounts(data.accounts || []);
     } catch { /* lista de BMs é opcional */ }
@@ -245,7 +246,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
   const fetchConfig = async () => {
     setLoadingConfig(true);
     try {
-      const res = await fetch('/api/admin/fluxo/config');
+      const res = await apiFetch('/api/admin/fluxo/config');
       if (res.ok) {
         const data = (await res.json()) as RespostaConfigFluxo;
         setConfig(data);
@@ -273,7 +274,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
     setSyncingWithMeta(true);
     setMetaSyncNotice(null);
     try {
-      const res = await fetch('/api/admin/fluxo/templates/sync-meta', {
+      const res = await apiFetch('/api/admin/fluxo/templates/sync-meta', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });
@@ -303,7 +304,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
     setSavingMetaConfig(true);
     setMetaSaveSuccess(null);
     try {
-      const res = await fetch('/api/admin/fluxo/config', {
+      const res = await apiFetch('/api/admin/fluxo/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -336,7 +337,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
   const fetchInstances = async () => {
     setLoadingInstances(true);
     try {
-      const res = await fetch('/api/admin/fluxo/instances');
+      const res = await apiFetch('/api/admin/fluxo/instances');
       if (res.ok) {
         const data = (await res.json()) as RespostaInstanciasFluxo;
         setInstances(Array.isArray(data.instances) ? data.instances : []);
@@ -355,7 +356,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
   const fetchTemplates = async () => {
     setLoadingTemplates(true);
     try {
-      const res = await fetch('/api/admin/fluxo/templates');
+      const res = await apiFetch('/api/admin/fluxo/templates');
       if (res.ok) {
         const data = (await res.json()) as RespostaListaModelosFluxo;
         if (data.templates && Array.isArray(data.templates)) {
@@ -376,7 +377,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
   const fetchWebhookEvents = async () => {
     setLoadingWebhooks(true);
     try {
-      const res = await fetch('/api/admin/fluxo/events');
+      const res = await apiFetch('/api/admin/fluxo/events');
       if (res.ok) {
         const data = (await res.json()) as RespostaEventosFluxo;
         if (data.events && Array.isArray(data.events)) {
@@ -423,7 +424,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
 
     setSavingConfig(true);
     try {
-      const res = await fetch('/api/admin/fluxo/config', {
+      const res = await apiFetch('/api/admin/fluxo/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -464,7 +465,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
         payload.instanceId = customInstance;
       }
 
-      const res = await fetch('/api/admin/fluxo/test-connection', {
+      const res = await apiFetch('/api/admin/fluxo/test-connection', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -535,7 +536,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
         });
       }
 
-      const res = await fetch('/api/admin/fluxo/templates', {
+      const res = await apiFetch('/api/admin/fluxo/templates', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -589,7 +590,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
         });
       }
 
-      const res = await fetch('/api/admin/fluxo/templates', {
+      const res = await apiFetch('/api/admin/fluxo/templates', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -620,7 +621,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
   // Update Template Status / Quality Score
   const handleUpdateTemplateStatus = async (templateName: string, newStatus: string) => {
     try {
-      const res = await fetch(`/api/admin/fluxo/templates/${encodeURIComponent(templateName)}/status`, {
+      const res = await apiFetch(`/api/admin/fluxo/templates/${encodeURIComponent(templateName)}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus })
@@ -640,7 +641,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
   const handleDeleteTemplate = async (templateName: string, accountId?: string) => {
     if (!confirm(`Deseja realmente excluir o template "${templateName}"?`)) return;
     try {
-      const res = await fetch(`/api/admin/fluxo/templates/${encodeURIComponent(templateName)}?accountId=${encodeURIComponent(accountId || 'env')}`, {
+      const res = await apiFetch(`/api/admin/fluxo/templates/${encodeURIComponent(templateName)}?accountId=${encodeURIComponent(accountId || 'env')}`, {
         method: 'DELETE'
       });
       if (res.ok) {
@@ -786,7 +787,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
 
     setSendingTest(true);
     try {
-      const res = await fetch('/api/admin/fluxo/send-test-message', {
+      const res = await apiFetch('/api/admin/fluxo/send-test-message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -839,7 +840,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
 
     setSendingTest(true);
     try {
-      const res = await fetch('/api/admin/fluxo/send-template-test', {
+      const res = await apiFetch('/api/admin/fluxo/send-template-test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -904,7 +905,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
     setTestChatMessages((prev) => [...prev, newMsg]);
 
     try {
-      const res = await fetch('/api/admin/fluxo/send-test-message', {
+      const res = await apiFetch('/api/admin/fluxo/send-test-message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1002,7 +1003,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
   // Simulate Webhook Event
   const handleSimulateWebhook = async (status: string) => {
     try {
-      const res = await fetch('/api/admin/fluxo/events/simulate', {
+      const res = await apiFetch('/api/admin/fluxo/events/simulate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1022,7 +1023,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
   // Simulate Incoming Customer Message via Webhook
   const handleSimulateIncomingMessage = async () => {
     try {
-      const res = await fetch('/api/webhooks/simulate-incoming', {
+      const res = await apiFetch('/api/webhooks/simulate-incoming', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1043,7 +1044,7 @@ export const AdminWhatsAppFluxoView: React.FC<AdminWhatsAppFluxoViewProps> = ({
   // Clear Webhook Logs
   const handleClearWebhookLogs = async () => {
     try {
-      await fetch('/api/admin/fluxo/events', { method: 'DELETE' });
+      await apiFetch('/api/admin/fluxo/events', { method: 'DELETE' });
       setWebhookEvents([]);
       onShowToast('Logs de webhooks limpos com sucesso.');
     } catch {

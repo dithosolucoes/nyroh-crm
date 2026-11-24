@@ -1,3 +1,4 @@
+import { apiFetch } from '../api/client';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Lead, User } from '@shared/types';
 import { AdminWhatsAppFluxoView } from './AdminWhatsAppFluxoView';
@@ -27,7 +28,7 @@ interface Props {
 }
 
 async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, { headers: { 'Content-Type': 'application/json' }, ...init });
+  const res = await apiFetch(url, { headers: { 'Content-Type': 'application/json' }, ...init });
   const data = await res.json().catch(() => ({}));
   if (res.status === 503) {
     throw new Error('Esta tela ainda não está liberada neste servidor (migração de UX desligada). Peça ao administrador para ativar NYROH_APLICAR_MIGRACOES_UX.');

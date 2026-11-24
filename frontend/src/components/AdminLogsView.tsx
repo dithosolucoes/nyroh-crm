@@ -1,3 +1,4 @@
+import { apiFetch } from '../api/client';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { RespostaLogsServidor } from '@shared/contracts/rotas';
 
@@ -33,7 +34,7 @@ export const AdminLogsView: React.FC = () => {
   const carregar = useCallback(async (completo: boolean) => {
     try {
       const params = new URLSearchParams({ level: nivel, category: categoria, q: busca, limit: '500' });
-      const res = await fetch(`/api/admin/logs?${params.toString()}`);
+      const res = await apiFetch(`/api/admin/logs?${params.toString()}`);
       if (!res.ok) {
         setErro(res.status === 403 ? 'Acesso restrito ao Administrador.' : `Erro ${res.status} ao buscar os logs.`);
         return;

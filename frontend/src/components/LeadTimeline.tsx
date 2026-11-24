@@ -1,3 +1,4 @@
+import { apiFetch } from '../api/client';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Phone, MessageSquare, Ban, CheckCircle2, XCircle } from 'lucide-react';
 
@@ -59,11 +60,11 @@ export const LeadTimeline: React.FC<{ leadId: string; calls: TimelineCall[]; ref
 
   useEffect(() => {
     let vivo = true;
-    fetch(`/api/leads/${leadId}/block-requests`)
+    apiFetch(`/api/leads/${leadId}/block-requests`)
       .then(r => (r.ok ? r.json() : []))
       .then(d => { if (vivo && Array.isArray(d)) setBloqueios(d); })
       .catch(() => {});
-    fetch(`/api/leads/${leadId}/messages?limit=60`)
+    apiFetch(`/api/leads/${leadId}/messages?limit=60`)
       .then(r => (r.ok ? r.json() : null))
       .then(d => {
         const lista = Array.isArray(d) ? d : Array.isArray(d?.messages) ? d.messages : [];

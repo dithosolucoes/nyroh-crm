@@ -1,3 +1,4 @@
+import { apiFetch } from '../api/client';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { RespostaUploadZip, RespostaErroApi } from '@shared/contracts/rotas';
 import { parseTemplateBody, templateVarIndexes, renderTemplateBody } from '@shared/lib/templateSegments';
@@ -173,7 +174,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   const [checkedBatchIds, setCheckedBatchIds] = useState<string[]>([]);
   const [brandOptions, setBrandOptions] = useState<Array<{ id: string; name: string }>>([]);
   useEffect(() => {
-    fetch('/api/brands').then(r => (r.ok ? r.json() : [])).then(d => { if (Array.isArray(d)) setBrandOptions(d); }).catch(() => {});
+    apiFetch('/api/brands').then(r => (r.ok ? r.json() : [])).then(d => { if (Array.isArray(d)) setBrandOptions(d); }).catch(() => {});
   }, []);
   const [selectedBatchId, setSelectedBatchId] = useState<string>('');
   const [leads, setLeads] = useState<CampaignLead[]>([]);
@@ -214,7 +215,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   const [dispatchPhoneNumberId, setDispatchPhoneNumberId] = useState<string>('');
   const [dispatchNumbers, setDispatchNumbers] = useState<Array<{ id: string; name: string; phone: string }>>([]);
   useEffect(() => {
-    fetch('/api/admin/fluxo/instances')
+    apiFetch('/api/admin/fluxo/instances')
       .then(r => r.json() as Promise<RespostaInstanciasFluxo>)
       .then(d => { if (d?.success && Array.isArray(d.instances)) setDispatchNumbers(d.instances); })
       .catch(() => { /* seletor é opcional */ });
@@ -321,7 +322,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   const [camposLead, setCamposLead] = useState<string[]>([]);
   useEffect(() => {
     const qs = selectedBatchId ? `?batchId=${encodeURIComponent(selectedBatchId)}` : '';
-    fetch(`/api/campaign/lead-fields${qs}`)
+    apiFetch(`/api/campaign/lead-fields${qs}`)
       .then(r => (r.ok ? r.json() : null))
       .then(d => setCamposLead(Array.isArray(d?.fields) ? d.fields : []))
       .catch(() => setCamposLead([]));
@@ -380,7 +381,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
     }
     setTestSending(true);
     try {
-      const r = await fetch('/api/campaign/test-dispatch', {
+      const r = await apiFetch('/api/campaign/test-dispatch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -486,7 +487,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   const fetchMetaTemplates = async () => {
     try {
       setLoadingTemplates(true);
-      const res = await fetch('/api/admin/fluxo/templates');
+      const res = await apiFetch('/api/admin/fluxo/templates');
       if (res.ok) {
         const data = (await res.json()) as RespostaListaModelosFluxo;
         if (data.templates && Array.isArray(data.templates)) {
@@ -506,7 +507,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   const fetchCopyTemplates = async () => {
     try {
       setLoadingCopies(true);
-      const res = await fetch('/api/campaign/copies');
+      const res = await apiFetch('/api/campaign/copies');
       if (res.ok) {
         const data = (await res.json()) as RespostaListaCopias;
         if (Array.isArray(data)) {
@@ -576,7 +577,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
     }
 
     try {
-      const res = await fetch(`/api/campaign/copies/${selectedCopyTemplateId}`, {
+      const res = await apiFetch(`/api/campaign/copies/${selectedCopyTemplateId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -632,7 +633,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
     }
 
     try {
-      const res = await fetch('/api/campaign/copies', {
+      const res = await apiFetch('/api/campaign/copies', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -675,7 +676,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
     if (!confirm(`Deseja realmente excluir a copy "${copyName}" da biblioteca?`)) return;
 
     try {
-      const res = await fetch(`/api/campaign/copies/${copyId}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/campaign/copies/${copyId}`, { method: 'DELETE' });
       if (res.ok) {
         setCopyTemplates(prev => prev.filter(c => c.id !== copyId));
         if (selectedCopyTemplateId === copyId) {
@@ -744,7 +745,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   const carregarHistoricoZips = async () => {
     setZipUploadsCarregando(true);
     try {
-      const r = await fetch('/api/campaign/uploads');
+      const r = await apiFetch('/api/campaign/uploads');
       const d = (await r.json()) as RespostaListaUploads;
       setZipUploads(Array.isArray(d.uploads) ? d.uploads : []);
     } catch {
@@ -780,7 +781,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   const fetchBatches = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/campaign/batches');
+      const res = await apiFetch('/api/campaign/batches');
       if (res.ok) {
         const data = (await res.json()) as RespostaListaLotes;
         setBatches(data);
@@ -816,7 +817,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
       if (searchQuery.trim()) {
         url.searchParams.set('search', searchQuery.trim());
       }
-      const res = await fetch(url.toString());
+      const res = await apiFetch(url.toString());
       if (res.ok) {
         const data = await res.json();
         setLeads(data);
@@ -884,7 +885,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   // Fetch initial speed from backend
   const fetchDispatchSpeed = async () => {
     try {
-      const res = await fetch('/api/campaign/dispatch/speed');
+      const res = await apiFetch('/api/campaign/dispatch/speed');
       if (res.ok) {
         const data = (await res.json()) as RespostaVelocidadeDisparo;
         if (data.currentSpeed) setDispatchSpeed(data.currentSpeed);
@@ -907,7 +908,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
     setDispatchSpeed(val);
     setIsUpdatingSpeed(true);
     try {
-      const res = await fetch('/api/campaign/dispatch/speed', {
+      const res = await apiFetch('/api/campaign/dispatch/speed', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ speed: val })
@@ -927,7 +928,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   // Pause batch
   const handlePauseBatch = async (batchId: string) => {
     try {
-      const res = await fetch(`/api/campaign/batches/${batchId}/pause`, { method: 'POST' });
+      const res = await apiFetch(`/api/campaign/batches/${batchId}/pause`, { method: 'POST' });
       if (res.ok) {
         setLiveBatchProgress(prev => prev ? { ...prev, status: 'paused' } : null);
         showNotification('success', '⏸️ Esteira de disparo pausada.');
@@ -940,7 +941,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   // Resume batch
   const handleResumeBatch = async (batchId: string) => {
     try {
-      const res = await fetch(`/api/campaign/batches/${batchId}/resume`, { method: 'POST' });
+      const res = await apiFetch(`/api/campaign/batches/${batchId}/resume`, { method: 'POST' });
       if (res.ok) {
         setLiveBatchProgress(prev => prev ? { ...prev, status: 'running' } : null);
         showNotification('success', '▶️ Esteira de disparo retomada.');
@@ -954,7 +955,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   const handleCancelBatch = async (batchId: string) => {
     if (!confirm('Deseja realmente cancelar o disparo dos leads restantes deste lote?')) return;
     try {
-      const res = await fetch(`/api/campaign/batches/${batchId}/cancel`, { method: 'POST' });
+      const res = await apiFetch(`/api/campaign/batches/${batchId}/cancel`, { method: 'POST' });
       if (res.ok) {
         setLiveBatchProgress(prev => prev ? { ...prev, status: 'cancelled' } : null);
         showNotification('success', '🛑 Disparo cancelado pelo gestor.');
@@ -1013,7 +1014,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   const handleCreateBatch = async () => {
     if (!newBatchName.trim()) return;
     try {
-      const res = await fetch('/api/campaign/batches', {
+      const res = await apiFetch('/api/campaign/batches', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1040,7 +1041,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   const handleDeleteBatch = async (batchId: string) => {
     if (!confirm('Deseja realmente excluir esta safra e todos os seus leads de staging?')) return;
     try {
-      const res = await fetch(`/api/campaign/batches/${batchId}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/campaign/batches/${batchId}`, { method: 'DELETE' });
       if (res.ok) {
         setBatches(prev => prev.filter(b => b.id !== batchId));
         if (selectedBatchId === batchId) {
@@ -1114,7 +1115,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
 
     // 1. Notificar servidor e inicializar job de tracking
     try {
-      await fetch('/api/campaign/import-progress/init', {
+      await apiFetch('/api/campaign/import-progress/init', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1131,7 +1132,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
     // 2. Polling contínuo como garantia absoluta caso WebSockets sofram oscilações de rede
     const pollInterval = setInterval(async () => {
       try {
-        const pRes = await fetch(`/api/campaign/import-progress/${jobId}`);
+        const pRes = await apiFetch(`/api/campaign/import-progress/${jobId}`);
         if (pRes.ok) {
           const pData: ImportProgressData = await pRes.json();
           setImportProgressData(prev => ({
@@ -1277,7 +1278,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
         setDispatchProgress(prev => (prev < 90 ? prev + 15 : prev));
       }, 300);
 
-      const res = await fetch('/api/campaign/dispatch', {
+      const res = await apiFetch('/api/campaign/dispatch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1320,7 +1321,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   // Simulate positive response or opt-out
   const handleSimulateLeadReply = async (leadId: string, isInterested: boolean) => {
     try {
-      const res = await fetch(`/api/campaign/leads/${leadId}/simulate-reply`, {
+      const res = await apiFetch(`/api/campaign/leads/${leadId}/simulate-reply`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isInterested })
@@ -1371,9 +1372,9 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
     setDispatchInfo(null);
     try {
       const [marcas, numeros, previa] = await Promise.all([
-        fetch('/api/brands').then(r => (r.ok ? r.json() : [])),
-        fetch('/api/phone-numbers').then(r => (r.ok ? r.json() : [])),
-        fetch('/api/regras-contato/previa', { method: 'POST' }).then(r => (r.ok ? r.json() : null)),
+        apiFetch('/api/brands').then(r => (r.ok ? r.json() : [])),
+        apiFetch('/api/phone-numbers').then(r => (r.ok ? r.json() : [])),
+        apiFetch('/api/regras-contato/previa', { method: 'POST' }).then(r => (r.ok ? r.json() : null)),
       ]);
       const marcaId = (currentBatch as any)?.brandId as string | undefined;
       const marca = marcas.find((m: any) => m.id === marcaId);
@@ -1421,7 +1422,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
       const qtd = plano[batchId] ?? 0;
       if (qtd <= 0) continue;
       try {
-        const res = await fetch('/api/campaign/dispatch', {
+        const res = await apiFetch('/api/campaign/dispatch', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -1463,7 +1464,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
         tentativas++;
         await new Promise(resolve => setTimeout(resolve, 2000));
         try {
-          const progRes = await fetch(`/api/campaign/batches/${batchId}/progress`);
+          const progRes = await apiFetch(`/api/campaign/batches/${batchId}/progress`);
           if (!progRes.ok) { concluido = true; break; }
           const prog = await progRes.json();
           if (prog && prog.total > 0) {
@@ -1539,7 +1540,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
         ? dispatchSelectedClosers 
         : [dispatchSelectedCloser || 'seller-thomas'];
 
-      const res = await fetch('/api/campaign/dispatch', {
+      const res = await apiFetch('/api/campaign/dispatch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1587,7 +1588,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
         const pollInterval = setInterval(async () => {
           attempts++;
           try {
-            const progRes = await fetch(`/api/campaign/batches/${selectedBatchId}/progress`);
+            const progRes = await apiFetch(`/api/campaign/batches/${selectedBatchId}/progress`);
             if (progRes.ok) {
               const progData = await progRes.json();
               if (progData && progData.total > 0) {
@@ -1649,7 +1650,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   // Move Lead to arbitrary Status in Kanban
   const handleMoveLeadStatus = async (leadId: string, newStatus: CampaignLeadStatus, note?: string) => {
     try {
-      const res = await fetch('/api/campaign/simulate-action', {
+      const res = await apiFetch('/api/campaign/simulate-action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1684,7 +1685,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
         };
       }).filter(d => d.quota > 0);
 
-      const res = await fetch('/api/campaign/distribute', {
+      const res = await apiFetch('/api/campaign/distribute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1717,7 +1718,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   const handleReleaseQuarantine = async () => {
     if (!selectedBatchId) return;
     try {
-      const res = await fetch(`/api/campaign/batches/${selectedBatchId}/release-quarantine`, {
+      const res = await apiFetch(`/api/campaign/batches/${selectedBatchId}/release-quarantine`, {
         method: 'POST'
       });
       const data = (await res.json()) as RespostaLiberacaoQuarentena | RespostaErroApi;
@@ -1738,7 +1739,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
   const handleSaveQuarantineConfig = async () => {
     if (!selectedBatchId) return;
     try {
-      const res = await fetch(`/api/campaign/batches/${selectedBatchId}/quarantine-config`, {
+      const res = await apiFetch(`/api/campaign/batches/${selectedBatchId}/quarantine-config`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1767,7 +1768,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
     );
     if (!ok) return;
     try {
-      const res = await fetch(`/api/campaign/batches/${selectedBatchId}/return-unsent`, { method: 'POST' });
+      const res = await apiFetch(`/api/campaign/batches/${selectedBatchId}/return-unsent`, { method: 'POST' });
       const data = (await res.json()) as RespostaDevolucaoLeads | RespostaErroApi;
       if (res.ok && 'returned' in data) {
         showNotification('success', data.message);
@@ -1790,7 +1791,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
     if (!confirmReset) return;
 
     try {
-      const res = await fetch(`/api/campaign/batches/${selectedBatchId}/reset-staging`, {
+      const res = await apiFetch(`/api/campaign/batches/${selectedBatchId}/reset-staging`, {
         method: 'POST'
       });
       const data = await res.json();
@@ -1819,7 +1820,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
 
     try {
       setIsSyncingWhatsApp(true);
-      const res = await fetch(`/api/campaign/batches/${selectedBatchId}/sync-whatsapp-web`, {
+      const res = await apiFetch(`/api/campaign/batches/${selectedBatchId}/sync-whatsapp-web`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rawText: syncWhatsAppInput })
@@ -1929,7 +1930,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
                 onChange={async (e) => {
                   const brandId = e.target.value || null;
                   try {
-                    const res = await fetch(`/api/campaign/batches/${currentBatch.id}/brand`, {
+                    const res = await apiFetch(`/api/campaign/batches/${currentBatch.id}/brand`, {
                       method: 'PUT',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ brandId }),

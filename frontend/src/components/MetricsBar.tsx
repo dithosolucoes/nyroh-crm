@@ -1,3 +1,4 @@
+import { apiFetch } from '../api/client';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Lead, CustomTag } from '@shared/types';
 import { getLeadNiche } from '@shared/lib/niche';
@@ -107,7 +108,7 @@ export const MetricsBar: React.FC<MetricsBarProps> = ({
       const url = selectedSalespersonId && selectedSalespersonId !== 'ALL'
         ? `/api/calls?salespersonId=${encodeURIComponent(selectedSalespersonId)}`
         : '/api/calls';
-      const res = await fetch(url);
+      const res = await apiFetch(url);
       if (res.ok) {
         const data = (await res.json()) as RespostaListaLigacoesGerais;
         setCalls(data);
@@ -164,7 +165,7 @@ export const MetricsBar: React.FC<MetricsBarProps> = ({
   const handleExportCsv = async () => {
     setExportingCsv(true);
     try {
-      const res = await fetch('/api/export/csv');
+      const res = await apiFetch('/api/export/csv');
       if (res.ok) {
         const blob = await res.blob();
         const url = window.URL.createObjectURL(blob);
@@ -549,7 +550,7 @@ export const MetricsBar: React.FC<MetricsBarProps> = ({
               onClick={async () => {
                 try {
                   onShowToast('Varrendo banco de dados para recuperar sites antigos...');
-                  const res = await fetch('/api/leads/recover-websites', { method: 'POST' });
+                  const res = await apiFetch('/api/leads/recover-websites', { method: 'POST' });
                   const data = await res.json();
                   if (data.recoveredCount > 0) {
                     onShowToast(`🎉 ${data.recoveredCount} sites antigos recuperados com sucesso! Atualizando...`);
@@ -573,7 +574,7 @@ export const MetricsBar: React.FC<MetricsBarProps> = ({
               onClick={async () => {
                 try {
                   onShowToast('Varrendo banco de dados para recuperar telefones...');
-                  const res = await fetch('/api/leads/recover-phones', { method: 'POST' });
+                  const res = await apiFetch('/api/leads/recover-phones', { method: 'POST' });
                   const data = await res.json();
                   if (data.recoveredCount > 0) {
                     onShowToast(`🎉 ${data.recoveredCount} telefones recuperados com sucesso! Atualizando...`);

@@ -1,3 +1,4 @@
+import { apiFetch } from '../api/client';
 import React, { useState } from 'react';
 import { CustomTag } from '@shared/types';
 import type { RespostaErroApi } from '@shared/contracts/rotas';
@@ -48,7 +49,7 @@ export const TagManagerModal: React.FC<TagManagerModalProps> = ({
 
     setCreating(true);
     try {
-      const res = await fetch('/api/tags', {
+      const res = await apiFetch('/api/tags', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -79,7 +80,7 @@ export const TagManagerModal: React.FC<TagManagerModalProps> = ({
 
     setDeletingId(id);
     try {
-      const res = await fetch(`/api/tags/${id}`, {
+      const res = await apiFetch(`/api/tags/${id}`, {
         method: 'DELETE'
       });
 

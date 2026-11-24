@@ -1,3 +1,4 @@
+import { apiFetch } from '../api/client';
 import React, { useState } from 'react';
 import { X, Lock, KeyRound, CheckCircle2, AlertCircle, RefreshCw, Eye, EyeOff } from 'lucide-react';
 import type { RespostaAlterarSenha } from '@shared/contracts/rotas';
@@ -40,7 +41,7 @@ export const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
 
     setLoading(true);
     try {
-      const res = await fetch('/api/auth/change-password', {
+      const res = await apiFetch('/api/auth/change-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ newPassword })

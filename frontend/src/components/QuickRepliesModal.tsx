@@ -1,3 +1,4 @@
+import { apiFetch } from '../api/client';
 import React, { useState, useEffect } from 'react';
 import { Salesperson } from '@shared/types';
 import type { RespostaRapida, RespostaListaRespostasRapidas, RespostaErroApi } from '@shared/contracts/rotas';
@@ -33,7 +34,7 @@ export const QuickRepliesModal: React.FC<QuickRepliesModalProps> = ({
   const fetchReplies = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/quick-replies');
+      const res = await apiFetch('/api/quick-replies');
       if (res.ok) {
         const data = (await res.json()) as RespostaListaRespostasRapidas;
         const list = Array.isArray(data.quickReplies) ? data.quickReplies : (Array.isArray(data) ? data : []);
@@ -66,7 +67,7 @@ export const QuickRepliesModal: React.FC<QuickRepliesModalProps> = ({
 
     setSaving(true);
     try {
-      const res = await fetch('/api/quick-replies', {
+      const res = await apiFetch('/api/quick-replies', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -102,7 +103,7 @@ export const QuickRepliesModal: React.FC<QuickRepliesModalProps> = ({
     if (!confirm(`Deseja excluir o atalho ${sc}?`)) return;
 
     try {
-      const res = await fetch(`/api/quick-replies/${id}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/quick-replies/${id}`, { method: 'DELETE' });
       if (res.ok) {
         onShowToast(`Atalho ${sc} removido.`);
         setReplies(prev => prev.filter(r => r.id !== id));

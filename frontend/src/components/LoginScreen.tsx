@@ -1,3 +1,4 @@
+import { apiFetch } from '../api/client';
 import React, { useState } from 'react';
 import { Shield, Lock, Mail, ArrowRight, User, Eye, EyeOff, CheckCircle2, ShieldCheck, KeyRound, Sparkles, Zap, ShieldAlert } from 'lucide-react';
 import { User as UserType } from '@shared/types';
@@ -28,7 +29,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, onShow
     setErrorMsg('');
 
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await apiFetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: targetEmail, password: targetPass })

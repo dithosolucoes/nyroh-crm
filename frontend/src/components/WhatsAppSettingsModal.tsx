@@ -1,3 +1,4 @@
+import { apiFetch } from '../api/client';
 import React, { useState, useEffect } from 'react';
 import { X, MessageSquare, Check, RotateCcw, Sparkles, Send, Info, Briefcase, Smartphone, HelpCircle } from 'lucide-react';
 import { DEFAULT_WHATSAPP_TEMPLATE, getStoredWhatsAppTemplate, formatWhatsAppMessage, WhatsAppAppType, getStoredWhatsAppAppType, setStoredWhatsAppAppType } from '@shared/lib/phone';
@@ -33,7 +34,7 @@ export const WhatsAppSettingsModal: React.FC<WhatsAppSettingsModalProps> = ({
 
       // Puxar modelos oficiais aprovados na Meta
       setLoadingMetaTemplates(true);
-      fetch('/api/whatsapp/approved-templates')
+      apiFetch('/api/whatsapp/approved-templates')
         .then(r => r.json())
         .then(d => {
           if (d.success && Array.isArray(d.templates)) {
@@ -58,7 +59,7 @@ export const WhatsAppSettingsModal: React.FC<WhatsAppSettingsModalProps> = ({
 
       // 3. Persistir no PostgreSQL para o vendedor atual se logado / selecionado
       if (currentSalesperson?.id) {
-        const res = await fetch(`/api/salespeople/${currentSalesperson.id}/whatsapp-type`, {
+        const res = await apiFetch(`/api/salespeople/${currentSalesperson.id}/whatsapp-type`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ whatsappType: selectedAppType })

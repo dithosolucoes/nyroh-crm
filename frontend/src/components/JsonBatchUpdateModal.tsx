@@ -1,3 +1,4 @@
+import { apiFetch } from '../api/client';
 import React, { useState } from 'react';
 import { X, FileCode, CheckCircle2, RefreshCw, Sparkles, ArrowRight } from 'lucide-react';
 
@@ -36,7 +37,7 @@ export const JsonBatchUpdateModal: React.FC<JsonBatchUpdateModalProps> = ({
     setResultData(null);
 
     try {
-      const res = await fetch('/api/leads/batch-update', {
+      const res = await apiFetch('/api/leads/batch-update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

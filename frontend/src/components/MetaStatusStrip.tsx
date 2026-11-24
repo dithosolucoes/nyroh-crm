@@ -1,3 +1,4 @@
+import { apiFetch } from '../api/client';
 import React, { useCallback, useEffect, useState } from 'react';
 import type { RespostaStatusMeta, RespostaSincronizacaoTodas, RespostaStatusFluxo } from '@shared/contracts/rotas';
 import { CheckCircle2, AlertTriangle, RefreshCw } from 'lucide-react';
@@ -17,11 +18,11 @@ export default function MetaStatusStrip({ onShowToast, onChanged }: Props) {
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch('/api/admin/meta/status');
+      const res = await apiFetch('/api/admin/meta/status');
       if (res.ok) setStatus((await res.json()) as RespostaStatusMeta);
     } catch { /* faixa é informativa */ }
     try {
-      const res = await fetch('/api/admin/fluxo/status');
+      const res = await apiFetch('/api/admin/fluxo/status');
       if (res.ok) setFluxo((await res.json()) as RespostaStatusFluxo);
     } catch { /* faixa é informativa */ }
   }, []);
@@ -31,7 +32,7 @@ export default function MetaStatusStrip({ onShowToast, onChanged }: Props) {
   const testAll = async () => {
     setBusy(true);
     try {
-      const res = await fetch('/api/admin/meta/sync-all', { method: 'POST' });
+      const res = await apiFetch('/api/admin/meta/sync-all', { method: 'POST' });
       const data = (await res.json()) as RespostaSincronizacaoTodas;
       onShowToast(data.success ? 'Contas sincronizadas com a Meta.' : 'Alguma conta não respondeu. Veja a mensagem na lista de contas.');
       await load();

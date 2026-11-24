@@ -1,3 +1,4 @@
+import { apiFetch } from '../api/client';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   MessageSquare,
@@ -167,7 +168,7 @@ export const ThomasWhatsAppDesktopView: React.FC<ThomasWhatsAppDesktopViewProps>
 
   useEffect(() => {
     let alive = true;
-    fetch('/api/auth/me')
+    apiFetch('/api/auth/me')
       .then(r => (r.ok ? (r.json() as Promise<RespostaSessaoAtual>) : null))
       .then(d => {
         if (alive && d?.user) setCurrentUser(d.user);
@@ -218,7 +219,7 @@ export const ThomasWhatsAppDesktopView: React.FC<ThomasWhatsAppDesktopViewProps>
   const loadTemplateCatalog = async (refresh = false) => {
     setCatalogLoading(true);
     try {
-      const res = await fetch(`/api/whatsapp/fluxo-templates${refresh ? '?refresh=1' : ''}`);
+      const res = await apiFetch(`/api/whatsapp/fluxo-templates${refresh ? '?refresh=1' : ''}`);
       const data = await res.json().catch(() => null);
       const list = Array.isArray(data?.templates) ? data.templates.map(catalogToOption) : [];
       setCatalogTemplates(list);
@@ -247,7 +248,7 @@ export const ThomasWhatsAppDesktopView: React.FC<ThomasWhatsAppDesktopViewProps>
 
   const fetchQuickReplies = async () => {
     try {
-      const res = await fetch('/api/quick-replies');
+      const res = await apiFetch('/api/quick-replies');
       if (res.ok) {
         const data = (await res.json()) as RespostaListaRespostasRapidas;
         const list = Array.isArray(data.quickReplies) ? data.quickReplies : (Array.isArray(data) ? data : []);
@@ -298,7 +299,7 @@ export const ThomasWhatsAppDesktopView: React.FC<ThomasWhatsAppDesktopViewProps>
       if (searchQuery.trim()) params.set('q', searchQuery.trim());
       if (serverFilter) params.set('filter', serverFilter);
 
-      const res = await fetch(`/api/inbox?${params.toString()}`);
+      const res = await apiFetch(`/api/inbox?${params.toString()}`);
       if (!res.ok) return;
       const data: InboxPage = await res.json();
       if (req !== inboxRequestRef.current) return; // resposta velha: a busca já mudou
@@ -488,7 +489,7 @@ export const ThomasWhatsAppDesktopView: React.FC<ThomasWhatsAppDesktopViewProps>
     if (!leadId || !olderCursor || loadingOlder) return;
     setLoadingOlder(true);
     try {
-      const res = await fetch(`/api/leads/${leadId}/messages?before=${encodeURIComponent(olderCursor)}`);
+      const res = await apiFetch(`/api/leads/${leadId}/messages?before=${encodeURIComponent(olderCursor)}`);
       if (!res.ok || leadId !== openLeadIdRef.current) return;
       const data = await res.json();
       const antigas = (data.messages || []) as LeadChatMessage[];
@@ -525,7 +526,7 @@ export const ThomasWhatsAppDesktopView: React.FC<ThomasWhatsAppDesktopViewProps>
     const t = setTimeout(async () => {
       setSearchingMessages(true);
       try {
-        const r = await fetch(`/api/messages/search?q=${encodeURIComponent(termo)}`);
+        const r = await apiFetch(`/api/messages/search?q=${encodeURIComponent(termo)}`);
         if (r.ok) setMessageResults((await r.json()).results || []);
       } catch {
         /* ignora */
@@ -539,7 +540,7 @@ export const ThomasWhatsAppDesktopView: React.FC<ThomasWhatsAppDesktopViewProps>
   const [salespeople, setSalespeople] = useState<Salesperson[]>([]);
   useEffect(() => {
     let vivo = true;
-    fetch('/api/salespeople')
+    apiFetch('/api/salespeople')
       .then(r => (r.ok ? r.json() : []))
       .then(d => {
         if (vivo && Array.isArray(d)) setSalespeople(d);
@@ -556,7 +557,7 @@ export const ThomasWhatsAppDesktopView: React.FC<ThomasWhatsAppDesktopViewProps>
 
   const carregarNotas = async (leadId: string) => {
     try {
-      const r = await fetch(`/api/leads/${leadId}/notes`);
+      const r = await apiFetch(`/api/leads/${leadId}/notes`);
       if (r.ok && leadId === openLeadIdRef.current) setNotes(((await r.json()) as RespostaListaNotas).notes || []);
     } catch {
       /* ignora */
@@ -569,7 +570,7 @@ export const ThomasWhatsAppDesktopView: React.FC<ThomasWhatsAppDesktopViewProps>
     if (!leadId || !texto || savingNote) return;
     setSavingNote(true);
     try {
-      const r = await fetch(`/api/leads/${leadId}/notes`, {
+      const r = await apiFetch(`/api/leads/${leadId}/notes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: texto })
@@ -591,7 +592,7 @@ export const ThomasWhatsAppDesktopView: React.FC<ThomasWhatsAppDesktopViewProps>
     if (!lead?.id || !salespersonId) return;
     const destino = salespeople?.find(v => v.id === salespersonId);
     try {
-      const r = await fetch(`/api/leads/${lead.id}/assign`, {
+      const r = await apiFetch(`/api/leads/${lead.id}/assign`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ salespersonId, salespersonName: destino?.name })
@@ -612,7 +613,7 @@ export const ThomasWhatsAppDesktopView: React.FC<ThomasWhatsAppDesktopViewProps>
     if (!lead?.id) return;
     const marcar = !lead.resolvedAt;
     try {
-      const r = await fetch(`/api/leads/${lead.id}/resolve`, {
+      const r = await apiFetch(`/api/leads/${lead.id}/resolve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ resolved: marcar })
@@ -632,7 +633,7 @@ export const ThomasWhatsAppDesktopView: React.FC<ThomasWhatsAppDesktopViewProps>
       if (!isSilent) {
         setLoadingMessages(true);
       }
-      const res = await fetch(`/api/leads/${leadId}/messages`);
+      const res = await apiFetch(`/api/leads/${leadId}/messages`);
       if (leadId !== openLeadIdRef.current) return; // já trocou de conversa: resposta velha, descarta
       if (res.ok) {
         const data = await res.json();
@@ -694,7 +695,7 @@ export const ThomasWhatsAppDesktopView: React.FC<ThomasWhatsAppDesktopViewProps>
 
   // Avisa a FluxoAPI que a conversa foi aberta/lida (dois traços azuis no celular do cliente). O servidor limita a 1x/20s.
   const markConversationRead = (leadId: string) => {
-    fetch(`/api/leads/${encodeURIComponent(leadId)}/read`, { method: 'POST' }).catch(() => {});
+    apiFetch(`/api/leads/${encodeURIComponent(leadId)}/read`, { method: 'POST' }).catch(() => {});
   };
 
   useEffect(() => {
@@ -730,7 +731,7 @@ export const ThomasWhatsAppDesktopView: React.FC<ThomasWhatsAppDesktopViewProps>
 
   // ---- Presença: avisa o servidor que estou nesta conversa (a cada 8s) e saio ao trocar/fechar ----
   const sendPresence = (leadId: string, body: { typing?: boolean; leave?: boolean }) => {
-    return fetch(`/api/leads/${encodeURIComponent(leadId)}/presence`, {
+    return apiFetch(`/api/leads/${encodeURIComponent(leadId)}/presence`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
@@ -880,7 +881,7 @@ export const ThomasWhatsAppDesktopView: React.FC<ThomasWhatsAppDesktopViewProps>
     const lead = activeLeadRef.current;
     if (!lead) return { ok: false as const, status: 0, error: { message: 'Nenhuma conversa selecionada.' } as any };
     const phone = lead.phoneNumber || (lead as any).phone || (lead.id.startsWith('lead_wa_') ? lead.id.replace('lead_wa_', '') : undefined);
-    const res = await fetch(`/api/leads/${encodeURIComponent(lead.id)}/messages`, {
+    const res = await apiFetch(`/api/leads/${encodeURIComponent(lead.id)}/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1186,7 +1187,7 @@ export const ThomasWhatsAppDesktopView: React.FC<ThomasWhatsAppDesktopViewProps>
     }
 
     try {
-      const res = await fetch(`/api/leads/${activeLead.id}/simulate-reply`, {
+      const res = await apiFetch(`/api/leads/${activeLead.id}/simulate-reply`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

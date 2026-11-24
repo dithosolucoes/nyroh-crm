@@ -1,3 +1,4 @@
+import { apiFetch } from '../api/client';
 import React, { useState, useRef } from 'react';
 import { Upload, FileArchive, CheckCircle, AlertCircle, RefreshCw, X, FileCheck, Info, Users, UserCheck, Percent, ArrowLeft } from 'lucide-react';
 import JSZip from 'jszip';
@@ -150,7 +151,7 @@ export const ZipUploadModal: React.FC<ZipUploadModalProps> = ({
 
       // Notificar servidor da inicialização
       try {
-        await fetch('/api/campaign/import-progress/init', {
+        await apiFetch('/api/campaign/import-progress/init', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -165,7 +166,7 @@ export const ZipUploadModal: React.FC<ZipUploadModalProps> = ({
 
       const pollInterval = setInterval(async () => {
         try {
-          const pRes = await fetch(`/api/campaign/import-progress/${jobId}`);
+          const pRes = await apiFetch(`/api/campaign/import-progress/${jobId}`);
           if (pRes.ok) {
             const pData: ImportProgressData = await pRes.json();
             setCampaignProgressData(prev => ({
@@ -417,7 +418,7 @@ export const ZipUploadModal: React.FC<ZipUploadModalProps> = ({
         const chunk = allItems.slice(i, i + chunkSize);
         setProgressMessage(`Salvando leads no sistema... (${Math.min(i + chunkSize, allItems.length)} / ${allItems.length})`);
 
-        const res = await fetch('/api/leads/batch', {
+        const res = await apiFetch('/api/leads/batch', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ items: chunk })

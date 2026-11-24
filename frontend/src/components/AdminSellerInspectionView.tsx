@@ -1,3 +1,4 @@
+import { apiFetch } from '../api/client';
 import React, { useState, useEffect, useMemo } from 'react';
 import { countSellerLeads } from '@shared/lib/sellerCounts';
 import type { RespostaErroApi, RespostaEstatisticasVendedor, RespostaTransferenciaLote } from '@shared/contracts/rotas';
@@ -127,7 +128,7 @@ export const AdminSellerInspectionView: React.FC<AdminSellerInspectionViewProps>
     }
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/salesperson/${salespersonId}/stats`);
+      const res = await apiFetch(`/api/admin/salesperson/${salespersonId}/stats`);
       if (res.ok) {
         const data = (await res.json()) as RespostaEstatisticasVendedor;
         setStatsData(data);
@@ -174,7 +175,7 @@ export const AdminSellerInspectionView: React.FC<AdminSellerInspectionViewProps>
     // FASE 4: troca de carteira exige confirmação (antes acontecia com um clique no dropdown).
     if (!window.confirm(`Mover este lead para ${target?.name || 'o vendedor escolhido'}?`)) return;
     try {
-      const res = await fetch(`/api/leads/${leadId}/assign`, {
+      const res = await apiFetch(`/api/leads/${leadId}/assign`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -207,7 +208,7 @@ export const AdminSellerInspectionView: React.FC<AdminSellerInspectionViewProps>
     const target = salespeople.find((s) => s.id === batchTargetSellerId);
     setIsTransferringBatch(true);
     try {
-      const res = await fetch('/api/leads/batch-assign', {
+      const res = await apiFetch('/api/leads/batch-assign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -238,7 +239,7 @@ export const AdminSellerInspectionView: React.FC<AdminSellerInspectionViewProps>
     const nextStatus = currentSeller.active === false ? true : false;
     setIsTogglingActive(true);
     try {
-      const res = await fetch(`/api/salespeople/${currentSeller.id}/toggle-active`, {
+      const res = await apiFetch(`/api/salespeople/${currentSeller.id}/toggle-active`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ active: nextStatus })
@@ -271,7 +272,7 @@ export const AdminSellerInspectionView: React.FC<AdminSellerInspectionViewProps>
     }
     setIsSavingProfile(true);
     try {
-      const res = await fetch(`/api/salespeople/${currentSeller.id}`, {
+      const res = await apiFetch(`/api/salespeople/${currentSeller.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -309,7 +310,7 @@ export const AdminSellerInspectionView: React.FC<AdminSellerInspectionViewProps>
     }
     setIsResettingPassword(true);
     try {
-      const res = await fetch(`/api/salespeople/${currentSeller.id}/reset-password`, {
+      const res = await apiFetch(`/api/salespeople/${currentSeller.id}/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ newPassword: newPassword.trim() })
@@ -1014,7 +1015,7 @@ export const AdminSellerInspectionView: React.FC<AdminSellerInspectionViewProps>
                     onClick={async () => {
                       const nextVal = currentSeller.canGenerateAuditPdf === false ? true : false;
                       try {
-                        const res = await fetch(`/api/salespeople/${currentSeller.id}/toggle-audit-pdf`, {
+                        const res = await apiFetch(`/api/salespeople/${currentSeller.id}/toggle-audit-pdf`, {
                           method: 'PATCH',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({ canGenerateAuditPdf: nextVal })

@@ -1,3 +1,4 @@
+import { apiFetch } from '../api/client';
 import React, { useEffect, useState } from 'react';
 import { RefreshCw, Trash2, Plus, X } from 'lucide-react';
 import type { RespostaContasMeta, RespostaSincronizacaoConta, RespostaCadastroConta, RespostaEmbeddedSignupConcluido, RespostaConfigEmbeddedSignup } from '@shared/contracts/rotas';
@@ -38,7 +39,7 @@ export default function MetaAccountsPanel({ onShowToast, onAccountsChanged, numb
   const load = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/meta/accounts');
+      const res = await apiFetch('/api/admin/meta/accounts');
       const data = (await res.json()) as RespostaContasMeta;
       if (res.ok && data.success) setAccounts(data.accounts || []);
     } finally {
@@ -53,7 +54,7 @@ export default function MetaAccountsPanel({ onShowToast, onAccountsChanged, numb
     setError(null);
     setBusy('add');
     try {
-      const res = await fetch('/api/admin/meta/accounts', {
+      const res = await apiFetch('/api/admin/meta/accounts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, wabaId, businessId, accessToken: token })
@@ -86,7 +87,7 @@ export default function MetaAccountsPanel({ onShowToast, onAccountsChanged, numb
     signupRef.current = {};
     setBusy('signup');
     try {
-      const res = await fetch('/api/admin/meta/embedded-signup/complete', {
+      const res = await apiFetch('/api/admin/meta/embedded-signup/complete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -139,7 +140,7 @@ export default function MetaAccountsPanel({ onShowToast, onAccountsChanged, numb
     setError(null);
     setBusy('signup');
     try {
-      const cfgRes = await fetch('/api/admin/meta/embedded-signup/config');
+      const cfgRes = await apiFetch('/api/admin/meta/embedded-signup/config');
       const cfg = (await cfgRes.json()) as RespostaConfigEmbeddedSignup;
       if (!cfg.ready) {
         onShowToast('Falta configurar o login da Meta no servidor (META_APP_ID, META_CONFIG_ID e META_APP_SECRET).');
@@ -172,7 +173,7 @@ export default function MetaAccountsPanel({ onShowToast, onAccountsChanged, numb
   const syncAccount = async (id: string) => {
     setBusy(id);
     try {
-      const res = await fetch(`/api/admin/meta/accounts/${encodeURIComponent(id)}/sync`, { method: 'POST' });
+      const res = await apiFetch(`/api/admin/meta/accounts/${encodeURIComponent(id)}/sync`, { method: 'POST' });
       const data = (await res.json()) as RespostaSincronizacaoConta;
       onShowToast(data.success ? `Sincronizado: ${data.numbers} número(s), ${data.templates} modelo(s).` : (data.error || 'Falha ao sincronizar.'));
       await load();
@@ -186,7 +187,7 @@ export default function MetaAccountsPanel({ onShowToast, onAccountsChanged, numb
     if (!window.confirm(`Remover a BM "${label}" do CRM? O token guardado será apagado.`)) return;
     setBusy(id);
     try {
-      await fetch(`/api/admin/meta/accounts/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      await apiFetch(`/api/admin/meta/accounts/${encodeURIComponent(id)}`, { method: 'DELETE' });
       onShowToast('BM removida do CRM.');
       onSelect(null);
       await load();

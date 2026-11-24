@@ -1,3 +1,4 @@
+import { apiFetch } from '../api/client';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Play, Pause, Mic, AlertCircle, Loader2 } from 'lucide-react';
 
@@ -89,7 +90,7 @@ export const WhatsAppVoiceAudioPlayer: React.FC<WhatsAppVoiceAudioPlayerProps> =
 
     (async () => {
       try {
-        const res = await fetch(audioUrl);
+        const res = await apiFetch(audioUrl);
         if (!res.ok) return;
         const buf = await res.arrayBuffer();
         const AudioCtxClass = window.AudioContext || (window as any).webkitAudioContext;
