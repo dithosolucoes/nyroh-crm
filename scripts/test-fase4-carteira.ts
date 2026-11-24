@@ -3,7 +3,7 @@
  * Rodar: npx tsx scripts/test-fase4-carteira.ts
  */
 import assert from 'node:assert/strict';
-import { callResultToSave } from '../src/lib/callResult';
+import { callResultToSave } from '../shared/lib/callResult';
 
 let passed = 0, failed = 0;
 function test(name: string, fn: () => void) {

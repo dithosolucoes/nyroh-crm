@@ -3,7 +3,7 @@
  * Rodar: npx tsx scripts/test-fase5-ui.ts
  */
 import assert from 'node:assert/strict';
-import { isUiFlagOn } from '../src/lib/uiFlags';
+import { isUiFlagOn } from '../shared/lib/uiFlags';
 
 let passed = 0, failed = 0;
 function test(name: string, fn: () => void) {

@@ -2,8 +2,19 @@
 
 CRM com Kanban de leads, disparo em massa por modelo aprovado e chat de atendimento no **mesmo número de WhatsApp** para a equipe toda, via [FluxoAPI](https://fluxoapi.com.br) (Cloud API oficial da Meta, com coexistência).
 
-- **Servidor:** Node 20 + Express (`server.ts`), PostgreSQL, Redis/BullMQ (opcional, recomendado).
-- **Interface:** React 19 + Vite (`src/`).
+- **Servidor:** Node 20 + Express (`apps/api/server.ts`), PostgreSQL, Redis/BullMQ (opcional, recomendado).
+- **Interface:** React 19 + Vite (`apps/web/`).
+- **Código compartilhado:** `shared/` (contratos, tipos e regras puras usadas pelos dois lados) e `server/redisQueue.ts`.
+
+### Estrutura do projeto
+```
+apps/web/        interface (workspace npm)
+apps/api/        servidor Express (workspace npm); o arranque é apps/api/server.ts
+shared/          contratos (shared/contracts), tipos e regras compartilhadas
+server/          fila Redis (BullMQ)
+migrations/      migrações SQL de arquivo
+scripts/         testes e verificações
+```
 - **Tempo real:** SSE (`/api/realtime/stream`) com reenvio do que se perdeu na reconexão.
 
 ---
@@ -60,6 +71,12 @@ npm install
 
 ```bash
 npm run dev
+```
+
+Só a interface, com dados falsos (sem servidor; só leitura, salvar não funciona):
+
+```bash
+npm run dev:web
 ```
 
 Em desenvolvimento a tela de login mostra botões de acesso rápido (contas de demonstração). Eles **não existem** no build de produção.

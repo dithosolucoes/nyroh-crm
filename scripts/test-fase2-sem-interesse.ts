@@ -3,7 +3,7 @@
  * Rodar: npx tsx scripts/test-fase2-sem-interesse.ts
  */
 import assert from 'node:assert/strict';
-import { SEM_INTERESSE_TAG, detectOptOut } from '../src/lib/leadIntent';
+import { SEM_INTERESSE_TAG, detectOptOut } from '../shared/lib/leadIntent';
 
 let passed = 0, failed = 0;
 function test(name: string, fn: () => void) {

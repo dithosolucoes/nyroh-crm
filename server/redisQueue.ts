@@ -11,7 +11,10 @@ import {
   delayForIndex,
   estimateSeconds,
   FluxoRateLimitedError
-} from '../src/lib/dispatchRate.js';
+} from '../apps/api/lib/dispatchRate.js';
+import type { ProgressoLote } from '../shared/contracts/rotas.js';
+import { executarLoteEmMemoria } from '../apps/api/lib/filaEnvioMemoria.js';
+import { modoFilaEnvio, escolherAdaptadorFila } from '../apps/api/lib/filaEnvio.js';
 
 // ============================================================================
 // REDIS CONNECTION & CLIENT FACTORY
@@ -230,27 +233,8 @@ export interface DispatchContext {
   maxAttempts: number;
 }
 
-export interface CampaignBatchProgress {
-  batchId: string;
-  total: number;
-  enqueued: number;
-  sent: number;
-  failed: number;
-  speedPerSecond: number;
-  status: 'idle' | 'running' | 'paused' | 'completed' | 'cancelled';
-  startedAt: string;
-  completedAt?: string;
-  lastError?: string;
-  recentLogs: Array<{
-    id: string;
-    leadId: string;
-    phone: string;
-    leadName?: string;
-    status: 'sent' | 'failed';
-    error?: string;
-    timestamp: string;
-  }>;
-}
+// O formato do progresso mora em shared/contracts/rotas.ts (ProgressoLote), usado pelo servidor e pelo front.
+export type CampaignBatchProgress = ProgressoLote;
 
 // In-Memory state for batch tracking and speed control
 const batchProgressMap = new Map<string, CampaignBatchProgress>();
@@ -629,7 +613,7 @@ export async function enqueueZipImportJob(data: ZipImportJobData): Promise<boole
 
 // 3. Enfileirar Disparo de Campanha
 export async function enqueueCampaignDispatchJob(data: CampaignDispatchJobData): Promise<boolean> {
-  if (campaignDispatchQueue) {
+  if (campaignDispatchQueue && escolherAdaptadorFila(modoFilaEnvio(process.env.NYROH_FILA_ENVIO), !!campaignDispatchQueue) === 'redis') {
     try {
       await campaignDispatchQueue.add('campaign-message-send', data);
       return true;
@@ -659,7 +643,7 @@ export async function enqueueCampaignDispatchBatch(
 
   console.log(`🚀 [Queue] Enfileirando lote de ${jobs.length} disparos a ${safeSpeed.toFixed(2)} msgs/s (${Math.round(safeSpeed * 60)}/min${cappedByPlan ? `; pedido ${requested}/s foi reduzido ao teto do plano` : ''}). Duração estimada: ${estimatedSecs}s`);
 
-  if (campaignDispatchQueue) {
+  if (campaignDispatchQueue && escolherAdaptadorFila(modoFilaEnvio(process.env.NYROH_FILA_ENVIO), !!campaignDispatchQueue) === 'redis') {
     try {
       const bullJobs = jobs.map((jobData, idx) => ({
         name: 'campaign-message-send',
@@ -681,32 +665,15 @@ export async function enqueueCampaignDispatchBatch(
     }
   }
 
-  // Fallback assíncrono em memória com throttle exato
-  setImmediate(async () => {
-    const delayPerMsg = Math.max(10, Math.floor(1000 / safeSpeed));
-    for (let i = 0; i < jobs.length; i++) {
-      const jobData = jobs[i];
-      if (jobData.batchId && isBatchCancelled(jobData.batchId)) {
-        console.log(`🛑 [Queue Memory] Lote ${jobData.batchId} cancelado pelo usuário.`);
-        break;
-      }
-
-      while (jobData.batchId && isBatchPaused(jobData.batchId)) {
-        await new Promise(r => setTimeout(r, 500));
-        if (jobData.batchId && isBatchCancelled(jobData.batchId)) break;
-      }
-
-      await runDispatchInMemoryWithRetry({
-        ...jobData,
-        speedPerSecond: safeSpeed,
-        jobIndex: i,
-        totalJobs: jobs.length
-      });
-
-      if (i < jobs.length - 1) {
-        await new Promise(r => setTimeout(r, delayPerMsg));
-      }
-    }
+  // Fallback assíncrono em memória com throttle exato (esteira extraída em apps/api/lib/filaEnvioMemoria.ts)
+  setImmediate(() => {
+    executarLoteEmMemoria(jobs, {
+      velocidade: safeSpeed,
+      processar: (job) => runDispatchInMemoryWithRetry(job as CampaignDispatchJobData),
+      pausado: isBatchPaused,
+      cancelado: isBatchCancelled,
+      esperar: sleep,
+    }).catch((e) => console.error('Erro na esteira em memória de lote:', e));
   });
 
   return { enqueued: jobs.length, speed: safeSpeed, estimatedSeconds: estimatedSecs, requestedSpeed: Number.isFinite(requested) ? requested : undefined, cappedByPlan };

@@ -10,48 +10,48 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-import { statusRank, shouldApplyStatus, normalizeStatus } from '../src/lib/fluxoStatus';
-import { describeFluxoError, KNOWN_FLUXO_ERROR_CODES } from '../src/lib/fluxoErrors';
-import { buildTemplatePayload, sanitizeTemplateValue, type CatalogTemplate } from '../src/lib/fluxoTemplate';
-import { isWindowOpen, windowExpiryFromInbound, latestExpiry, WINDOW_MS } from '../src/lib/windowUtil';
-import { arePhonesEquivalent, phoneDigitVariants, normalizeE164Phone, formatAndValidateE164Phone } from '../src/lib/phone';
-import { verifyFluxoWebhook } from '../src/lib/webhookAuth';
-import { missingFluxoVars, summarizeFluxoInstance } from '../src/lib/fluxoInstanceStatus';
-import { buildFluxoAudioMedia, isFluxoAudioVoiceEnabled } from '../src/lib/fluxoAudio';
-import { parseTemplateBody, templateVarIndexes, renderTemplateBody } from '../src/lib/templateSegments';
-import { buildTemplateVariables, buildLeadVariables, fillLeadTokens } from '../src/lib/templateCopy';
-import { listExtraFieldKeys } from '../src/lib/leadTokens';
-import { buildFluxoAuthHeaders, fluxoInstancePath, prepareOutboundMedia } from '../src/lib/fluxoClient';
-import { extensionFor, saveMediaBuffer } from '../src/lib/mediaStorage';
-import { effectiveSpeedPerSecond, dispatchRpm, planRpm, delayForIndex, maxDispatchPerSecond, FluxoRateLimitedError } from '../src/lib/dispatchRate';
-import { detectOptOut, sanitizeTemplateVariable } from '../src/lib/leadIntent';
-import { isPubliclyFetchableUrl } from '../src/lib/auditEngine';
-import { validarAutomacao, logicaEmPalavras, conversaSimulada, renderPrevia, tokensDesconhecidos, EVENTOS, ACOES, CONDICOES, type Automacao } from '../src/lib/automacoes';
-import { planejarEvento, type RegistroAutomacao } from '../src/lib/automacoesExecucao';
-import { criarExecutorAcoes, camposDoLead } from '../src/lib/automacoesExecutores';
-import { dispararAgendas, lerPausaGeral } from '../src/lib/automacoesRoutes';
-import { registrarEventoGeral } from '../src/lib/automacoesExecucao';
-import { colunaPermitida, TABELAS_BACKUP } from '../src/lib/backupRoutes';
-import { normalizarEnvio, decidirEnvio, ENVIO_PADRAO, type ConfigEnvio } from '../src/lib/automacoesEnvio';
-import { validarInstanciaEscolhida, escolherInstanciaDisparo } from '../src/lib/dispatchInstancia';
-import { distribuirQuantidade } from '../src/lib/dispatchDistribuicao';
-import { quandoExecutar, estaVencido, contemPalavra } from '../src/lib/automacoesFila';
-import { registrarEventoCliente, eventoDaResposta, type DepsRecebimento } from '../src/lib/automacoesExecucao';
-import { processarVencidos, type DepsWorker } from '../src/lib/automacoesWorker';
-import { decidirEvento, estadoInicial, pausarLead, liberarLead } from '../src/lib/automacoesEstado';
-import { dentroDosLimites, pausaGeralAtiva, proximaVersao, registroAuditoria, aplicarVersao } from '../src/lib/automacoesLimites';
+import { statusRank, shouldApplyStatus, normalizeStatus } from '../shared/lib/fluxoStatus';
+import { describeFluxoError, KNOWN_FLUXO_ERROR_CODES } from '../apps/api/lib/fluxoErrors';
+import { buildTemplatePayload, sanitizeTemplateValue, type CatalogTemplate } from '../apps/api/lib/fluxoTemplate';
+import { isWindowOpen, windowExpiryFromInbound, latestExpiry, WINDOW_MS } from '../apps/api/lib/windowUtil';
+import { arePhonesEquivalent, phoneDigitVariants, normalizeE164Phone, formatAndValidateE164Phone } from '../shared/lib/phone';
+import { verifyFluxoWebhook } from '../apps/api/lib/webhookAuth';
+import { missingFluxoVars, summarizeFluxoInstance } from '../apps/api/lib/fluxoInstanceStatus';
+import { buildFluxoAudioMedia, isFluxoAudioVoiceEnabled } from '../apps/api/lib/fluxoAudio';
+import { parseTemplateBody, templateVarIndexes, renderTemplateBody } from '../shared/lib/templateSegments';
+import { buildTemplateVariables, buildLeadVariables, fillLeadTokens } from '../shared/lib/templateCopy';
+import { listExtraFieldKeys } from '../shared/lib/leadTokens';
+import { buildFluxoAuthHeaders, fluxoInstancePath, prepareOutboundMedia } from '../apps/api/lib/fluxoClient';
+import { extensionFor, saveMediaBuffer } from '../apps/api/lib/mediaStorage';
+import { effectiveSpeedPerSecond, dispatchRpm, planRpm, delayForIndex, maxDispatchPerSecond, FluxoRateLimitedError } from '../apps/api/lib/dispatchRate';
+import { detectOptOut, sanitizeTemplateVariable } from '../shared/lib/leadIntent';
+import { isPubliclyFetchableUrl } from '../apps/api/lib/auditEngine';
+import { validarAutomacao, logicaEmPalavras, conversaSimulada, renderPrevia, tokensDesconhecidos, EVENTOS, ACOES, CONDICOES, type Automacao } from '../shared/lib/automacoes';
+import { planejarEvento, type RegistroAutomacao } from '../apps/api/lib/automacoesExecucao';
+import { criarExecutorAcoes, camposDoLead } from '../apps/api/lib/automacoesExecutores';
+import { dispararAgendas, lerPausaGeral } from '../apps/api/lib/automacoesRoutes';
+import { registrarEventoGeral } from '../apps/api/lib/automacoesExecucao';
+import { colunaPermitida, TABELAS_BACKUP } from '../apps/api/lib/backupRoutes';
+import { normalizarEnvio, decidirEnvio, ENVIO_PADRAO, type ConfigEnvio } from '../shared/lib/automacoesEnvio';
+import { validarInstanciaEscolhida, escolherInstanciaDisparo } from '../apps/api/lib/dispatchInstancia';
+import { distribuirQuantidade } from '../shared/lib/dispatchDistribuicao';
+import { quandoExecutar, estaVencido, contemPalavra } from '../apps/api/lib/automacoesFila';
+import { registrarEventoCliente, eventoDaResposta, type DepsRecebimento } from '../apps/api/lib/automacoesExecucao';
+import { processarVencidos, type DepsWorker } from '../apps/api/lib/automacoesWorker';
+import { decidirEvento, estadoInicial, pausarLead, liberarLead } from '../shared/lib/automacoesEstado';
+import { dentroDosLimites, pausaGeralAtiva, proximaVersao, registroAuditoria, aplicarVersao } from '../apps/api/lib/automacoesLimites';
 const LIMITES_TESTE = { porDia: 3, porSemana: 10 };
-import { avaliarCondicoes, dentroDaFaixaHoraria, proximaOcorrencia, avaliarNo } from '../src/lib/automacoesEstado';
-import { substituirVariaveis } from '../src/lib/automacoes';
-import { pedidoDePararPelasRegras, pedidoDeAlertaPelasRegras } from '../src/lib/automacoesExecucao';
-import { dentroDaJanela24h } from '../src/lib/automacoesWorker';
-import { resolveLeadTokens, TOKEN_NAMES } from '../src/lib/leadTokens';
-import { validateTemplateCategory, buildMetaButtons, defaultExamples, countBodyVariables, validateTemplateVariables } from '../src/lib/templateRules';
+import { avaliarCondicoes, dentroDaFaixaHoraria, proximaOcorrencia, avaliarNo } from '../shared/lib/automacoesEstado';
+import { substituirVariaveis } from '../shared/lib/automacoes';
+import { pedidoDePararPelasRegras, pedidoDeAlertaPelasRegras } from '../apps/api/lib/automacoesExecucao';
+import { dentroDaJanela24h } from '../apps/api/lib/automacoesWorker';
+import { resolveLeadTokens, TOKEN_NAMES } from '../shared/lib/leadTokens';
+import { validateTemplateCategory, buildMetaButtons, defaultExamples, countBodyVariables, validateTemplateVariables } from '../apps/api/lib/templateRules';
 import {
   verifyMetaSignature, metaSendText, metaSendTemplate, metaMarkRead, metaDownloadMedia,
   encryptMetaToken, decryptMetaToken, setMetaRegistry, resolveMetaSender,
   metaCreateTemplate, metaDeleteTemplate, metaListTemplates, receivingPhoneNumberId, parseCoexistenceEchoes
-} from '../src/lib/metaClient';
+} from '../apps/api/lib/metaClient';
 
 let passed = 0;
 let failed = 0;
@@ -1418,9 +1418,12 @@ test('limites do JSON precisam ser inteiros de pelo menos 1', () => {
 });
 
 group('Opt-out pelas automações do JSON (sem palavra fixa no código)');
-test('sem automação de "pediu para parar" ativa, nenhuma palavra vira opt-out', () => {
-  assert.equal(pedidoDePararPelasRegras('pare', []), false);
-  assert.equal(pedidoDePararPelasRegras('pare', [{ id: 'x', status: 'inativa', def: { nome: 'x', gatilho: { evento: 'cliente_pediu_parar', filtro: { texto_contem: 'pare' } }, passos: [] } } as never]), false);
+test('palavras fixas valem sem automação; automação inativa não traz palavras extras', () => {
+  // Desde o modelo híbrido (palavras fixas no código): "pare" sempre descadastra.
+  assert.equal(pedidoDePararPelasRegras('pare', []), true);
+  // Palavra fora da lista fixa só vale por automação ativa.
+  assert.equal(pedidoDePararPelasRegras('chega', []), false);
+  assert.equal(pedidoDePararPelasRegras('chega', [{ id: 'x', status: 'inativa', def: { nome: 'x', gatilho: { evento: 'cliente_pediu_parar', filtro: { texto_contem: 'chega' } }, passos: [] } } as never]), false);
 });
 test('a palavra do JSON, numa automação ativa, marca opt-out', () => {
   const regras = [{ id: 'p', status: 'ativa', def: { nome: 'parar', gatilho: { evento: 'cliente_pediu_parar', filtro: { texto_contem: 'sair' } }, passos: [] } } as never];

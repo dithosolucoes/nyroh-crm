@@ -610,6 +610,10 @@ async function main() {
       ok(!!left, 'quando o vendedor sai da conversa, o admin é avisado', left?.data);
       sse.close();
       ok((await anon.req('POST', `/api/leads/${leadA}/presence`, { json: {} })).status === 401, 'presença exige login');
+
+      // Roleta em lote: o front envia `count`. O servidor tem que respeitar esse limite (antes ignorava e usava 50).
+      const roleta1 = await admin.req('POST', '/api/salespeople/distribute-roulette', { json: { count: 1, leadType: 'geral' } });
+      ok(roleta1.status === 200 && roleta1.json?.totalProcessed <= 1, 'roleta em lote respeita count=1 (não processa mais que 1 lead)', roleta1.json);
     }
 
     group('🔌 Tempo real: SSE com replay (queda de conexão não perde evento)');
@@ -680,6 +684,86 @@ async function main() {
       // espaçamento: 48/min = 1,25s entre mensagens
       const gaps = tpl.slice(1).map((a: any, i: number) => (a.at - tpl[i].at) / 1000);
       ok(gaps.every((g: number) => g >= 0.9), `mensagens espaçadas (≥ ~1,25s): ${gaps.map((g: number) => g.toFixed(2)).join('s, ')}s`, gaps);
+    }
+
+    // ==================================================================================== DEDUP NA IMPORTAÇÃO
+    group('🧹 Importação: dedupe por telefone (já disparado e repetido no arquivo)');
+    {
+      const subirZip = async (nomeArquivo: string, leads: Array<{ id: string; name: string; phone: string }>) => {
+        const zip = new JSZip();
+        zip.file('leads.json', JSON.stringify(leads));
+        const zbuf = await zip.generateAsync({ type: 'nodebuffer' });
+        const form = new FormData();
+        form.append('zipFile', new Blob([new Uint8Array(zbuf)], { type: 'application/zip' }), nomeArquivo);
+        form.append('safraName', `Safra ${nomeArquivo}`);
+        return admin.req('POST', '/api/campaign/upload-zip', { form });
+      };
+      const registro = async (nomeArquivo: string) => {
+        const lista = await admin.get('/api/campaign/uploads');
+        return (lista.json?.uploads || []).find((u: any) => u.fileName === nomeArquivo);
+      };
+
+      // Caminho feliz: lead novo entra; o mesmo telefone repetido no arquivo é descartado.
+      const novos = await subirZip('dedup-novos.zip', [
+        { id: 'N1', name: 'Novo Um', phone: '(19) 98888-0001' },
+        { id: 'N2', name: 'Novo Um Repetido', phone: '(19) 98888-0001' }
+      ]);
+      ok(novos.status === 200 && !!novos.json?.batchId, 'importa safra com lead novo e um telefone repetido', novos.json || novos.text.slice(0, 200));
+      const uNovos = await registro('dedup-novos.zip');
+      ok(uNovos?.leadsSaved === 1, 'lead novo entra (1 salvo)', uNovos);
+      ok(uNovos?.skippedRepeated === 1 && uNovos?.skippedContacted === 0, 'telefone repetido no arquivo é descartado (1 repetido, 0 já disparado)', uNovos);
+
+      // Caso de erro: telefone que já recebeu disparo na safra anterior não sobe de novo.
+      const ja = await subirZip('dedup-ja-disparados.zip', [
+        { id: 'J1', name: 'Padaria Um (de novo)', phone: '(19) 99999-0001' }
+      ]);
+      ok(ja.status === 200, 'importa safra com telefone que já recebeu disparo', ja.json || ja.text.slice(0, 200));
+      const uJa = await registro('dedup-ja-disparados.zip');
+      ok(uJa?.leadsSaved === 0 && uJa?.skippedContacted === 1, 'telefone já disparado não sobe de novo (0 salvo, 1 já disparado)', uJa);
+    }
+
+    // ==================================================================================== DESCADASTRO PELA ROTA
+    group('🚫 Descadastro: lead de safra que responde PARAR sai da fila de envio');
+    {
+      const TEL_OPT = '5519977776666';
+      const zip = new JSZip();
+      zip.file('leads.json', JSON.stringify([{ id: 'OPT1', name: 'Quer Parar', phone: '(19) 97777-6666' }]));
+      const zbuf = await zip.generateAsync({ type: 'nodebuffer' });
+      const form = new FormData();
+      form.append('zipFile', new Blob([new Uint8Array(zbuf)], { type: 'application/zip' }), 'safra-optout.zip');
+      form.append('safraName', 'Safra Descadastro');
+      const up = await admin.req('POST', '/api/campaign/upload-zip', { form });
+      const batchId = up.json?.batchId;
+      ok(up.status === 200 && !!batchId, 'importa safra com um lead para o teste de descadastro', up.json || up.text.slice(0, 200));
+
+      const estoque = async () => {
+        const lista = await admin.get('/api/campaign/batches');
+        return (lista.json || []).find((b: any) => b.id === batchId)?.stagingCount;
+      };
+      const antes = await estoque();
+      ok(antes === 1, 'lote começa com 1 lead na fila de envio', antes);
+
+      const r = await sendWebhook(fluxoEvent('message.received', { conversation_id: 'conv_OPT', message_id: 'msg_optout1', from: TEL_OPT, type: 'text', text: 'PARAR' }));
+      ok(r.status === 200, 'webhook com "PARAR" é aceito', r.json);
+      await sleep(800);
+      const depois = await estoque();
+      ok(depois === 0, 'depois de PARAR o lead SAI da fila de envio (stagingCount 1 → 0)', { antes, depois });
+
+      // Erro: quem não pediu para parar continua na fila (controle)
+      const zip2 = new JSZip();
+      zip2.file('leads.json', JSON.stringify([{ id: 'CTL1', name: 'Quer Saber', phone: '(19) 97777-7777' }]));
+      const zbuf2 = await zip2.generateAsync({ type: 'nodebuffer' });
+      const form2 = new FormData();
+      form2.append('zipFile', new Blob([new Uint8Array(zbuf2)], { type: 'application/zip' }), 'safra-controle.zip');
+      form2.append('safraName', 'Safra Controle');
+      const up2 = await admin.req('POST', '/api/campaign/upload-zip', { form: form2 });
+      const batchCtl = up2.json?.batchId;
+      // Controle: este lead NÃO responde nada, então tem que continuar na fila.
+      // (Quem responde qualquer coisa sai da fila pela regra "não reenviar após resposta".)
+      await sleep(500);
+      const lista2 = await admin.get('/api/campaign/batches');
+      const ctl = (lista2.json || []).find((b: any) => b.id === batchCtl)?.stagingCount;
+      ok(ctl === 1, 'lead que não respondeu continua na fila (controle)', ctl);
     }
 
     // ==================================================================================== DIAGNÓSTICO

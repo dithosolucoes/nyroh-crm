@@ -22,12 +22,12 @@ import {
   montarZip,
   montarManifesto,
   type ColetaBanco,
-} from '../src/lib/backupRoutes';
+} from '../apps/api/lib/backupRoutes';
 
 const raiz = process.cwd();
 
 function lerArquivos(): string[] {
-  const alvos: string[] = [path.join(raiz, 'server.ts')];
+  const alvos: string[] = [path.join(raiz, 'apps', 'api', 'server.ts')];
   for (const pasta of ['src/lib', 'migrations']) {
     const dir = path.join(raiz, pasta);
     if (!fs.existsSync(dir)) continue;
