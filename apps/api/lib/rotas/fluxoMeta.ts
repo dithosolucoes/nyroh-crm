@@ -3,6 +3,8 @@
  */
 import type { Express } from 'express';
 import crypto from 'crypto';
+import { cifrarSegredo } from '../cifraSegredos.js';
+import { listarContas, salvarConta, registrarInstancia } from '../fluxoContas.js';
 
 type StoredMetaTemplate = any;
 type FluxoWebhookEvent = any;
@@ -44,6 +46,66 @@ export function configurarFluxoMeta(deps: DependenciasFluxoMeta): void {
 }
 
 export function registrarFluxoMeta(app: Express): void {
+  // Contas da FluxoAPI (hierarquia conta -> instâncias). Atrás da flag NYROH_FLUXO_CONTAS (nasce desligada).
+  const contasLigadas = () => (process.env.NYROH_FLUXO_CONTAS || '').trim() === 'true';
+  const contasRecusa = (req: any, res: any) => {
+    if (!isUserAdmin(req.user)) {
+      res.status(403).json({ error: 'Acesso restrito ao Administrador.' });
+      return true;
+    }
+    if (!contasLigadas() || !D.usePostgres || !D.pgPool) {
+      res.status(404).json({ error: 'Recurso indisponível: ative NYROH_FLUXO_CONTAS e a migração 2026-11-fluxo-contas.sql.' });
+      return true;
+    }
+    return false;
+  };
+  const auditar = (req: any, acao: string, detalhe: Record<string, unknown>) => {
+    console.info('[auditoria] fluxo contas', JSON.stringify({
+      por: req.user?.email || req.user?.id || 'desconhecido',
+      em: new Date().toISOString(),
+      acao,
+      ...detalhe
+    }));
+  };
+
+  app.get('/api/admin/fluxo/contas', async (req: any, res) => {
+    if (contasRecusa(req, res)) return;
+    try {
+      return res.json({ contas: await listarContas(D.pgPool) });
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Não foi possível listar as contas.' });
+    }
+  });
+
+  app.post('/api/admin/fluxo/contas', async (req: any, res) => {
+    if (contasRecusa(req, res)) return;
+    try {
+      const { id, nome, bmId, apiKey, apiSecret, webhookSecret } = req.body || {};
+      const { id: contaId } = await salvarConta(D.pgPool, { id, nome, bmId, apiKey, apiSecret, webhookSecret });
+      auditar(req, id ? 'conta_atualizada' : 'conta_criada', {
+        contaId,
+        campos: ['nome', 'bmId', 'apiKey', 'apiSecret', 'webhookSecret'].filter(k => req.body?.[k] !== undefined)
+      });
+      return res.json({ ok: true, id: contaId });
+    } catch (err: any) {
+      // Sem chave-mestra, a cifra recusa: nada foi gravado.
+      const semChave = /NYROH_CHAVE_SEGREDOS/.test(String(err?.message));
+      return res.status(semChave ? 503 : 400).json({ error: semChave ? 'Configure NYROH_CHAVE_SEGREDOS antes de salvar segredos. Nada foi gravado.' : (err?.message || 'Dados inválidos.') });
+    }
+  });
+
+  app.post('/api/admin/fluxo/contas/:id/instancias', async (req: any, res) => {
+    if (contasRecusa(req, res)) return;
+    try {
+      const { instanceId, numero, marcaId } = req.body || {};
+      const { id } = await registrarInstancia(D.pgPool, String(req.params.id), { instanceId, numero, marcaId });
+      auditar(req, 'instancia_registrada', { contaId: req.params.id, instanciaId: id });
+      return res.json({ ok: true, id });
+    } catch (err: any) {
+      return res.status(400).json({ error: err?.message || 'Dados inválidos.' });
+    }
+  });
+
   // GET config
   app.get('/api/admin/fluxo/config', (req: any, res) => {
     const isAdmin = isUserAdmin(req.user); // antes: liberava anônimo fora de produção
@@ -99,6 +161,14 @@ export function registrarFluxoMeta(app: Express): void {
       metaVerifyToken
     } = req.body;
 
+    // Segredo só vai para o banco CIFRADO. Sem a chave-mestra, recusa antes de mexer em qualquer coisa.
+    const enviouSegredo = [apiKey, apiSecret, metaAccessToken, metaVerifyToken].some(v => v !== undefined && String(v).trim());
+    if (D.usePostgres && enviouSegredo && !(process.env.NYROH_CHAVE_SEGREDOS || '').trim()) {
+      return res.status(503).json({
+        error: 'Configure NYROH_CHAVE_SEGREDOS no Railway antes de salvar segredos. Nada foi gravado.'
+      });
+    }
+
     if (apiKey !== undefined) D.memoryFluxoConfig.apiKey = String(apiKey).trim();
     if (apiSecret !== undefined && String(apiSecret).trim()) D.memoryFluxoConfig.apiSecret = String(apiSecret).trim();
     if (instanceId !== undefined) D.memoryFluxoConfig.instanceId = String(instanceId).trim();
@@ -108,19 +178,29 @@ export function registrarFluxoMeta(app: Express): void {
     if (metaPhoneNumberId !== undefined) D.memoryMetaConfig.phoneNumberId = String(metaPhoneNumberId).trim();
     if (metaVerifyToken !== undefined && String(metaVerifyToken).trim()) D.memoryMetaConfig.verifyToken = String(metaVerifyToken).trim();
 
+    // Auditoria: quem mudou e quais campos (nunca os valores).
+    const camposAlterados = Object.entries({ apiKey, apiSecret, instanceId, metaAccessToken, metaWabaId, metaPhoneNumberId, metaVerifyToken })
+      .filter(([, v]) => v !== undefined)
+      .map(([k]) => k);
+    console.info('[auditoria] config FluxoAPI/Meta alterada', JSON.stringify({
+      por: req.user?.email || req.user?.id || 'desconhecido',
+      em: new Date().toISOString(),
+      campos: camposAlterados
+    }));
+
     // Persist to PostgreSQL system_settings if connected
     if (D.usePostgres && D.pgPool) {
       try {
         if (apiKey !== undefined && String(apiKey).trim()) {
           await D.pgPool.query(
             SQL_INSERT_SYSTEM_SETTINGS,
-            [String(apiKey).trim()]
+            [cifrarSegredo(String(apiKey).trim())]
           );
         }
         if (apiSecret !== undefined && String(apiSecret).trim()) {
           await D.pgPool.query(
             SQL_INSERT_SYSTEM_SETTINGS_2,
-            [String(apiSecret).trim()]
+            [cifrarSegredo(String(apiSecret).trim())]
           );
         }
         if (instanceId !== undefined && String(instanceId).trim()) {
@@ -133,7 +213,7 @@ export function registrarFluxoMeta(app: Express): void {
         if (metaAccessToken !== undefined && String(metaAccessToken).trim()) {
           await D.pgPool.query(
             SQL_INSERT_SYSTEM_SETTINGS_4,
-            [String(metaAccessToken).trim()]
+            [cifrarSegredo(String(metaAccessToken).trim())]
           );
         }
         if (metaWabaId !== undefined && String(metaWabaId).trim()) {
@@ -151,7 +231,7 @@ export function registrarFluxoMeta(app: Express): void {
         if (metaVerifyToken !== undefined && String(metaVerifyToken).trim()) {
           await D.pgPool.query(
             SQL_INSERT_SYSTEM_SETTINGS_7,
-            [String(metaVerifyToken).trim()]
+            [cifrarSegredo(String(metaVerifyToken).trim())]
           );
         }
 

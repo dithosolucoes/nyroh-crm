@@ -38,6 +38,10 @@ interface MenuLateralProps {
   onOpenWhatsAppSettings: () => void;
   onOpenChangePassword: () => void;
   onLogout: () => void;
+  /** Rotas de atendimento (Geral + vendedores). Só o admin vê; aparece na gaveta do celular. */
+  rotas?: { id: string; name: string; count: number }[];
+  rotaAtivaId?: string;
+  onEscolherRota?: (id: string) => void;
 }
 
 interface ItemMenu {
@@ -75,7 +79,10 @@ export const MenuLateral: React.FC<MenuLateralProps> = ({
   onOpenTagsModal,
   onOpenWhatsAppSettings,
   onOpenChangePassword,
-  onLogout
+  onLogout,
+  rotas,
+  rotaAtivaId,
+  onEscolherRota
 }) => {
   const [gavetaAberta, setGavetaAberta] = useState(false);
   const isAdmin = currentUser.role === 'admin';
@@ -293,7 +300,32 @@ export const MenuLateral: React.FC<MenuLateralProps> = ({
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-4">{renderGrupos()}</div>
+            <div className="flex-1 overflow-y-auto p-4">
+              {isAdmin && rotas && rotas.length > 0 && onEscolherRota && (
+                <div className="mb-5">
+                  <span className="text-xs font-bold text-neutral-500 uppercase tracking-wider block px-2 mb-1.5">Rota de atendimento</span>
+                  <div className="space-y-0.5">
+                    {rotas.map(r => {
+                      const ativa = (rotaAtivaId || 'ALL') === r.id;
+                      return (
+                        <button
+                          key={r.id}
+                          onClick={() => { onEscolherRota(r.id); setGavetaAberta(false); }}
+                          aria-pressed={ativa}
+                          className={`w-full flex items-center justify-between gap-2 px-2.5 py-2.5 rounded-lg text-xs transition-colors cursor-pointer ${
+                            ativa ? 'bg-neutral-900 text-white font-bold' : 'text-neutral-700 font-medium hover:bg-neutral-100'
+                          }`}
+                        >
+                          <span className="truncate">{r.name}</span>
+                          <span className={`text-[11px] font-mono px-1.5 py-0.5 rounded-full shrink-0 ${ativa ? 'bg-white/20 text-white' : 'bg-neutral-200 text-neutral-700'}`}>{r.count}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              {renderGrupos()}
+            </div>
             {rodape}
           </div>
         </div>

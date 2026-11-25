@@ -124,6 +124,9 @@ export function resolveMetaSender(phoneNumberId?: string | null): { accessToken:
   return { accessToken: env.accessToken, phoneNumberId: pid || env.phoneNumberId, wabaId: env.wabaId, accountId: 'env' };
 }
 
+/** Leitura de segredos do banco (FluxoAPI e Meta), cifrados com NYROH_CHAVE_SEGREDOS. Ver lib/cifraSegredos.ts. */
+export { lerSegredoDoBanco } from './cifraSegredos.js';
+
 /** Criptografia do token no banco. Chave: META_TOKEN_ENCRYPTION_KEY (qualquer texto longo, guardado no Railway). */
 function encryptionKey(): Buffer {
   const raw = (process.env.META_TOKEN_ENCRYPTION_KEY || '').trim();

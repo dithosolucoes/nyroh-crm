@@ -36,7 +36,8 @@ export function ListaLeads({ f }: { f: DesktopVM }) {
               {/* Dois estados separados e honestos: a conexão do navegador com o CRM,
                   e o estado REAL da instância na FluxoAPI (antes isto dizia "Meta Cloud API
                   Conectada" só porque o SSE do navegador estava aberto). */}
-              <div className="flex items-center gap-2 text-xs text-neutral-500">
+              {/* Celular: a linha de status só aparece quando há problema (WhatsApp desconectado). */}
+              <div className={`flex items-center gap-2 text-xs text-neutral-500 ${runtime.whatsappConnected ? 'max-md:hidden' : ''}`}>
                 <span className="flex items-center gap-1.5">
                   <span className={`w-2 h-2 rounded-full ${realtimeActive ? 'bg-emerald-500 animate-pulse' : 'bg-neutral-400'}`} />
                   <span className="font-medium text-[11px]">{realtimeActive ? 'CRM em tempo real' : 'CRM offline'}</span>

@@ -28,6 +28,8 @@ import { detectOptOut, sanitizeTemplateVariable } from '../shared/lib/leadIntent
 import { isPubliclyFetchableUrl } from '../apps/api/lib/auditEngine';
 import { validarAutomacao, logicaEmPalavras, conversaSimulada, renderPrevia, tokensDesconhecidos, EVENTOS, ACOES, CONDICOES, type Automacao } from '../shared/lib/automacoes';
 import { planejarEvento, type RegistroAutomacao } from '../apps/api/lib/automacoesExecucao';
+import { cifrarSegredo, decifrarSegredo, estaCifrado } from '../apps/api/lib/cifraSegredos';
+import { salvarConta, listarContas, obterCredenciaisDaInstancia } from '../apps/api/lib/fluxoContas';
 import { criarExecutorAcoes, camposDoLead } from '../apps/api/lib/automacoesExecutores';
 import { dispararAgendas, lerPausaGeral } from '../apps/api/lib/automacoesRoutes';
 import { registrarEventoGeral } from '../apps/api/lib/automacoesExecucao';
@@ -1012,6 +1014,103 @@ test('sessões de login ficam fora da exportação; configurações entram com s
 });
 
 group('Agenda e palavra-chave das automações');
+test('segredo cifrado: ida e volta, IV aleatório, chave errada e texto alterado são recusados', () => {
+  const antiga = process.env.NYROH_CHAVE_SEGREDOS;
+  process.env.NYROH_CHAVE_SEGREDOS = 'chave-de-teste-com-tamanho-suficiente';
+  try {
+    const cifra = cifrarSegredo('segredo-da-fluxo-123');
+    assert.ok(estaCifrado(cifra), 'deve sair com o prefixo enc:v1:');
+    assert.ok(!cifra.includes('segredo-da-fluxo-123'), 'o texto puro não pode aparecer no cifrado');
+    assert.equal(decifrarSegredo(cifra), 'segredo-da-fluxo-123');
+    assert.notEqual(cifrarSegredo('x'), cifrarSegredo('x'), 'IV aleatório: mesmo texto, cifras diferentes');
+
+    // Texto cifrado alterado (um byte trocado) não pode ser aceito
+    const partes = cifra.split(':');
+    const dados = Buffer.from(partes[partes.length - 1], 'base64');
+    dados[0] = dados[0] ^ 0xff;
+    partes[partes.length - 1] = dados.toString('base64');
+    assert.throws(() => decifrarSegredo(partes.join(':')));
+
+    // Outra chave-mestra não lê
+    process.env.NYROH_CHAVE_SEGREDOS = 'outra-chave-mestra-bem-diferente';
+    assert.throws(() => decifrarSegredo(cifra));
+  } finally {
+    if (antiga === undefined) delete process.env.NYROH_CHAVE_SEGREDOS;
+    else process.env.NYROH_CHAVE_SEGREDOS = antiga;
+  }
+});
+
+test('contas FluxoAPI: segredo entra cifrado, listagem não devolve segredo, decifra só no servidor', async () => {
+  const antiga = process.env.NYROH_CHAVE_SEGREDOS;
+  process.env.NYROH_CHAVE_SEGREDOS = 'chave-de-teste-contas-fluxo-123456';
+  try {
+    const gravados: unknown[][] = [];
+    const banco: Record<string, any> = {};
+    const pool = {
+      query: async (sql: string, params: unknown[] = []) => {
+        if (sql.startsWith('INSERT INTO fluxo_contas')) {
+          gravados.push(params);
+          banco.conta = { id: params[0], nome: params[1], bm_id: params[2], api_key_cifrada: params[3], api_secret_cifrado: params[4], webhook_secret_cifrado: params[5] };
+          return { rows: [] };
+        }
+        if (sql.includes('FROM fluxo_contas ORDER BY')) {
+          const c = banco.conta;
+          return { rows: c ? [{ id: c.id, nome: c.nome, bm_id: c.bm_id, tem_key: !!c.api_key_cifrada, tem_secret: !!c.api_secret_cifrado, tem_webhook: !!c.webhook_secret_cifrado }] : [] };
+        }
+        if (sql.includes('FROM fluxo_instancias ORDER BY')) return { rows: [] };
+        if (sql.includes('FROM fluxo_instancias i JOIN')) {
+          const c = banco.conta;
+          return { rows: c && params[0] === 'inst_teste' ? [c] : [] };
+        }
+        throw new Error('SQL inesperado no teste: ' + sql.slice(0, 40));
+      }
+    };
+
+    await salvarConta(pool, { nome: 'Conta Teste', apiKey: 'chave-publica-XYZ9', apiSecret: 'segredo-privado-ABC', webhookSecret: 'whsec-teste-42' });
+    const linha = gravados[0] as string[];
+    for (const valor of [linha[3], linha[4], linha[5]]) {
+      assert.ok(estaCifrado(valor), 'segredo deve ir cifrado');
+      assert.ok(!valor.includes('XYZ9') && !valor.includes('ABC') && !valor.includes('whsec'), 'texto puro não pode ir ao banco');
+    }
+
+    const lista = await listarContas(pool);
+    const json = JSON.stringify(lista);
+    assert.ok(!json.includes('chave-publica') && !json.includes('segredo-privado') && !json.includes('whsec-teste'), 'listagem não pode trazer segredo');
+    assert.equal(lista[0].temApiSecret, true);
+
+    const credenciais = await obterCredenciaisDaInstancia(pool, 'inst_teste');
+    assert.equal(credenciais?.apiKey, 'chave-publica-XYZ9');
+    assert.equal(credenciais?.apiSecret, 'segredo-privado-ABC');
+    assert.equal(credenciais?.webhookSecret, 'whsec-teste-42');
+  } finally {
+    if (antiga === undefined) delete process.env.NYROH_CHAVE_SEGREDOS;
+    else process.env.NYROH_CHAVE_SEGREDOS = antiga;
+  }
+});
+
+test('contas FluxoAPI: sem NYROH_CHAVE_SEGREDOS, nada é gravado', async () => {
+  const antiga = process.env.NYROH_CHAVE_SEGREDOS;
+  delete process.env.NYROH_CHAVE_SEGREDOS;
+  let chamadas = 0;
+  const pool = { query: async () => { chamadas++; return { rows: [] }; } };
+  try {
+    await assert.rejects(() => salvarConta(pool, { nome: 'X', apiKey: 'abc' }), /NYROH_CHAVE_SEGREDOS/);
+    assert.equal(chamadas, 0, 'não pode haver nenhuma escrita sem a chave');
+  } finally {
+    if (antiga !== undefined) process.env.NYROH_CHAVE_SEGREDOS = antiga;
+  }
+});
+
+test('segredo cifrado: sem NYROH_CHAVE_SEGREDOS nada é gravado (falha fechada)', () => {
+  const antiga = process.env.NYROH_CHAVE_SEGREDOS;
+  delete process.env.NYROH_CHAVE_SEGREDOS;
+  try {
+    assert.throws(() => cifrarSegredo('qualquer'), /NYROH_CHAVE_SEGREDOS/);
+  } finally {
+    if (antiga !== undefined) process.env.NYROH_CHAVE_SEGREDOS = antiga;
+  }
+});
+
 test('espera personalizada soma no horário certo (ex.: 1h30 = 90 minutos)', () => {
   const agora = new Date('2026-11-10T10:00:00-03:00');
   assert.equal(quandoExecutar(agora, 1.5).toISOString(), '2026-11-10T14:30:00.000Z');
