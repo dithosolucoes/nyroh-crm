@@ -1,5 +1,16 @@
 @import "tailwindcss";
 
+/* Esconde a barra de rolagem mantendo a rolagem (faixas de chips e cartões no celular) */
+.no-scrollbar,
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar,
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
 /* Custom visible scrollbars for smooth scrolling everywhere */
 ::-webkit-scrollbar {
   width: 10px;

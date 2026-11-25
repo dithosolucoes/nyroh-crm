@@ -570,7 +570,7 @@ export function ChatConversa({ f }: { f: DesktopVM }) {
                         handleSendMessage();
                       }
                     }}
-                    placeholder={`Mensagem para ${activeLead.name}... (Shift+Enter quebra linha, / para atalhos)`}
+                    placeholder="Escreva uma mensagem… (/ para atalhos)"
                     className="flex-1 min-w-0 min-h-11 px-4 py-2.5 bg-neutral-100 focus:bg-white border border-transparent focus:border-neutral-300 rounded-xl text-xs text-neutral-900 placeholder-neutral-400 focus:outline-none transition-all resize-none max-h-40 leading-relaxed"
                   />
                 )}
