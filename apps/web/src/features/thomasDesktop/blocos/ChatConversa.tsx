@@ -74,7 +74,7 @@ export function ChatConversa({ f }: { f: DesktopVM }) {
                         : `${presenceUsers.map(u => u.name).join(', ')} também está nesta conversa`}
                     </div>
                   )}
-                  <div className="flex items-center gap-2 text-xs text-neutral-500 mt-0.5">
+                  <div className="max-md:hidden flex items-center gap-2 text-xs text-neutral-500 mt-0.5">
                     <span>Nicho: <strong>{activeLead.niche || 'Geral'}</strong></span>
                     {activeLead.website && (
                       <span>• <a href={activeLead.website} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">Ver Site Atual</a></span>

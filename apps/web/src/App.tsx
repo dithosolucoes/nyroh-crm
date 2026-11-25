@@ -773,6 +773,16 @@ export default function App() {
         onOpenWhatsAppSettings={() => setIsWhatsAppModalOpen(true)}
         onOpenChangePassword={() => setIsChangePasswordModalOpen(true)}
         onLogout={handleLogout}
+        rotas={[
+          { id: 'ALL', name: 'Geral', count: leads.length },
+          ...salespeople.map(s => ({
+            id: s.id,
+            name: s.name,
+            count: leads.filter(l => (l.salespersonId || 'seller-thomas') === s.id).length
+          }))
+        ]}
+        rotaAtivaId={selectedSalespersonId}
+        onEscolherRota={(id) => handleNavigateToSalesperson(id)}
       />
 
       {/* Main Content Area */}
@@ -915,7 +925,9 @@ export default function App() {
             )}
 
             {/* Top Navbar Header with Salesperson Selector & Dedicated Instance indicator */}
-            <header className="bg-white border-b border-neutral-200 px-3 md:px-6 py-2 md:py-2.5 flex flex-wrap items-center justify-between gap-2.5 shrink-0 shadow-2xs z-10">
+            {/* No celular, em Conversas, este cabeçalho some para dar espaço ao chat. A troca de rota
+                (Geral / vendedor) e "Mesa do Admin" continuam no menu "Mais". */}
+            <header className={`bg-white border-b border-neutral-200 px-3 md:px-6 py-2 md:py-2.5 flex flex-wrap items-center justify-between gap-2.5 shrink-0 shadow-2xs z-10 ${activeTab === 'whatsapp' ? 'max-md:hidden' : ''}`}>
               <div className="min-w-0 flex items-center gap-3 max-md:hidden">
                 <div>
                   <div className="flex items-center gap-2">

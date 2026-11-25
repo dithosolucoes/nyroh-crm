@@ -50,7 +50,7 @@ import { buildFluxoAudioMedia, isFluxoAudioVoiceEnabled, uploadFluxoAudioMedia }
 import { installLogBuffer, readLogs, logCategories } from '../../shared/lib/logBuffer.js';
 installLogBuffer();
 import { executeFluxoRequest, downloadFluxoMediaBinary, prepareOutboundMedia, fluxoInstancePath, hasFfmpeg, type FluxoApiResult } from './lib/fluxoClient.js';
-import { setMetaRegistry, listMetaRegistry, encryptMetaToken, decryptMetaToken, metaDownloadMedia, metaSyncAccount, metaValidateToken, resolveMetaAccount, receivingPhoneNumberId, parseCoexistenceEchoes, getEmbeddedSignupConfig, metaExchangeSignupCode, metaSubscribeWaba, metaDiscoverWabaIds, type MetaAccountRecord, type MetaNumberRecord, getMetaProvider, getMetaCredentials, verifyMetaSignature, metaSendText, metaSendTemplate, metaSendMedia, metaMarkRead, metaCreateTemplate, metaDeleteTemplate, metaListPhoneNumbers, metaListTemplates } from './lib/metaClient.js';
+import { setMetaRegistry, listMetaRegistry, encryptMetaToken, decryptMetaToken, lerSegredoDoBanco, metaDownloadMedia, metaSyncAccount, metaValidateToken, resolveMetaAccount, receivingPhoneNumberId, parseCoexistenceEchoes, getEmbeddedSignupConfig, metaExchangeSignupCode, metaSubscribeWaba, metaDiscoverWabaIds, type MetaAccountRecord, type MetaNumberRecord, getMetaProvider, getMetaCredentials, verifyMetaSignature, metaSendText, metaSendTemplate, metaSendMedia, metaMarkRead, metaCreateTemplate, metaDeleteTemplate, metaListPhoneNumbers, metaListTemplates } from './lib/metaClient.js';
 import { verifyFluxoWebhook } from './lib/webhookAuth.js';
 import { sanitizeTemplateVariable, resolveManualInterest, SEM_INTERESSE_TAG } from '../../shared/lib/leadIntent.js';
 import { distributionByCount } from './lib/distribution.js';
@@ -958,13 +958,13 @@ END $$;
             apply(value);
           };
           for (const row of settingsRows.rows) {
-            if (row.key === 'fluxo_api_key') applyIfNoEnv('FLUXO_KEY', row.key, row.value, v => (memoryFluxoConfig.apiKey = v));
-            if (row.key === 'fluxo_api_secret') applyIfNoEnv('FLUXO_SECRET', row.key, row.value, v => (memoryFluxoConfig.apiSecret = v));
+            if (row.key === 'fluxo_api_key') applyIfNoEnv('FLUXO_KEY', row.key, lerSegredoDoBanco(row.key, row.value), v => (memoryFluxoConfig.apiKey = v));
+            if (row.key === 'fluxo_api_secret') applyIfNoEnv('FLUXO_SECRET', row.key, lerSegredoDoBanco(row.key, row.value), v => (memoryFluxoConfig.apiSecret = v));
             if (row.key === 'fluxo_instance_id') applyIfNoEnv('FLUXO_INSTANCE_ID', row.key, row.value, v => (memoryFluxoConfig.instanceId = v));
-            if (row.key === 'meta_access_token') applyIfNoEnv('META_ACCESS_TOKEN', row.key, row.value, v => (memoryMetaConfig.accessToken = v));
+            if (row.key === 'meta_access_token') applyIfNoEnv('META_ACCESS_TOKEN', row.key, lerSegredoDoBanco(row.key, row.value), v => (memoryMetaConfig.accessToken = v));
             if (row.key === 'meta_waba_id') applyIfNoEnv('META_WABA_ID', row.key, row.value, v => (memoryMetaConfig.wabaId = v));
             if (row.key === 'meta_phone_number_id') applyIfNoEnv('META_PHONE_NUMBER_ID', row.key, row.value, v => (memoryMetaConfig.phoneNumberId = v));
-            if (row.key === 'meta_verify_token') applyIfNoEnv('META_VERIFY_TOKEN', row.key, row.value, v => (memoryMetaConfig.verifyToken = v));
+            if (row.key === 'meta_verify_token') applyIfNoEnv('META_VERIFY_TOKEN', row.key, lerSegredoDoBanco(row.key, row.value), v => (memoryMetaConfig.verifyToken = v));
           }
           if (ignored.length) {
             console.log(`[Config] Variáveis de ambiente têm prioridade; ignorado do banco: ${ignored.join(', ')}.`);
