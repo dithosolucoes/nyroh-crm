@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Lead, ColumnStatus, CustomTag, MasterColumnId } from '@shared/types';
-import { Copy, QrCode, Phone, ExternalLink, MessageCircle, ChevronLeft, ChevronRight, Check, CalendarClock, AlertTriangle, Clock, PhoneCall, Sparkles, CheckCircle, Globe } from 'lucide-react';
+import { Copy, Link2, QrCode, Phone, ExternalLink, MessageCircle, ChevronLeft, ChevronRight, Check, CalendarClock, AlertTriangle, Clock, PhoneCall, Sparkles, CheckCircle, Globe } from 'lucide-react';
 import { openWhatsApp, getStoredWhatsAppAppType, getQrTelLink, getStoredWhatsAppTemplate, formatWhatsAppMessage } from '@shared/lib/phone';
 import { QrCodeModal } from './QrCodeModal';
 import { getFollowUpInfo } from '@shared/lib/followUp';
@@ -332,17 +332,17 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
           {/* 1. Copiar URL */}
           <button
             onClick={handleCopyUrl}
-            className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 active:bg-neutral-300 rounded transition-colors"
+            className="inline-flex items-center gap-1 px-2 py-1 max-md:min-h-10 max-md:px-2.5 text-[10px] font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 active:bg-neutral-300 rounded transition-colors"
             title="Copiar URL gerada"
           >
-            {copiedUrl ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3 text-neutral-500" />}
-            <span>Copiar URL</span>
+            {copiedUrl ? <Check className="w-3 h-3 text-emerald-600" /> : <Link2 className="w-3 h-3 text-neutral-500" />}
+            <span className="max-md:sr-only">Copiar URL</span>
           </button>
 
           {/* 2. WhatsApp */}
           <button
             onClick={handleOpenWhatsApp}
-            className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-200 rounded transition-colors"
+            className="inline-flex items-center gap-1 px-2 py-1 max-md:min-h-10 max-md:px-3 text-[10px] font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-200 rounded transition-colors"
             title={`Abrir WhatsApp (${getStoredWhatsAppAppType() === 'business' ? 'Business' : getStoredWhatsAppAppType() === 'normal' ? 'Normal' : 'Celular'})`}
           >
             <MessageCircle className="w-3 h-3 text-emerald-600" />
@@ -352,11 +352,11 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({
           {/* 3. Copiar Número Bruto */}
           <button
             onClick={handleCopyPhone}
-            className="inline-flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 active:bg-neutral-300 rounded transition-colors"
+            className="inline-flex items-center gap-1 px-2 py-1 max-md:min-h-10 max-md:px-2.5 text-[10px] font-medium text-neutral-700 bg-neutral-100 hover:bg-neutral-200 active:bg-neutral-300 rounded transition-colors"
             title="Copiar Número Bruto (sem 0 adicional)"
           >
             {copiedPhone ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3 text-neutral-500" />}
-            <span>Copiar Número</span>
+            <span className="max-md:sr-only">Copiar Número</span>
           </button>
         </div>
 
