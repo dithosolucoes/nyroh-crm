@@ -242,8 +242,8 @@ export const AllLeadsTable: React.FC<AllLeadsTableProps> = ({
 
       {/* Table */}
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs border-collapse">
-          <thead>
+        <table className="w-full text-left text-xs border-collapse max-md:block max-md:[&_th]:px-1.5 max-md:[&_td]:px-1.5">
+          <thead className="max-md:hidden">
             <tr className="border-b border-neutral-200 text-neutral-500 font-medium bg-neutral-50/50">
               <th className="py-2.5 px-3 w-10 text-center">
                 <input
@@ -258,17 +258,17 @@ export const AllLeadsTable: React.FC<AllLeadsTableProps> = ({
                 />
               </th>
               <th className="py-2.5 px-3">Nome do Lead</th>
-              <th className="py-2.5 px-3">Nicho</th>
+              <th className="hidden md:table-cell py-2.5 px-3">Nicho</th>
               <th className="py-2.5 px-3">Telefone (Bruto)</th>
-              <th className="py-2.5 px-3">URL do Site</th>
+              <th className="hidden md:table-cell py-2.5 px-3">URL do Site</th>
               <th className="py-2.5 px-3">Estágio do Pipeline</th>
-              <th className="py-2.5 px-3">Última Etiqueta</th>
-              <th className="py-2.5 px-3">Próximo Retorno</th>
-              <th className="py-2.5 px-3">Ligações</th>
+              <th className="hidden md:table-cell py-2.5 px-3">Última Etiqueta</th>
+              <th className="hidden md:table-cell py-2.5 px-3">Próximo Retorno</th>
+              <th className="hidden md:table-cell py-2.5 px-3">Ligações</th>
               <th className="py-2.5 px-3 text-right">Ações</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-neutral-100 text-neutral-800">
+          <tbody className="divide-y divide-neutral-100 text-neutral-800 max-md:block">
             {filteredLeads.length === 0 ? (
               <tr>
                 <td colSpan={10} className="py-8 text-center text-neutral-400 italic">
@@ -282,7 +282,7 @@ export const AllLeadsTable: React.FC<AllLeadsTableProps> = ({
                 return (
                   <tr 
                     key={lead.id} 
-                    className={`hover:bg-neutral-50/80 transition-colors ${isSelected ? 'bg-blue-50/40' : ''}`}
+                    className={`hover:bg-neutral-50/80 transition-colors max-md:flex max-md:flex-wrap max-md:items-center max-md:gap-x-3 max-md:py-2 ${isSelected ? 'bg-blue-50/40' : ''}`}
                   >
                     <td className="py-3 px-3 text-center">
                       <input
@@ -292,19 +292,19 @@ export const AllLeadsTable: React.FC<AllLeadsTableProps> = ({
                         className="rounded border-neutral-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                       />
                     </td>
-                    <td className="py-3 px-3 font-semibold text-neutral-900">
+                    <td className="py-3 px-3 font-semibold text-neutral-900 max-md:flex-1 max-md:min-w-0">
                       <button
                         onClick={() => onOpenDetails(lead)}
                         className="text-left hover:text-blue-600 transition-colors"
                       >
                         {lead.name}
                       </button>
-                      <span className="block text-[10px] font-mono text-neutral-400 font-normal">
+                      <span className="hidden md:block text-[10px] font-mono text-neutral-400 font-normal">
                         ID: {lead.id}
                       </span>
                     </td>
 
-                    <td className="py-3 px-3">
+                    <td className="hidden md:table-cell py-3 px-3">
                       <span className="inline-block px-2 py-0.5 rounded text-[11px] font-medium bg-neutral-100 text-neutral-700 border border-neutral-200/60">
                         {getLeadNiche(lead)}
                       </span>
@@ -323,7 +323,7 @@ export const AllLeadsTable: React.FC<AllLeadsTableProps> = ({
                       </div>
                     </td>
 
-                    <td className="py-3 px-3">
+                    <td className="hidden md:table-cell py-3 px-3">
                       <div className="flex flex-col gap-1">
                         {lead.publicUrl ? (
                           <div className="flex items-center gap-1">
@@ -387,7 +387,7 @@ export const AllLeadsTable: React.FC<AllLeadsTableProps> = ({
                       </select>
                     </td>
 
-                    <td className="py-3 px-3">
+                    <td className="hidden md:table-cell py-3 px-3">
                       {lead.lastCallTag ? (
                         <div className="flex flex-wrap items-center gap-1">
                           {lead.lastCallTag.split(',').map((tName, i) => {
@@ -409,7 +409,7 @@ export const AllLeadsTable: React.FC<AllLeadsTableProps> = ({
                       )}
                     </td>
 
-                    <td className="py-3 px-3">
+                    <td className="hidden md:table-cell py-3 px-3">
                       {fInfo.status === 'OVERDUE' && (
                         <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-800 bg-rose-100 px-2 py-0.5 rounded border border-rose-200">
                           <AlertTriangle className="w-3 h-3 text-rose-600 shrink-0" />
@@ -433,13 +433,13 @@ export const AllLeadsTable: React.FC<AllLeadsTableProps> = ({
                       )}
                     </td>
 
-                    <td className="py-3 px-3">
+                    <td className="hidden md:table-cell py-3 px-3">
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-neutral-100 text-neutral-600">
                         {lead.callCount || 0} registro(s)
                       </span>
                     </td>
 
-                  <td className="py-3 px-3 text-right">
+                  <td className="py-3 px-3 text-right max-md:ml-auto">
                     <div className="flex items-center justify-end gap-1">
                       {/* WhatsApp */}
                       <button

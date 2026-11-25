@@ -324,7 +324,7 @@ export const AdminCampaignDisparosView: React.FC<AdminCampaignDisparosViewProps>
         ];
         return (
           <div className="w-full bg-white border-b border-neutral-200 px-4 sm:px-6 shrink-0">
-            <nav className="flex items-stretch gap-6 overflow-x-auto no-scrollbar">
+            <nav className="flex flex-wrap items-stretch gap-x-6 gap-y-2">
               {ETAPAS.map((etapa, idx) => {
                 const etapaAtiva = etapa.views.some(v => v.v === activeTab);
                 return (

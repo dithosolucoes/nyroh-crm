@@ -31,7 +31,9 @@ async function jsonFetch<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await apiFetch(url, { headers: { 'Content-Type': 'application/json' }, ...init });
   const data = await res.json().catch(() => ({}));
   if (res.status === 503) {
-    throw new Error('Esta tela ainda não está liberada neste servidor (migração de UX desligada). Peça ao administrador para ativar NYROH_APLICAR_MIGRACOES_UX.');
+    // Detalhe técnico só no console; o usuário vê uma mensagem normal.
+    console.warn('[NYROH] 503 em', url, '— provável migração de UX desligada no servidor.');
+    throw new Error('Esta área ainda não está disponível. Tente de novo mais tarde ou fale com o administrador.');
   }
   if (!res.ok) throw new Error(data.error || `Erro ${res.status}`);
   return data as T;
@@ -80,7 +82,7 @@ export const AdminEstruturaView: React.FC<Props> = ({ leads, currentUser, onShow
             </a>
           </div>
         )}
-        <nav className="flex gap-6 mt-5 overflow-x-auto no-scrollbar">
+        <nav className="flex flex-wrap gap-x-6 gap-y-2 mt-5">
           {tabsDaSecao.map(t => {
             const ativa = tab === t.id;
             return (
@@ -434,7 +436,7 @@ const botaoPrimario = 'px-4 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 
 const botaoSecundario = 'px-3 py-2 rounded-lg border border-neutral-300 bg-white hover:bg-neutral-50 text-sm font-semibold text-neutral-800';
 
 const SubAbas: React.FC<{ opcoes: Array<{ id: string; label: string; count?: number }>; atual: string; onChange: (id: string) => void }> = ({ opcoes, atual, onChange }) => (
-  <div className="flex gap-6 border-b border-neutral-200 mb-6 overflow-x-auto no-scrollbar">
+  <div className="flex flex-wrap gap-x-6 gap-y-2 border-b border-neutral-200 mb-6">
     {opcoes.map(o => {
       const ativa = atual === o.id;
       return (

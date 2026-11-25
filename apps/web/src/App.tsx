@@ -405,8 +405,17 @@ export default function App() {
     const poll = setInterval(() => {
       if (document.visibilityState === 'visible') scheduleFetchLeads();
     }, 30000);
+    // Ao voltar para a aba, recarrega só se ela ficou oculta por mais de 30 s.
+    // Trocas rápidas de aba não disparam GET /api/leads + /api/calls.
+    let ocultaDesde: number | null = null;
     const onVisible = () => {
-      if (document.visibilityState === 'visible') scheduleFetchLeads();
+      if (document.visibilityState === 'hidden') {
+        ocultaDesde = Date.now();
+        return;
+      }
+      const ficouOculta = ocultaDesde !== null && Date.now() - ocultaDesde > 30000;
+      ocultaDesde = null;
+      if (ficouOculta) scheduleFetchLeads();
     };
     document.addEventListener('visibilitychange', onVisible);
 
@@ -418,9 +427,12 @@ export default function App() {
   }, [currentUser?.id]);
   const fetchLeads = async () => {
     setLoadingLeads(true);
+    // Tempo limite: sem resposta em 15 s, sai do "carregando" em vez de girar para sempre.
+    const controle = new AbortController();
+    const relogio = setTimeout(() => controle.abort(), 15000);
     try {
       // If a specific salesperson route is active, we can fetch their isolated leads or full list
-      const res = await apiFetch('/api/leads');
+      const res = await apiFetch('/api/leads', { signal: controle.signal });
       const contentType = res.headers.get('content-type') || '';
       if (res.ok && contentType.includes('application/json')) {
         // A listagem vem como LeadListado (campos com null). Convertida para Lead pela função explícita, sem cast.
@@ -434,6 +446,7 @@ export default function App() {
       showToast('Erro ao carregar lista de leads.');
       setLeads([]);
     } finally {
+      clearTimeout(relogio);
       setLoadingLeads(false);
     }
   };
@@ -746,6 +759,8 @@ export default function App() {
         podeVerConversas={!!(activeSalesperson?.id === 'seller-thomas' || activeSalesperson?.name === 'Thomas' || isAdmin)}
         totalLeads={leads.length}
         onNavigate={(d: Destino) => {
+          // Navegar pelo menu sempre sai da tela de importação (overlay de tela cheia).
+          setIsZipModalOpen(false);
           if (d.tab === 'admin') {
             setAdminSection(d.section ?? 'cockpit');
             setActiveTab('admin');
@@ -761,7 +776,7 @@ export default function App() {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col h-full min-h-0 min-w-0 overflow-hidden">
+      <main className="flex-1 flex flex-col h-full min-h-0 min-w-0 overflow-hidden max-md:pb-[calc(3.5rem+env(safe-area-inset-bottom))]">
         {isZipModalOpen ? (
           <ZipUploadModal
             isOpen={isZipModalOpen}
@@ -947,7 +962,7 @@ export default function App() {
                       {/* All Sellers Button */}
                       <button
                         onClick={() => handleNavigateToSalesperson('ALL')}
-                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+                        className={`flex items-center gap-1.5 px-2.5 py-2 md:py-1 min-h-9 md:min-h-0 rounded-lg text-xs font-semibold transition-all ${
                           selectedSalespersonId === 'ALL'
                             ? 'bg-white text-neutral-900 shadow-2xs font-bold'
                             : 'text-neutral-600 hover:text-neutral-900'
@@ -970,7 +985,7 @@ export default function App() {
                           <button
                             key={seller.id}
                             onClick={() => handleNavigateToSalesperson(seller.id)}
-                            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+                            className={`flex items-center gap-1.5 px-2.5 py-2 md:py-1 min-h-9 md:min-h-0 rounded-lg text-xs font-semibold transition-all ${
                               isSelected
                                 ? 'bg-white text-blue-700 shadow-2xs ring-1 ring-neutral-200 font-bold'
                                 : 'text-neutral-600 hover:text-neutral-900'
@@ -1002,7 +1017,7 @@ export default function App() {
                         setActiveTab('admin');
                         setAdminSection('cockpit');
                       }}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-neutral-900 hover:bg-black text-white text-xs font-bold shadow-2xs transition-all"
+                      className="flex items-center gap-1.5 px-3 py-2 md:py-1.5 min-h-11 md:min-h-0 rounded-xl bg-neutral-900 hover:bg-black text-white text-xs font-bold shadow-2xs transition-all"
                       title="Voltar à Mesa Diretora do Super Admin"
                     >
                       <ArrowLeft className="w-3.5 h-3.5 text-amber-400" />
@@ -1031,8 +1046,9 @@ export default function App() {
                     fetchLeads();
                     fetchSalespeople();
                   }}
-                  className="p-1.5 rounded-xl border border-neutral-200 text-neutral-600 hover:bg-neutral-50 transition-colors"
+                  className="min-h-11 min-w-11 md:min-h-0 md:min-w-0 flex items-center justify-center p-2.5 md:p-1.5 rounded-xl border border-neutral-200 text-neutral-600 hover:bg-neutral-50 transition-colors"
                   title="Atualizar dados"
+                  aria-label="Atualizar dados"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${loadingLeads ? 'animate-spin' : ''}`} />
                 </button>

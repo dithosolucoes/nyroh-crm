@@ -3,13 +3,13 @@ import { formatInstancePhone } from '@shared/lib/useRuntimeConfig';
 import type { DesktopVM } from '../useThomasDesktop';
 
 export function ListaLeads({ f }: { f: DesktopVM }) {
-  const { activeSalesperson, setSelectedLeadId, runtime, isAdminUser, searchQuery, setSearchQuery, filterType, setFilterType, loadingMessages, realtimeActive, inbox, inboxHasMore, inboxLoading, fetchInbox, formatarHorario, previaDaConversa, bumpConversationUnread, filteredLeads, totalNaoLidas, activeLead, messageSearch, setMessageSearch, messageResults, searchingMessages, fetchMessages } = f;
+  const { activeSalesperson, setSelectedLeadId, setChatMobileAberto, chatMobileAberto, runtime, isAdminUser, searchQuery, setSearchQuery, filterType, setFilterType, loadingMessages, realtimeActive, inbox, inboxHasMore, inboxLoading, fetchInbox, formatarHorario, previaDaConversa, bumpConversationUnread, filteredLeads, totalNaoLidas, activeLead, messageSearch, setMessageSearch, messageResults, searchingMessages, fetchMessages } = f;
   return (
     <>
       {/* ========================================================================= */}
       {/* 1. LEFT COLUMN: Leads / Conversations List                                */}
       {/* ========================================================================= */}
-      <div className="w-full xl:w-[420px] 2xl:w-[460px] flex flex-col bg-white border-b xl:border-b-0 xl:border-r border-neutral-200 shrink-0 h-full">
+      <div className={`w-full xl:w-[420px] 2xl:w-[460px] flex flex-col bg-white border-b xl:border-b-0 xl:border-r border-neutral-200 shrink-0 h-full ${chatMobileAberto ? 'max-md:hidden' : ''}`}>
         {/* User Identity & Real-time Indicator Header */}
         <div className="p-4 border-b border-neutral-200 bg-neutral-50/70 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -97,6 +97,7 @@ export function ListaLeads({ f }: { f: DesktopVM }) {
                   key={r.messageId}
                   onClick={() => {
                     setSelectedLeadId(r.leadId);
+                    setChatMobileAberto(true);
                     setMessageSearch('');
                   }}
                   className="w-full text-left p-2.5 hover:bg-neutral-50"
@@ -194,6 +195,7 @@ export function ListaLeads({ f }: { f: DesktopVM }) {
                   key={lead.id}
                   onClick={() => {
                     setSelectedLeadId(lead.id);
+                    setChatMobileAberto(true);
                     if (naoLidas > 0) bumpConversationUnread(lead.id, 0);
                   }}
                   className={`p-3.5 flex items-start gap-3 cursor-pointer transition-all ${
