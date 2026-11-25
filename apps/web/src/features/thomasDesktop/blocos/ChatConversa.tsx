@@ -84,7 +84,7 @@ export function ChatConversa({ f }: { f: DesktopVM }) {
               </div>
 
               {/* Action Buttons: Preview Nyroh Site, Quick Replies, Templates, Simulator, Dossier Toggle */}
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap max-md:flex-nowrap max-md:w-full max-md:overflow-x-auto no-scrollbar">
                 {/* Quick Replies Atalhos Modal Trigger */}
                 <button
                   onClick={() => setIsQuickRepliesModalOpen(true)}
@@ -448,11 +448,11 @@ export function ChatConversa({ f }: { f: DesktopVM }) {
                   <Paperclip className="w-4 h-4" />
                 </button>
 
-                {/* Emoji Button */}
+                {/* Emoji Button (no celular o teclado já tem emojis: some para abrir espaço para o texto) */}
                 <button
                   type="button"
                   onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                  className={`p-2.5 rounded-xl border transition-colors cursor-pointer ${
+                  className={`max-md:hidden p-2.5 rounded-xl border transition-colors cursor-pointer ${
                     showEmojiPicker
                       ? 'bg-amber-100 text-amber-900 border-amber-300'
                       : 'border-neutral-200 bg-neutral-100 hover:bg-neutral-200 text-neutral-600'
@@ -570,8 +570,8 @@ export function ChatConversa({ f }: { f: DesktopVM }) {
                         handleSendMessage();
                       }
                     }}
-                    placeholder={`Mensagem para ${activeLead.name}... (Shift+Enter quebra linha, / para atalhos)`}
-                    className="flex-1 px-4 py-2.5 bg-neutral-100 focus:bg-white border border-transparent focus:border-neutral-300 rounded-xl text-xs text-neutral-900 placeholder-neutral-400 focus:outline-none transition-all resize-none max-h-40 leading-relaxed"
+                    placeholder="Escreva uma mensagem… (/ para atalhos)"
+                    className="flex-1 min-w-0 min-h-11 px-4 py-2.5 bg-neutral-100 focus:bg-white border border-transparent focus:border-neutral-300 rounded-xl text-xs text-neutral-900 placeholder-neutral-400 focus:outline-none transition-all resize-none max-h-40 leading-relaxed"
                   />
                 )}
 

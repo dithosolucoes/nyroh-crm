@@ -469,14 +469,14 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
                 <Shield className="w-3 h-3 text-amber-600" />
                 Área Exclusiva Super Admin
               </span>
-              <span className="text-[10px] font-mono text-neutral-400">
+              <span className="hidden sm:inline text-[10px] font-mono text-neutral-400">
                 Sessão: {currentUser.name} ({currentUser.email})
               </span>
             </div>
             <h1 className="text-lg sm:text-xl font-bold text-neutral-900 tracking-tight">
               Central de Comando & Governança da Operação
             </h1>
-            <p className="text-xs text-neutral-500 mt-0.5">
+            <p className="hidden sm:block text-xs text-neutral-500 mt-0.5">
               Gestão de equipe, divisão de carteiras de leads, controle de acessos (RBAC) e auditoria caixa-preta.
             </p>
           </div>

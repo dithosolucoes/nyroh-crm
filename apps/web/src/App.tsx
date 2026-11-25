@@ -916,7 +916,7 @@ export default function App() {
 
             {/* Top Navbar Header with Salesperson Selector & Dedicated Instance indicator */}
             <header className="bg-white border-b border-neutral-200 px-3 md:px-6 py-2 md:py-2.5 flex flex-wrap items-center justify-between gap-2.5 shrink-0 shadow-2xs z-10">
-              <div className="min-w-0 flex items-center gap-3">
+              <div className="min-w-0 flex items-center gap-3 max-md:hidden">
                 <div>
                   <div className="flex items-center gap-2">
                     <h2 className="text-xs md:text-sm font-bold text-neutral-900 tracking-tight truncate">
@@ -1021,7 +1021,7 @@ export default function App() {
                       title="Voltar à Mesa Diretora do Super Admin"
                     >
                       <ArrowLeft className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Mesa do Admin</span>
+                      <span className="max-md:sr-only">Mesa do Admin</span>
                     </button>
                   </>
                 ) : (

@@ -193,7 +193,9 @@ export const MetricsBar: React.FC<MetricsBarProps> = ({
   return (
     <div className="bg-white border-b border-neutral-200 px-3 md:px-6 py-2.5 md:py-3.5 space-y-2.5 md:space-y-3 shrink-0 shadow-2xs">
       {/* Cards de Métricas Principais (Scrollable Horizontal até telas xl: 1280px+) */}
-      <div className="flex xl:grid overflow-x-auto xl:overflow-x-visible grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-2.5 xl:gap-3 pb-1 xl:pb-0 scrollbar-none">
+      {/* Celular: uma linha que rola na horizontal, com cartões que encaixam (sempre dá para ver o próximo).
+          Tablet e desktop: grade. */}
+      <div className="flex md:grid md:grid-cols-3 xl:grid-cols-5 gap-2.5 xl:gap-3 overflow-x-auto md:overflow-visible snap-x snap-mandatory [&>*]:snap-start pb-1 md:pb-0 no-scrollbar">
         {/* Card 1: Ligações Hoje */}
         <div className="bg-neutral-50 border border-neutral-200/80 rounded-xl p-2.5 xl:p-3 flex items-center justify-between min-w-[160px] xl:min-w-0 shrink-0 xl:shrink">
           <div>

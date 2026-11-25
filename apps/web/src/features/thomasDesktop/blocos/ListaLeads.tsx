@@ -1,8 +1,11 @@
-import { MessageSquare, Globe, Search, Flame, User, RefreshCw, Filter } from 'lucide-react';
+import { useState } from 'react';
+import { MessageSquare, Globe, Search, Flame, User, RefreshCw, Filter, History } from 'lucide-react';
 import { formatInstancePhone } from '@shared/lib/useRuntimeConfig';
 import type { DesktopVM } from '../useThomasDesktop';
 
 export function ListaLeads({ f }: { f: DesktopVM }) {
+  // Celular: a busca no histórico de mensagens fica recolhida até o usuário pedir (desktop: sempre visível).
+  const [historicoAberto, setHistoricoAberto] = useState(false);
   const { activeSalesperson, setSelectedLeadId, setChatMobileAberto, chatMobileAberto, runtime, isAdminUser, searchQuery, setSearchQuery, filterType, setFilterType, loadingMessages, realtimeActive, inbox, inboxHasMore, inboxLoading, fetchInbox, formatarHorario, previaDaConversa, bumpConversationUnread, filteredLeads, totalNaoLidas, activeLead, messageSearch, setMessageSearch, messageResults, searchingMessages, fetchMessages } = f;
   return (
     <>
@@ -11,10 +14,10 @@ export function ListaLeads({ f }: { f: DesktopVM }) {
       {/* ========================================================================= */}
       <div className={`w-full xl:w-[420px] 2xl:w-[460px] flex flex-col bg-white border-b xl:border-b-0 xl:border-r border-neutral-200 shrink-0 h-full ${chatMobileAberto ? 'max-md:hidden' : ''}`}>
         {/* User Identity & Real-time Indicator Header */}
-        <div className="p-4 border-b border-neutral-200 bg-neutral-50/70 flex items-center justify-between">
+        <div className="p-3 md:p-4 border-b border-neutral-200 bg-neutral-50/70 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="relative">
-              <div className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-2xs">
+              <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-2xs">
                 {activeSalesperson?.name?.substring(0, 2).toUpperCase() || 'TH'}
               </div>
               <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white" />
@@ -61,21 +64,35 @@ export function ListaLeads({ f }: { f: DesktopVM }) {
         </div>
 
         {/* Search Bar */}
-        <div className="p-3 border-b border-neutral-100">
-          <div className="relative">
+        <div className="p-3 border-b border-neutral-100 flex items-center gap-2">
+          <div className="relative flex-1 min-w-0">
             <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               placeholder="Buscar por nome, telefone ou nicho..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-1.5 bg-neutral-100/80 hover:bg-neutral-100 focus:bg-white border border-transparent focus:border-neutral-300 rounded-xl text-xs text-neutral-800 placeholder-neutral-400 transition-all focus:outline-none"
+              className="w-full pl-9 pr-3 py-2 md:py-1.5 bg-neutral-100/80 hover:bg-neutral-100 focus:bg-white border border-transparent focus:border-neutral-300 rounded-xl text-xs text-neutral-800 placeholder-neutral-400 transition-all focus:outline-none"
             />
           </div>
+          {/* Celular: botão para abrir a busca no histórico de mensagens */}
+          <button
+            type="button"
+            onClick={() => setHistoricoAberto(v => !v)}
+            aria-pressed={historicoAberto}
+            aria-label="Buscar no histórico de mensagens"
+            title="Buscar no histórico de mensagens"
+            className={`md:hidden min-h-10 min-w-10 flex items-center justify-center rounded-xl border transition-colors ${
+              historicoAberto ? 'bg-amber-100 border-amber-300 text-amber-900' : 'bg-neutral-100 border-transparent text-neutral-600'
+            }`}
+          >
+            <History className="w-4 h-4" />
+          </button>
         </div>
 
-        {/* Busca DENTRO das mensagens (antes não existia: achar uma conversa antiga era abrir uma a uma) */}
-        <div className="px-3 pb-2 border-b border-neutral-100">
+        {/* Busca DENTRO das mensagens (antes não existia: achar uma conversa antiga era abrir uma a uma).
+            No celular fica recolhida até o botão de histórico, ou aberta quando já há texto digitado. */}
+        <div className={`px-3 pb-2 border-b border-neutral-100 ${historicoAberto || messageSearch ? '' : 'max-md:hidden'}`}>
           <div className="relative">
             <Search className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input

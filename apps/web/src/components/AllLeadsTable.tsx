@@ -262,9 +262,9 @@ export const AllLeadsTable: React.FC<AllLeadsTableProps> = ({
               <th className="py-2.5 px-3">Telefone (Bruto)</th>
               <th className="hidden md:table-cell py-2.5 px-3">URL do Site</th>
               <th className="py-2.5 px-3">Estágio do Pipeline</th>
-              <th className="hidden md:table-cell py-2.5 px-3">Última Etiqueta</th>
+              <th className="hidden 2xl:table-cell py-2.5 px-3">Última Etiqueta</th>
               <th className="hidden md:table-cell py-2.5 px-3">Próximo Retorno</th>
-              <th className="hidden md:table-cell py-2.5 px-3">Ligações</th>
+              <th className="hidden 2xl:table-cell py-2.5 px-3">Ligações</th>
               <th className="py-2.5 px-3 text-right">Ações</th>
             </tr>
           </thead>
@@ -305,7 +305,7 @@ export const AllLeadsTable: React.FC<AllLeadsTableProps> = ({
                     </td>
 
                     <td className="hidden md:table-cell py-3 px-3">
-                      <span className="inline-block px-2 py-0.5 rounded text-[11px] font-medium bg-neutral-100 text-neutral-700 border border-neutral-200/60">
+                      <span title={getLeadNiche(lead)} className="block max-w-[160px] truncate px-2 py-0.5 rounded text-[11px] font-medium bg-neutral-100 text-neutral-700 border border-neutral-200/60">
                         {getLeadNiche(lead)}
                       </span>
                     </td>
@@ -323,7 +323,7 @@ export const AllLeadsTable: React.FC<AllLeadsTableProps> = ({
                       </div>
                     </td>
 
-                    <td className="hidden md:table-cell py-3 px-3">
+                    <td className="hidden md:table-cell py-3 px-3 whitespace-nowrap">
                       <div className="flex flex-col gap-1">
                         {lead.publicUrl ? (
                           <div className="flex items-center gap-1">
@@ -387,7 +387,7 @@ export const AllLeadsTable: React.FC<AllLeadsTableProps> = ({
                       </select>
                     </td>
 
-                    <td className="hidden md:table-cell py-3 px-3">
+                    <td className="hidden 2xl:table-cell py-3 px-3">
                       {lead.lastCallTag ? (
                         <div className="flex flex-wrap items-center gap-1">
                           {lead.lastCallTag.split(',').map((tName, i) => {
@@ -433,7 +433,7 @@ export const AllLeadsTable: React.FC<AllLeadsTableProps> = ({
                       )}
                     </td>
 
-                    <td className="hidden md:table-cell py-3 px-3">
+                    <td className="hidden 2xl:table-cell py-3 px-3">
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-neutral-100 text-neutral-600">
                         {lead.callCount || 0} registro(s)
                       </span>
