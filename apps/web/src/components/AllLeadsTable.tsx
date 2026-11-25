@@ -292,7 +292,7 @@ export const AllLeadsTable: React.FC<AllLeadsTableProps> = ({
                         className="rounded border-neutral-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                       />
                     </td>
-                    <td className="py-3 px-3 font-semibold text-neutral-900 max-md:flex-1 max-md:min-w-0">
+                    <td className="py-3 px-3 font-semibold text-neutral-900 max-md:basis-[calc(100%-2.5rem)] max-md:min-w-0 max-md:break-words">
                       <button
                         onClick={() => onOpenDetails(lead)}
                         className="text-left hover:text-blue-600 transition-colors"
