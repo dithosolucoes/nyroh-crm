@@ -3,14 +3,14 @@ import { Lead, PIPELINE_COLUMNS } from '@shared/types';
 import type { DesktopVM } from '../useThomasDesktop';
 
 export function DossieLead({ f }: { f: DesktopVM }) {
-  const { onUpdateLeadColumn, isDossierOpen, setIsDossierOpen, formatarHorario, activeLead, salespeople, notes, noteDraft, setNoteDraft, savingNote, salvarNota, transferirConversa, alternarResolvida } = f;
+  const { chatMobileAberto, onUpdateLeadColumn, isDossierOpen, setIsDossierOpen, formatarHorario, activeLead, salespeople, notes, noteDraft, setNoteDraft, savingNote, salvarNota, transferirConversa, alternarResolvida } = f;
   return (
     <>
       {/* ========================================================================= */}
       {/* 3. RIGHT COLUMN: Collapsible Lead Dossier & CRM Pipeline Actions           */}
       {/* ========================================================================= */}
       {isDossierOpen && activeLead && (
-        <div className="w-full xl:w-[300px] 2xl:w-[340px] bg-white border-t xl:border-t-0 xl:border-l border-neutral-200 flex flex-col shrink-0 h-full overflow-y-auto animate-in slide-in-from-right-4 duration-150">
+        <div className={`w-full xl:w-[300px] 2xl:w-[340px] bg-white border-t xl:border-t-0 xl:border-l border-neutral-200 flex flex-col shrink-0 h-full overflow-y-auto animate-in slide-in-from-right-4 duration-150 ${chatMobileAberto ? 'max-md:fixed max-md:inset-0 max-md:z-40 max-md:border-t-0' : 'max-md:hidden'}`}>
           {/* Header */}
           <div className="p-4 border-b border-neutral-200 bg-neutral-50/70 flex items-center justify-between">
             <div className="flex items-center gap-2">

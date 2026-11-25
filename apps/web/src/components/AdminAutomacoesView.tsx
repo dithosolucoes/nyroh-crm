@@ -180,7 +180,7 @@ export default function AdminAutomacoesView() {
         <button type="button" onClick={novaAutomacao} className={BTN_PRIMARY}>Nova automação</button>
       </header>
 
-      <nav className="mb-4 flex gap-1 overflow-x-auto border-b border-[#E3E1DA]">
+      <nav className="mb-4 flex flex-wrap gap-1 border-b border-[#E3E1DA]">
         {SUBTABS.map((t) => (
           <button
             key={t.id}

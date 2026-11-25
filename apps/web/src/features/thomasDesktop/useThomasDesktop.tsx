@@ -88,6 +88,16 @@ export function useThomasDesktop({ leads, onUpdateLeadColumn, onShowToast, activ
     loadTemplateCatalog();
   }, []);
   const [isDossierOpen, setIsDossierOpen] = useState<boolean>(true);
+  // Celular: a tela mostra a LISTA ou o CHAT (um de cada vez). No desktop é ignorado.
+  // Não usa o lead selecionado, porque ele começa no primeiro da lista.
+  const [chatMobileAberto, setChatMobileAbertoState] = useState<boolean>(false);
+  const setChatMobileAberto = (aberto: boolean) => {
+    setChatMobileAbertoState(aberto);
+    // Ao abrir uma conversa no celular, o Dossiê começa fechado (ele vira tela cheia).
+    if (aberto && typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches) {
+      setIsDossierOpen(false);
+    }
+  };
   const [showEmojiPicker, setShowEmojiPicker] = useState<boolean>(false);
   const [attachmentPreview, setAttachmentPreview] = useState<{ name: string; url: string; type: string } | null>(null);
 
@@ -1137,6 +1147,8 @@ export function useThomasDesktop({ leads, onUpdateLeadColumn, onShowToast, activ
     initialLeadId,
     selectedLeadId,
     setSelectedLeadId,
+    chatMobileAberto,
+    setChatMobileAberto,
     runtime,
     currentUser,
     setCurrentUser,

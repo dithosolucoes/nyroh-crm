@@ -155,11 +155,25 @@ export const MenuLateral: React.FC<MenuLateralProps> = ({
     });
   }
 
+  // Atalhos da barra inferior do celular (os demais ficam em "Mais").
+  const atalhosMobile: { label: string; icon: React.ReactNode; destino: Destino }[] = [
+    {
+      label: 'Hoje',
+      icon: <CalendarClock className="w-5 h-5" />,
+      destino: isAdmin ? { tab: 'admin', section: 'cockpit' } : { tab: 'hoje' }
+    },
+    ...(podeVerConversas
+      ? [{ label: 'Conversas', icon: <MessageSquare className="w-5 h-5" />, destino: { tab: 'whatsapp' } as Destino }]
+      : []),
+    { label: 'Pipeline', icon: <LayoutGrid className="w-5 h-5" />, destino: { tab: 'kanban' } },
+    { label: 'Leads', icon: <Table className="w-5 h-5" />, destino: { tab: 'table' } }
+  ];
+
   const renderGrupos = () => (
     <div className="space-y-5">
       {grupos.map(g => (
         <div key={g.titulo}>
-          <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block px-2 mb-1.5">{g.titulo}</span>
+          <span className="text-xs font-bold text-neutral-500 uppercase tracking-wider block px-2 mb-1.5">{g.titulo}</span>
           <nav className="space-y-0.5">
             {g.itens.map(item => {
               const ativo = item.destino ? mesmoDestino(item.destino, destinoAtual) : false;
@@ -237,6 +251,38 @@ export const MenuLateral: React.FC<MenuLateralProps> = ({
           <Menu className="w-5 h-5" />
         </button>
       </div>
+
+      {/* Celular: barra inferior fixa com os atalhos principais e "Mais" (abre a gaveta). */}
+      <nav
+        className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-neutral-200 flex items-stretch pb-[env(safe-area-inset-bottom)] shadow-[0_-1px_3px_rgba(0,0,0,0.06)]"
+        aria-label="Navegação principal"
+      >
+        {atalhosMobile.map(a => {
+          const ativo = mesmoDestino(a.destino, destinoAtual);
+          return (
+            <button
+              key={a.label}
+              onClick={() => ir(a.destino)}
+              aria-current={ativo ? 'page' : undefined}
+              className={`flex-1 min-w-0 min-h-[56px] flex flex-col items-center justify-center gap-0.5 px-1 text-xs cursor-pointer transition-colors ${
+                ativo ? 'text-neutral-900 font-bold' : 'text-neutral-500 font-medium'
+              }`}
+            >
+              {a.icon}
+              <span className="truncate max-w-full">{a.label}</span>
+            </button>
+          );
+        })}
+        <button
+          onClick={() => setGavetaAberta(true)}
+          className={`flex-1 min-w-0 min-h-[56px] flex flex-col items-center justify-center gap-0.5 px-1 text-xs cursor-pointer transition-colors ${
+            gavetaAberta ? 'text-neutral-900 font-bold' : 'text-neutral-500 font-medium'
+          }`}
+        >
+          <Menu className="w-5 h-5" />
+          <span className="truncate max-w-full">Mais</span>
+        </button>
+      </nav>
 
       {gavetaAberta && (
         <div className="xl:hidden fixed inset-0 z-50 bg-neutral-900/50 flex justify-end" onClick={() => setGavetaAberta(false)}>

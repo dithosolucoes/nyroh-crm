@@ -1,18 +1,18 @@
-import { MessageSquare, Send, ExternalLink, Globe, Sparkles, Clock, CheckCheck, Check, ShieldCheck, RefreshCw, AlertCircle, Paperclip, Smile, Mic, Trash2, BadgeCheck, X, FileText, Download, Layers, Zap } from 'lucide-react';
+import { ArrowLeft, MessageSquare, Send, ExternalLink, Globe, Sparkles, Clock, CheckCheck, Check, ShieldCheck, RefreshCw, AlertCircle, Paperclip, Smile, Mic, Trash2, BadgeCheck, X, FileText, Download, Layers, Zap } from 'lucide-react';
 import { Lead } from '@shared/types';
 import { WhatsAppVoiceAudioPlayer } from '../../../components/WhatsAppVoiceAudioPlayer';
 import { describeSendError, QUICK_EMOJIS } from '../base';
 import type { DesktopVM } from '../useThomasDesktop';
 
 export function ChatConversa({ f }: { f: DesktopVM }) {
-  const { messages, inputText, setInputText, loadingMessages, isSending, presenceUsers, isRecordingAudio, recordingDuration, liveAudioVolume, setIsTemplateModalOpen, isDossierOpen, setIsDossierOpen, showEmojiPicker, setShowEmojiPicker, attachmentPreview, setAttachmentPreview, setIsQuickRepliesModalOpen, selectedSlashIndex, setSelectedSlashIndex, showSlashDropdown, setShowSlashDropdown, setSlashQuery, messagesEndRef, fileInputRef, inputTextareaRef, activeLead, replaceLeadVariables, matchingSlashReplies, handleSelectQuickReply, windowStatus, hasOlderMessages, loadingOlder, loadOlderMessages, notifyTyping, handleSendMessage, handleRetryMessage, handleStartVoiceRecord, handleCancelVoiceRecord, handleSendVoiceRecord, handleFileSelect, handlePasteIntoInput, isDraggingFile, setIsDraggingFile, handleDropFile, formatSeconds } = f;
+  const { chatMobileAberto, setChatMobileAberto, messages, inputText, setInputText, loadingMessages, isSending, presenceUsers, isRecordingAudio, recordingDuration, liveAudioVolume, setIsTemplateModalOpen, isDossierOpen, setIsDossierOpen, showEmojiPicker, setShowEmojiPicker, attachmentPreview, setAttachmentPreview, setIsQuickRepliesModalOpen, selectedSlashIndex, setSelectedSlashIndex, showSlashDropdown, setShowSlashDropdown, setSlashQuery, messagesEndRef, fileInputRef, inputTextareaRef, activeLead, replaceLeadVariables, matchingSlashReplies, handleSelectQuickReply, windowStatus, hasOlderMessages, loadingOlder, loadOlderMessages, notifyTyping, handleSendMessage, handleRetryMessage, handleStartVoiceRecord, handleCancelVoiceRecord, handleSendVoiceRecord, handleFileSelect, handlePasteIntoInput, isDraggingFile, setIsDraggingFile, handleDropFile, formatSeconds } = f;
   return (
     <>
       {/* ========================================================================= */}
       {/* 2. MIDDLE COLUMN: Interactive Real-Time WhatsApp Chat Interface           */}
       {/* ========================================================================= */}
       <div
-        className="flex-1 flex flex-col bg-[#efeae2]/30 min-w-0 h-full relative"
+        className={`flex-1 flex flex-col bg-[#efeae2]/30 min-w-0 h-full relative ${chatMobileAberto ? '' : 'max-md:hidden'}`}
         onDragOver={e => {
           e.preventDefault();
           if (!isDraggingFile) setIsDraggingFile(true);
@@ -32,6 +32,14 @@ export function ChatConversa({ f }: { f: DesktopVM }) {
             {/* Chat Header Bar */}
             <div className="px-4 sm:px-5 py-3 bg-white border-b border-neutral-200 flex flex-wrap items-center justify-between gap-3 shrink-0 shadow-2xs z-10">
               <div className="flex items-center gap-3 min-w-0">
+                {/* Celular: volta para a lista de conversas */}
+                <button
+                  onClick={() => setChatMobileAberto(false)}
+                  className="md:hidden -ml-2 min-h-11 min-w-11 flex items-center justify-center rounded-xl text-neutral-700 hover:bg-neutral-100"
+                  aria-label="Voltar para a lista de conversas"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </button>
                 <div className="w-10 h-10 rounded-full bg-neutral-900 text-white flex items-center justify-center font-bold text-sm shrink-0">
                   {activeLead.name.substring(0, 2).toUpperCase()}
                 </div>
