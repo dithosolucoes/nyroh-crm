@@ -2,8 +2,9 @@ import { apiFetch } from '../api/client';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Lead, User } from '@shared/types';
 import { AdminWhatsAppFluxoView } from './AdminWhatsAppFluxoView';
+import { ContasFluxo } from './ContasFluxo';
 
-type Tab = 'central' | 'marcas' | 'numeros' | 'bloqueios' | 'regras' | 'integracoes';
+type Tab = 'central' | 'marcas' | 'numeros' | 'bloqueios' | 'regras' | 'integracoes' | 'contas';
 
 interface Remessa { id: string; name: string; createdAt: string; leadCount: number; blockedCount: number; contatadosHoje?: number }
 interface Brand { id: string; name: string; services: string; numberIds: string[] }
@@ -46,11 +47,12 @@ const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'bloqueios', label: 'Bloqueios pendentes' },
   { id: 'regras', label: 'Regras de contato' },
   { id: 'integracoes', label: 'Integrações' },
+  { id: 'contas', label: 'Contas FluxoAPI' },
 ];
 
 const TABS_POR_SECAO: Record<'leads' | 'configuracoes', Tab[]> = {
   leads: ['central', 'bloqueios'],
-  configuracoes: ['marcas', 'numeros', 'regras', 'integracoes'],
+  configuracoes: ['marcas', 'numeros', 'regras', 'integracoes', 'contas'],
 };
 
 export const AdminEstruturaView: React.FC<Props> = ({ leads, currentUser, onShowToast, onOpenDetails, secao = 'leads' }) => {
@@ -107,6 +109,7 @@ export const AdminEstruturaView: React.FC<Props> = ({ leads, currentUser, onShow
         {tab === 'bloqueios' && <Bloqueios onShowToast={onShowToast} onError={setError} leads={leads} onOpenDetails={onOpenDetails} />}
         {tab === 'regras' && <RegrasContato onShowToast={onShowToast} onError={setError} />}
         {tab === 'integracoes' && <AdminWhatsAppFluxoView currentUser={currentUser} onShowToast={onShowToast} />}
+        {tab === 'contas' && <ContasFluxo onShowToast={onShowToast} />}
       </div>
     </div>
   );

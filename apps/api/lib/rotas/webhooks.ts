@@ -6,6 +6,7 @@
 import type { Express } from 'express';
 import type { RespostaWebhookRecebido, RespostaWebhookJaProcessado, RespostaSimulacaoWebhook } from '../../../../shared/contracts/rotas.js';
 import { optOutPorBotaoDoWebhook } from '../descadastroPadrao.js';
+import { segredosWebhookFluxo, registrarEventoPorNumeroMeta, contaDoNumeroMeta } from '../fluxoContas.js';
 
 
 export interface DependenciasWebhooks {
@@ -164,6 +165,19 @@ export async function processWebhookEventAsync(event: any) {
             else if (field === 'messages') {
               // Número que recebeu (multi-número): define qual token/BM usar para baixar mídia e marcar leitura
               const receivingPhoneId = String(val.metadata?.phone_number_id || '').trim() || undefined;
+              // Saúde do número e decisão do operador (só com o cadastro de contas ligado).
+              let numeroIgnorado = false;
+              if (receivingPhoneId && D.usePostgres && D.pgPool && (process.env.NYROH_FLUXO_CONTAS || '').trim() === 'true') {
+                try {
+                  await registrarEventoPorNumeroMeta(D.pgPool, receivingPhoneId);
+                  const vinculo = await contaDoNumeroMeta(D.pgPool, receivingPhoneId);
+                  numeroIgnorado = Boolean(vinculo?.ignorado);
+                  if (!vinculo) console.warn(`[webhook] número ${receivingPhoneId} não está cadastrado em nenhuma conta da FluxoAPI.`);
+                  if (numeroIgnorado) console.info(`[webhook] número ${receivingPhoneId} marcado como "não usar": mensagem não entra no CRM.`);
+                } catch (err: any) {
+                  console.error('[webhook] falha ao consultar o cadastro do número:', err?.message);
+                }
+              }
               // Status de entrega (sent, delivered, read, failed)
               if (val.statuses && Array.isArray(val.statuses)) {
                 for (const s of val.statuses) {
@@ -179,7 +193,7 @@ export async function processWebhookEventAsync(event: any) {
               }
 
               // Mensagem recebida do cliente
-              if (val.messages && Array.isArray(val.messages)) {
+              if (val.messages && Array.isArray(val.messages) && !numeroIgnorado) {
                 for (const m of val.messages) {
                   eventType = 'message_received';
                   let textBody = m.text?.body || '';
@@ -537,6 +551,34 @@ export async function processWebhookEventAsync(event: any) {
 }
 
 
+/**
+ * Valida a assinatura da FluxoAPI contra o segredo do ambiente e contra o de cada conta cadastrada.
+ * Devolve a primeira validação que bater; se nenhuma bater, devolve o motivo da última tentativa.
+ */
+async function validarAssinaturaFluxo(rawBody: string, headers: any): Promise<{ isValid: boolean; reason?: string; contaId?: string }> {
+  const candidatos: Array<{ contaId?: string; segredo: string }> = [];
+  if ((process.env.FLUXO_WEBHOOK_SECRET || '').trim()) {
+    candidatos.push({ segredo: (process.env.FLUXO_WEBHOOK_SECRET || '').trim() });
+  }
+  if (D.usePostgres && D.pgPool && (process.env.NYROH_FLUXO_CONTAS || '').trim() === 'true') {
+    try {
+      candidatos.push(...(await segredosWebhookFluxo(D.pgPool)));
+    } catch (err: any) {
+      console.error('[webhook] não consegui ler os segredos das contas:', err?.message);
+    }
+  }
+  if (!candidatos.length) {
+    return D.verifyFluxoWebhook(rawBody, headers);
+  }
+  let ultimo: { isValid: boolean; reason?: string } = { isValid: false, reason: 'Nenhum segredo de webhook bate com a assinatura.' };
+  for (const c of candidatos) {
+    const r = D.verifyFluxoWebhook(rawBody, headers, c.segredo);
+    if (r.isValid) return { isValid: true, contaId: c.contaId };
+    ultimo = r;
+  }
+  return ultimo;
+}
+
 export function registrarRotasWebhooks(app: Express): void {
   app.get(['/api/v1/webhook', '/api/webhooks/fluxo', '/api/webhooks/meta', '/api/webhook/whatsapp', '/webhook'], (req, res) => {
     const mode = req.query['hub.mode'];
@@ -564,9 +606,11 @@ export function registrarRotasWebhooks(app: Express): void {
 
     // Assinatura HMAC (§A9): HMAC-SHA256(whsec_…, `${timestamp}\n${corpo bruto}`)
     const metaSig = req.headers['x-hub-signature-256'];
+    // FluxoAPI: a assinatura diz de QUAL conta veio o evento. Testa o segredo de cada conta (e o do ambiente)
+    // até um bater. Assim não confiamos em nenhum campo do corpo antes de validar.
     const authCheck = metaSig
       ? D.verifyMetaSignature(rawBody, String(metaSig))
-      : D.verifyFluxoWebhook(rawBody, req.headers as any);
+      : await validarAssinaturaFluxo(rawBody, req.headers as any);
     if (!authCheck.isValid) {
       console.warn('[Webhook Auth Failed]:', authCheck.reason);
       return res.status(401).json({ error: 'Unauthorized: Assinatura do webhook inválida.', hint: authCheck.reason });

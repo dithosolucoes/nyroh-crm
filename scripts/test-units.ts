@@ -29,7 +29,8 @@ import { isPubliclyFetchableUrl } from '../apps/api/lib/auditEngine';
 import { validarAutomacao, logicaEmPalavras, conversaSimulada, renderPrevia, tokensDesconhecidos, EVENTOS, ACOES, CONDICOES, type Automacao } from '../shared/lib/automacoes';
 import { planejarEvento, type RegistroAutomacao } from '../apps/api/lib/automacoesExecucao';
 import { cifrarSegredo, decifrarSegredo, estaCifrado } from '../apps/api/lib/cifraSegredos';
-import { salvarConta, listarContas, obterCredenciaisDaInstancia } from '../apps/api/lib/fluxoContas';
+import { salvarConta, listarContas, obterCredenciaisDaConta, salvarVinculos, segredosWebhookFluxo } from '../apps/api/lib/fluxoContas';
+import { cruzarNumeros, chaveTelefone, descobrirNumerosDaConta, type FontesDescoberta } from '../apps/api/lib/fluxoDescoberta';
 import { criarExecutorAcoes, camposDoLead } from '../apps/api/lib/automacoesExecutores';
 import { dispararAgendas, lerPausaGeral } from '../apps/api/lib/automacoesRoutes';
 import { registrarEventoGeral } from '../apps/api/lib/automacoesExecucao';
@@ -1058,9 +1059,9 @@ test('contas FluxoAPI: segredo entra cifrado, listagem não devolve segredo, dec
           return { rows: c ? [{ id: c.id, nome: c.nome, bm_id: c.bm_id, tem_key: !!c.api_key_cifrada, tem_secret: !!c.api_secret_cifrado, tem_webhook: !!c.webhook_secret_cifrado }] : [] };
         }
         if (sql.includes('FROM fluxo_instancias ORDER BY')) return { rows: [] };
-        if (sql.includes('FROM fluxo_instancias i JOIN')) {
+        if (sql.includes('FROM fluxo_contas WHERE id')) {
           const c = banco.conta;
-          return { rows: c && params[0] === 'inst_teste' ? [c] : [] };
+          return { rows: c && params[0] === c.id ? [c] : [] };
         }
         throw new Error('SQL inesperado no teste: ' + sql.slice(0, 40));
       }
@@ -1078,7 +1079,7 @@ test('contas FluxoAPI: segredo entra cifrado, listagem não devolve segredo, dec
     assert.ok(!json.includes('chave-publica') && !json.includes('segredo-privado') && !json.includes('whsec-teste'), 'listagem não pode trazer segredo');
     assert.equal(lista[0].temApiSecret, true);
 
-    const credenciais = await obterCredenciaisDaInstancia(pool, 'inst_teste');
+    const credenciais = await obterCredenciaisDaConta(pool, String(linha[0]));
     assert.equal(credenciais?.apiKey, 'chave-publica-XYZ9');
     assert.equal(credenciais?.apiSecret, 'segredo-privado-ABC');
     assert.equal(credenciais?.webhookSecret, 'whsec-teste-42');
@@ -1098,6 +1099,74 @@ test('contas FluxoAPI: sem NYROH_CHAVE_SEGREDOS, nada é gravado', async () => {
     assert.equal(chamadas, 0, 'não pode haver nenhuma escrita sem a chave');
   } finally {
     if (antiga !== undefined) process.env.NYROH_CHAVE_SEGREDOS = antiga;
+  }
+});
+
+test('descoberta: cruza FluxoAPI e Meta pelo telefone, ignorando formatação, e marca quem falta nas duas pontas', async () => {
+  assert.equal(chaveTelefone('+55 31 9108-1751'), chaveTelefone('553191081751'));
+  assert.equal(chaveTelefone('12'), null);
+
+  const fluxo = [
+    { instanceId: 'inst_A', telefone: '+55 31 9108-1751', status: 'no_ar', nome: 'Comercial' },
+    { instanceId: 'inst_B', telefone: '+55 11 98821-6073', status: 'desconectado', nome: null },
+  ];
+  const meta = [
+    { bmId: 'bm1', bmName: 'VHC', wabaId: 'w1', metaPhoneNumberId: 'pn1', displayPhoneNumber: '+55 31 9108-1751', verifiedName: 'Nyroh', qualityRating: 'LOW', statusMeta: 'CONNECTED' },
+    { bmId: 'bm1', bmName: 'VHC', wabaId: 'w1', metaPhoneNumberId: 'pn2', displayPhoneNumber: '+55 31 3333-4444', verifiedName: 'Outro', qualityRating: 'GREEN', statusMeta: 'CONNECTED' },
+  ];
+  const c = cruzarNumeros(fluxo, meta);
+  const par = c.find(x => x.metaPhoneNumberId === 'pn1')!;
+  assert.equal(par.conferido, true);
+  assert.equal(par.instanceId, 'inst_A');
+  assert.equal(par.bmId, 'bm1');
+  assert.equal(c.find(x => x.metaPhoneNumberId === 'pn2')!.instanceId, null, 'número só da Meta não tem instância');
+  const soFluxo = c.find(x => x.instanceId === 'inst_B')!;
+  assert.equal(soFluxo.metaPhoneNumberId, null, 'instância sem número da Meta aparece sem BM');
+  assert.equal(soFluxo.conferido, false);
+});
+
+test('descoberta: sem token da Meta, avisa que o número vem sem BM e não chama a Meta', async () => {
+  let chamadasMeta = 0;
+  const fontes: FontesDescoberta = {
+    listarInstanciasFluxo: async () => [{ instanceId: 'inst_A', telefone: '+55 31 9108-1751', status: 'no_ar', nome: null }],
+    listarBmsEWabas: async () => { chamadasMeta++; return []; },
+    listarNumerosWaba: async () => [],
+  };
+  const r = await descobrirNumerosDaConta({ apiKey: 'k', apiSecret: 's', metaToken: null }, fontes);
+  assert.equal(chamadasMeta, 0);
+  assert.equal(r.candidatos.length, 1);
+  assert.ok(r.avisos.some(a => /Sem token da Meta/.test(a)));
+});
+
+test('vínculos: gravam por número da Meta, não duplicam em repetição e recusam item sem identificação', async () => {
+  const sqls: string[] = [];
+  const pool = { query: async (sql: string) => { sqls.push(sql); return { rows: [] }; } };
+  const r = await salvarVinculos(pool, 'conta_1', [{ metaPhoneNumberId: 'pn1', numero: '+55 31 9108-1751', bmId: 'bm1', marcaId: 'marca_x' }]);
+  assert.equal(r.gravados, 1);
+  assert.ok(sqls[0].includes('ON CONFLICT (meta_phone_number_id)'), 'número da Meta usa a própria chave de conflito');
+  await assert.rejects(() => salvarVinculos(pool, 'conta_1', [{ numero: 'sem id' }]), /sem identificação/);
+});
+
+test('webhook: a lista de segredos vem decifrada e ignora conta cujo segredo não abre', async () => {
+  const antiga = process.env.NYROH_CHAVE_SEGREDOS;
+  process.env.NYROH_CHAVE_SEGREDOS = 'chave-de-teste-segredos-webhook-999';
+  try {
+    const bom = cifrarSegredo('whsec-conta-um');
+    const pool = {
+      query: async () => ({
+        rows: [
+          { id: 'conta_1', webhook_secret_cifrado: bom },
+          { id: 'conta_2', webhook_secret_cifrado: 'enc:v1:nao:abre:nada' },
+        ],
+      }),
+    };
+    const lista = await segredosWebhookFluxo(pool);
+    assert.equal(lista.length, 1);
+    assert.equal(lista[0].contaId, 'conta_1');
+    assert.equal(lista[0].segredo, 'whsec-conta-um');
+  } finally {
+    if (antiga === undefined) delete process.env.NYROH_CHAVE_SEGREDOS;
+    else process.env.NYROH_CHAVE_SEGREDOS = antiga;
   }
 });
 

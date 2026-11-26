@@ -4,7 +4,8 @@
 import type { Express } from 'express';
 import crypto from 'crypto';
 import { cifrarSegredo } from '../cifraSegredos.js';
-import { listarContas, salvarConta, registrarInstancia } from '../fluxoContas.js';
+import { listarContas, salvarConta, salvarVinculos, registrarInstancia, obterCredenciaisDaConta } from '../fluxoContas.js';
+import { descobrirNumerosDaConta } from '../fluxoDescoberta.js';
 
 type StoredMetaTemplate = any;
 type FluxoWebhookEvent = any;
@@ -80,17 +81,45 @@ export function registrarFluxoMeta(app: Express): void {
   app.post('/api/admin/fluxo/contas', async (req: any, res) => {
     if (contasRecusa(req, res)) return;
     try {
-      const { id, nome, bmId, apiKey, apiSecret, webhookSecret } = req.body || {};
-      const { id: contaId } = await salvarConta(D.pgPool, { id, nome, bmId, apiKey, apiSecret, webhookSecret });
+      const { id, nome, bmId, apiKey, apiSecret, webhookSecret, metaToken } = req.body || {};
+      const { id: contaId } = await salvarConta(D.pgPool, { id, nome, bmId, apiKey, apiSecret, webhookSecret, metaToken });
       auditar(req, id ? 'conta_atualizada' : 'conta_criada', {
         contaId,
-        campos: ['nome', 'bmId', 'apiKey', 'apiSecret', 'webhookSecret'].filter(k => req.body?.[k] !== undefined)
+        campos: ['nome', 'bmId', 'apiKey', 'apiSecret', 'webhookSecret', 'metaToken'].filter(k => req.body?.[k] !== undefined)
       });
       return res.json({ ok: true, id: contaId });
     } catch (err: any) {
       // Sem chave-mestra, a cifra recusa: nada foi gravado.
       const semChave = /NYROH_CHAVE_SEGREDOS/.test(String(err?.message));
       return res.status(semChave ? 503 : 400).json({ error: semChave ? 'Configure NYROH_CHAVE_SEGREDOS antes de salvar segredos. Nada foi gravado.' : (err?.message || 'Dados inválidos.') });
+    }
+  });
+
+  // Descoberta: lista os números da FluxoAPI e da Meta para a conta. Devolve candidatos, sem segredo.
+  app.post('/api/admin/fluxo/contas/:id/descobrir', async (req: any, res) => {
+    if (contasRecusa(req, res)) return;
+    try {
+      const credenciais = await obterCredenciaisDaConta(D.pgPool, String(req.params.id));
+      if (!credenciais) return res.status(404).json({ error: 'Conta não encontrada.' });
+      const { candidatos, avisos } = await descobrirNumerosDaConta(credenciais);
+      auditar(req, 'descoberta', { contaId: req.params.id, encontrados: candidatos.length });
+      return res.json({ candidatos, avisos });
+    } catch (err: any) {
+      return res.status(502).json({ error: err?.message || 'Falha ao consultar a FluxoAPI ou a Meta.' });
+    }
+  });
+
+  // Vínculo: o operador decide a marca de cada número (ou ignora). Só grava o que foi escolhido.
+  app.post('/api/admin/fluxo/contas/:id/vincular', async (req: any, res) => {
+    if (contasRecusa(req, res)) return;
+    const vinculos = Array.isArray(req.body?.vinculos) ? req.body.vinculos : null;
+    if (!vinculos || !vinculos.length) return res.status(400).json({ error: 'Envie a lista de vínculos.' });
+    try {
+      const { gravados } = await salvarVinculos(D.pgPool, String(req.params.id), vinculos);
+      auditar(req, 'vinculos_salvos', { contaId: req.params.id, gravados });
+      return res.json({ ok: true, gravados });
+    } catch (err: any) {
+      return res.status(400).json({ error: err?.message || 'Vínculos inválidos.' });
     }
   });
 

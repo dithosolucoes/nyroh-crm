@@ -219,6 +219,37 @@ export async function metaExchangeSignupCode(code: string): Promise<{ success: b
   return { success: false, error: lastError };
 }
 
+/** BMs que o token enxerga, com as WABAs de cada uma (usado para saber qual número é de qual BM). */
+export async function metaDescobrirBmsEWabas(accessToken: string): Promise<Array<{ bmId: string; bmName: string; wabaId: string; wabaName: string }>> {
+  const r = await graphRequest('GET', '/me/businesses?fields=id,name,owned_whatsapp_business_accounts{id,name}', undefined, accessToken);
+  if (!r.success) return [];
+  const saida: Array<{ bmId: string; bmName: string; wabaId: string; wabaName: string }> = [];
+  for (const biz of r.data?.data || []) {
+    for (const waba of biz?.owned_whatsapp_business_accounts?.data || []) {
+      if (waba?.id) saida.push({ bmId: String(biz.id), bmName: String(biz.name || ''), wabaId: String(waba.id), wabaName: String(waba.name || '') });
+    }
+  }
+  return saida;
+}
+
+/** Números de uma WABA, com o phone_number_id que a Meta usa nos webhooks (metadata.phone_number_id). */
+export async function metaListarNumerosDoWaba(wabaId: string, accessToken: string): Promise<Array<{ id: string; displayPhoneNumber: string; verifiedName: string; status: string; qualityRating: string }>> {
+  const r = await graphRequest(
+    'GET',
+    `/${encodeURIComponent(wabaId)}/phone_numbers?fields=id,display_phone_number,verified_name,status,quality_rating&limit=100`,
+    undefined,
+    accessToken
+  );
+  if (!r.success) return [];
+  return (r.data?.data || []).map((n: any) => ({
+    id: String(n.id),
+    displayPhoneNumber: String(n.display_phone_number || ''),
+    verifiedName: String(n.verified_name || ''),
+    status: String(n.status || ''),
+    qualityRating: String(n.quality_rating || ''),
+  }));
+}
+
 /** Descobre a(s) WABA(s) que o token do login da Meta pode acessar (fallback quando a Meta não manda o ID). */
 export async function metaDiscoverWabaIds(accessToken: string): Promise<string[]> {
   const r = await graphRequest('GET', '/me/businesses?fields=owned_whatsapp_business_accounts{id,name}', undefined, accessToken);
