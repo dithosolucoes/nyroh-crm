@@ -46,7 +46,7 @@ interface Props {
   onShowToast: (msg: string) => void;
 }
 
-const FORM_VAZIO = { nome: '', bmId: '', apiKey: '', apiSecret: '', webhookSecret: '', metaToken: '' };
+const FORM_VAZIO = { id: '', nome: '', bmId: '', apiKey: '', apiSecret: '', webhookSecret: '', metaToken: '' };
 
 async function lerJson(res: Response): Promise<any> {
   return res.json().catch(() => ({}));
@@ -98,6 +98,7 @@ export const ContasFluxo: React.FC<Props> = ({ onShowToast }) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          id: form.id || undefined,
           nome: form.nome,
           bmId: form.bmId || null,
           apiKey: form.apiKey || undefined,
@@ -108,14 +109,22 @@ export const ContasFluxo: React.FC<Props> = ({ onShowToast }) => {
       });
       const data = await lerJson(res);
       if (!res.ok) throw new Error(data.error || 'Não foi possível salvar a conta.');
+      const editando = Boolean(form.id);
       setForm(FORM_VAZIO); // limpa os segredos da tela logo após enviar
-      onShowToast('Conta salva.');
+      onShowToast(editando ? 'Conta atualizada.' : 'Conta salva.');
       await carregar();
     } catch (e: any) {
       setErro(e?.message || 'Erro ao salvar a conta.');
     } finally {
       setSalvando(false);
     }
+  };
+
+  // Edição: preenche o formulário com a conta. Campos de segredo ficam vazios: em branco, o servidor mantém o que já está salvo.
+  const editarConta = (conta: ContaListada) => {
+    setForm({ ...FORM_VAZIO, id: conta.id, nome: conta.nome, bmId: conta.bmId || '' });
+    setErro(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const buscarNumeros = async (conta: ContaListada) => {
@@ -196,8 +205,12 @@ export const ContasFluxo: React.FC<Props> = ({ onShowToast }) => {
       {/* Cadastro de conta */}
       <form onSubmit={salvarConta} className="bg-white border border-neutral-200 rounded-xl p-4 space-y-3">
         <div>
-          <h3 className="text-sm font-bold text-neutral-900">Nova conta da FluxoAPI</h3>
-          <p className="text-[11px] text-neutral-500">Os segredos são guardados cifrados. Depois de salvar, a tela só mostra se estão configurados.</p>
+          <h3 className="text-sm font-bold text-neutral-900">{form.id ? 'Editar conta da FluxoAPI' : 'Nova conta da FluxoAPI'}</h3>
+          <p className="text-[11px] text-neutral-500">
+            {form.id
+              ? 'Para trocar um segredo, preencha só esse campo. Campo em branco mantém o que já está salvo.'
+              : 'Os segredos são guardados cifrados. Depois de salvar, a tela só mostra se estão configurados.'}
+          </p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <input className="text-xs border border-neutral-300 rounded-lg px-3 py-2" placeholder="Nome (ex.: Conta Nyroh)" value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} required />
@@ -207,9 +220,16 @@ export const ContasFluxo: React.FC<Props> = ({ onShowToast }) => {
           <input className="text-xs border border-neutral-300 rounded-lg px-3 py-2" type="password" autoComplete="off" placeholder="Segredo do webhook" value={form.webhookSecret} onChange={e => setForm({ ...form, webhookSecret: e.target.value })} />
           <input className="text-xs border border-neutral-300 rounded-lg px-3 py-2" type="password" autoComplete="off" placeholder="Token da Meta (para ver a BM de cada número)" value={form.metaToken} onChange={e => setForm({ ...form, metaToken: e.target.value })} />
         </div>
-        <button type="submit" disabled={salvando} className="px-4 py-2 rounded-lg bg-neutral-900 text-white text-xs font-bold disabled:opacity-50">
-          {salvando ? 'Salvando…' : 'Salvar conta'}
-        </button>
+        <div className="flex gap-2">
+          <button type="submit" disabled={salvando} className="px-4 py-2 rounded-lg bg-neutral-900 text-white text-xs font-bold disabled:opacity-50">
+            {salvando ? 'Salvando…' : form.id ? 'Salvar alterações' : 'Salvar conta'}
+          </button>
+          {form.id && (
+            <button type="button" onClick={() => setForm(FORM_VAZIO)} className="px-4 py-2 rounded-lg border border-neutral-300 text-xs font-bold">
+              Cancelar edição
+            </button>
+          )}
+        </div>
       </form>
 
       {/* Contas */}
@@ -225,9 +245,14 @@ export const ContasFluxo: React.FC<Props> = ({ onShowToast }) => {
                 <span className={`px-1.5 py-0.5 rounded ${conta.temMetaToken ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-900'}`}>token Meta {conta.temMetaToken ? 'ok' : 'falta'}</span>
               </div>
             </div>
-            <button onClick={() => buscarNumeros(conta)} disabled={buscando === conta.id} className="px-3 py-2 rounded-lg border border-neutral-300 text-xs font-bold hover:bg-neutral-50 disabled:opacity-50">
-              {buscando === conta.id ? 'Buscando…' : 'Buscar números'}
-            </button>
+            <div className="flex gap-2">
+              <button onClick={() => editarConta(conta)} className="px-3 py-2 rounded-lg border border-neutral-300 text-xs font-bold hover:bg-neutral-50">
+                Editar
+              </button>
+              <button onClick={() => buscarNumeros(conta)} disabled={buscando === conta.id} className="px-3 py-2 rounded-lg border border-neutral-300 text-xs font-bold hover:bg-neutral-50 disabled:opacity-50">
+                {buscando === conta.id ? 'Buscando…' : 'Buscar números'}
+              </button>
+            </div>
           </div>
 
           {/* Números já vinculados */}
