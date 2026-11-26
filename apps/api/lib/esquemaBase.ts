@@ -3,7 +3,20 @@
  * no bloco principal de initDatabase (server.ts). Rodam pelo runner de migrações antes dos dados.
  * NÃO editar uma migração já aplicada em produção: para mudar o esquema, criar uma migração nova.
  */
-import { type Migracao } from './migracoes.js';
+import { aplicarMigracoes, type Migracao, type ClienteSql } from './migracoes.js';
+import { MIGRACOES_FLUXO_CONTAS, lerMigracoesArquivo } from './migracoesArquivos.js';
+
+/**
+ * Tabelas do cadastro de contas FluxoAPI. Aplicadas no boot, mas em passo PRÓPRIO e sem derrubar o servidor:
+ * se falhar, o erro vai para o log e o resto do sistema segue. A funcionalidade só liga com NYROH_FLUXO_CONTAS=true.
+ */
+export async function aplicarEsquemaFluxoContas(cliente: ClienteSql): Promise<void> {
+  try {
+    await aplicarMigracoes(cliente, lerMigracoesArquivo(process.cwd(), MIGRACOES_FLUXO_CONTAS));
+  } catch (err: any) {
+    console.error('[fluxo contas] migração não aplicada (o resto do sistema segue):', err?.message);
+  }
+}
 
 const INSTRUCOES_DDL: string[] = [
   "CREATE TABLE IF NOT EXISTS salespeople (\n            id VARCHAR(255) PRIMARY KEY,\n            name VARCHAR(255) NOT NULL,\n            email VARCHAR(255),\n            phone VARCHAR(100),\n            color VARCHAR(100) NOT NULL DEFAULT '#0284c7',\n            bg_color VARCHAR(100) NOT NULL DEFAULT '#e0f2fe',\n            is_default BOOLEAN DEFAULT FALSE,\n            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP\n          )",
