@@ -30,7 +30,7 @@ import { configurarAuth, registrarAuth } from './lib/rotas/auth.js';
 import { configurarLeadsRestantes, registrarLeadsRestantes } from './lib/rotas/leadsRestantes.js';
 import { configurarDemais, registrarDemais } from './lib/rotas/demais.js';
 import { configurarVisitasSite, registrarVisitasSite } from './lib/rotas/visitasSite.js';
-import { ESQUEMA_BASE } from './lib/esquemaBase.js';
+import { ESQUEMA_BASE, aplicarEsquemaFluxoContas } from './lib/esquemaBase.js';
 import { VIEWS_COMPATIBILIDADE } from './lib/esquemaViews.js';
 import { NOTAS_E_RESOLVIDA } from './lib/esquemaNotas.js';
 import { CAIXA_DE_ENTRADA } from './lib/esquemaCaixa.js';
@@ -787,7 +787,7 @@ async function initDatabase(retries = 5, delayMs = 3000) {
 
         // Auto-create tables if they don't exist & run migrations
         // Esquema base (DDL) pelo runner de migrações (item 2.2a). Ver apps/api/lib/esquemaBase.ts.
-        await aplicarMigracoes(client, [ESQUEMA_BASE]);
+        await aplicarMigracoes(client, [ESQUEMA_BASE]); await aplicarEsquemaFluxoContas(client);
 
         // Dados e ajustes pontuais que continuam no boot (item 2.2b).
         await client.query(`
