@@ -4,7 +4,7 @@
 import type { Express } from 'express';
 import crypto from 'crypto';
 import { cifrarSegredo } from '../cifraSegredos.js';
-import { listarContas, salvarConta, salvarVinculos, registrarInstancia, obterCredenciaisDaConta, definirSegredoWebhookInstancia, listarEventosInstancia, atualizarSaudeInstancia } from '../fluxoContas.js';
+import { listarContas, salvarConta, salvarVinculos, registrarInstancia, obterCredenciaisDaConta, definirSegredoWebhookInstancia, listarEventosInstancia, atualizarSaudeInstancia, registrarNumerosDescobertos } from '../fluxoContas.js';
 import { descobrirNumerosDaConta } from '../fluxoDescoberta.js';
 
 type StoredMetaTemplate = any;
@@ -102,8 +102,10 @@ export function registrarFluxoMeta(app: Express): void {
       const credenciais = await obterCredenciaisDaConta(D.pgPool, String(req.params.id));
       if (!credenciais) return res.status(404).json({ error: 'Conta não encontrada.' });
       const { candidatos, avisos } = await descobrirNumerosDaConta(credenciais);
-      auditar(req, 'descoberta', { contaId: req.params.id, encontrados: candidatos.length });
-      return res.json({ candidatos, avisos });
+      // Persiste já: os números continuam na tela depois de F5, sem marca até o operador escolher.
+      const guardados = await registrarNumerosDescobertos(D.pgPool, String(req.params.id), candidatos);
+      auditar(req, 'descoberta', { contaId: req.params.id, encontrados: candidatos.length, guardados });
+      return res.json({ candidatos, avisos, guardados });
     } catch (err: any) {
       return res.status(502).json({ error: err?.message || 'Falha ao consultar a FluxoAPI ou a Meta.' });
     }

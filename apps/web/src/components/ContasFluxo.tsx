@@ -2,9 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { apiFetch } from '../api/client';
 
 /**
- * Contas da FluxoAPI. Uma conta tem vários números (instâncias). Cada número tem o seu segredo de webhook,
- * a sua saúde (status, modo, qualidade, limite e dias de acesso), o seu log de eventos e a sua marca.
- * Segredos são enviados uma vez e nunca voltam para a tela (o servidor só informa "tem/não tem").
+ * Contas da FluxoAPI. Uma conta tem vários números. Cada número tem o seu segredo de webhook,
+ * a sua saúde, o seu log de eventos e a sua marca (que pode ficar pendente). Tudo vem do banco: nada depende de F5.
+ * Segredos são enviados uma vez e nunca voltam para a tela.
  */
 
 interface NumeroVinculado {
@@ -37,19 +37,6 @@ interface ContaListada {
   numeros: NumeroVinculado[];
 }
 
-interface CandidatoNumero {
-  metaPhoneNumberId: string | null;
-  instanceId: string | null;
-  numero: string | null;
-  nomeVerificado: string | null;
-  bmId: string | null;
-  bmName: string | null;
-  wabaId: string | null;
-  statusFluxo: string | null;
-  qualidadeMeta: string | null;
-  conferido: boolean;
-}
-
 interface EventoRecebido {
   eventId: string | null;
   instanceId: string | null;
@@ -63,14 +50,18 @@ interface TesteConexao {
   mensagem: string;
 }
 
-type Decisao = { tipo: 'pendente' } | { tipo: 'marca'; marcaId: string } | { tipo: 'ignorar' };
-
 interface Props {
   onShowToast: (msg: string) => void;
 }
 
 const FORM_VAZIO = { id: '', nome: '', bmId: '', apiKey: '', apiSecret: '', webhookSecret: '', metaToken: '' };
 const UM_DIA_MS = 24 * 60 * 60 * 1000;
+const QUALIDADE_TEXTO: Record<string, string> = {
+  green: 'qualidade verde',
+  yellow: 'qualidade amarela',
+  red: 'qualidade vermelha',
+  unknown: 'qualidade desconhecida',
+};
 
 async function lerJson(res: Response): Promise<any> {
   return res.json().catch(() => ({}));
@@ -89,15 +80,13 @@ function Pill({ ok, texto, neutro }: { ok: boolean; texto: string; neutro?: bool
   return <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${cor}`}>{texto}</span>;
 }
 
-const QUALIDADE_TEXTO: Record<string, string> = { green: 'qualidade verde', yellow: 'qualidade amarela', red: 'qualidade vermelha', unknown: 'qualidade desconhecida' };
-
-/** Avisos que o operador precisa ver sem procurar: segredo faltando, qualidade caindo, acesso vencendo, webhook mudo. */
+/** Avisos que o operador precisa ver sem procurar. */
 function alertasDaConta(conta: ContaListada): string[] {
   const avisos: string[] = [];
   if (!conta.temApiKey || !conta.temApiSecret) avisos.push('Falta a chave ou o segredo da FluxoAPI nesta conta.');
   for (const n of conta.numeros) {
     const nome = n.numero || n.instanceId || 'Número';
-    if (!n.temSegredoWebhook) avisos.push(`${nome}: sem segredo do webhook. Os eventos desse número serão recusados.`);
+    if (n.instanceId && !n.temSegredoWebhook) avisos.push(`${nome}: sem segredo do webhook. Os eventos desse número serão recusados.`);
     if (n.qualidade === 'yellow' || n.qualidade === 'red') {
       avisos.push(`${nome}: qualidade ${n.qualidade === 'red' ? 'VERMELHA' : 'AMARELA'}. A Meta pode reduzir o limite diário ou desativar o número.`);
     }
@@ -120,11 +109,8 @@ export const ContasFluxo: React.FC<Props> = ({ onShowToast }) => {
   const [salvando, setSalvando] = useState(false);
   const [testes, setTestes] = useState<Record<string, TesteConexao>>({});
   const [testando, setTestando] = useState<string | null>(null);
-  const [contaAberta, setContaAberta] = useState<string | null>(null);
-  const [candidatos, setCandidatos] = useState<Record<string, CandidatoNumero[]>>({});
-  const [avisosDescoberta, setAvisosDescoberta] = useState<Record<string, string[]>>({});
-  const [decisoes, setDecisoes] = useState<Record<string, Decisao>>({});
   const [buscando, setBuscando] = useState<string | null>(null);
+  const [avisosDescoberta, setAvisosDescoberta] = useState<Record<string, string[]>>({});
   const [segredosNumero, setSegredosNumero] = useState<Record<string, string>>({});
   const [eventosAbertos, setEventosAbertos] = useState<string | null>(null);
   const [eventos, setEventos] = useState<Record<string, EventoRecebido[]>>({});
@@ -156,7 +142,7 @@ export const ContasFluxo: React.FC<Props> = ({ onShowToast }) => {
   const copiarEndereco = async () => {
     try {
       await navigator.clipboard.writeText(enderecoWebhook());
-      onShowToast('Endereço copiado. Cole no campo "Webhook de eventos" de cada número na FluxoAPI.');
+      onShowToast('Endereço copiado.');
     } catch {
       onShowToast('Não consegui copiar. Selecione o endereço e copie manualmente.');
     }
@@ -220,6 +206,7 @@ export const ContasFluxo: React.FC<Props> = ({ onShowToast }) => {
     }
   };
 
+  /** Busca os números na FluxoAPI e na Meta, guarda todos e atualiza a lista. Nenhuma escolha é obrigatória. */
   const buscarNumeros = async (conta: ContaListada) => {
     setBuscando(conta.id);
     setErro(null);
@@ -227,16 +214,9 @@ export const ContasFluxo: React.FC<Props> = ({ onShowToast }) => {
       const res = await apiFetch(`/api/admin/fluxo/contas/${encodeURIComponent(conta.id)}/descobrir`, { method: 'POST' });
       const data = await lerJson(res);
       if (!res.ok) throw new Error(data.error || 'Não foi possível buscar os números.');
-      const lista: CandidatoNumero[] = data.candidatos || [];
-      setCandidatos(prev => ({ ...prev, [conta.id]: lista }));
       setAvisosDescoberta(prev => ({ ...prev, [conta.id]: data.avisos || [] }));
-      // Começa tudo como pendente: o operador escolhe. Nada é gravado sem a escolha.
-      setDecisoes(prev => {
-        const n = { ...prev };
-        for (const c of lista) n[chaveDecisao(conta.id, c)] = { tipo: 'pendente' };
-        return n;
-      });
-      setContaAberta(conta.id);
+      onShowToast(`${data.guardados ?? (data.candidatos || []).length} número(s) encontrado(s).`);
+      await carregar();
     } catch (e: any) {
       setErro(e?.message || 'Erro ao buscar os números.');
     } finally {
@@ -244,45 +224,7 @@ export const ContasFluxo: React.FC<Props> = ({ onShowToast }) => {
     }
   };
 
-  function chaveDecisao(contaId: string, c: CandidatoNumero): string {
-    return `${contaId}|${c.metaPhoneNumberId || c.instanceId}`;
-  }
-
-  const gravarVinculos = async (conta: ContaListada) => {
-    const lista = candidatos[conta.id] || [];
-    const vinculos = lista
-      .map(c => ({ c, d: decisoes[chaveDecisao(conta.id, c)] }))
-      .filter(({ d }) => d && d.tipo !== 'pendente')
-      .map(({ c, d }) => ({
-        instanceId: c.instanceId,
-        metaPhoneNumberId: c.metaPhoneNumberId,
-        numero: c.numero,
-        wabaId: c.wabaId,
-        bmId: c.bmId,
-        marcaId: d!.tipo === 'marca' ? d!.marcaId : null,
-        ignorado: d!.tipo === 'ignorar',
-      }));
-    if (!vinculos.length) {
-      setErro('Escolha a marca de pelo menos um número (ou "Não usar") antes de salvar.');
-      return;
-    }
-    try {
-      const res = await apiFetch(`/api/admin/fluxo/contas/${encodeURIComponent(conta.id)}/vincular`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vinculos }),
-      });
-      const data = await lerJson(res);
-      if (!res.ok) throw new Error(data.error || 'Não foi possível salvar os vínculos.');
-      onShowToast(`${data.gravados} número(s) salvos.`);
-      setContaAberta(null);
-      await carregar();
-    } catch (e: any) {
-      setErro(e?.message || 'Erro ao salvar os vínculos.');
-    }
-  };
-
-  /** Troca a marca de um número já salvo. Grava na hora, sem botão extra. */
+  /** Troca a marca de um número. Grava na hora. "Pendente" é válido: não exige marca para salvar nada. */
   const mudarMarcaNumero = async (conta: ContaListada, n: NumeroVinculado, valor: string) => {
     const vinculo = {
       instanceId: n.instanceId,
@@ -367,7 +309,7 @@ export const ContasFluxo: React.FC<Props> = ({ onShowToast }) => {
       <div className="bg-white border border-neutral-200 rounded-xl p-4 space-y-2">
         <h3 className="text-sm font-bold text-neutral-900">Endereço do webhook</h3>
         <p className="text-[11px] text-neutral-500">
-          Cole este endereço no campo "Webhook de eventos" de cada número no painel da FluxoAPI. Cada número tem o seu segredo, que você cola na tela de cada número abaixo.
+          Cole este endereço no campo "Webhook de eventos" de cada número no painel da FluxoAPI.
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <code className="text-xs font-mono bg-neutral-50 border border-neutral-200 rounded-lg px-3 py-2 break-all">{enderecoWebhook()}</code>
@@ -409,9 +351,10 @@ export const ContasFluxo: React.FC<Props> = ({ onShowToast }) => {
       {contas.map(conta => {
         const alertas = alertasDaConta(conta);
         const teste = testes[conta.id];
+        const avisos = avisosDescoberta[conta.id] || [];
         return (
           <div key={conta.id} className="bg-white border border-neutral-200 rounded-xl p-4 space-y-4">
-            <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h3 className="text-sm font-bold text-neutral-900">{conta.nome}</h3>
                 <div className="flex flex-wrap gap-1.5 mt-1">
@@ -425,7 +368,7 @@ export const ContasFluxo: React.FC<Props> = ({ onShowToast }) => {
                 <button onClick={() => testarConexao(conta)} disabled={testando === conta.id} className="px-3 py-2 rounded-lg border border-neutral-300 text-xs font-bold hover:bg-neutral-50 disabled:opacity-50">
                   {testando === conta.id ? 'Testando…' : 'Testar conexão'}
                 </button>
-                <button onClick={() => buscarNumeros(conta)} disabled={buscando === conta.id} className="px-3 py-2 rounded-lg border border-neutral-300 text-xs font-bold hover:bg-neutral-50 disabled:opacity-50">
+                <button onClick={() => buscarNumeros(conta)} disabled={buscando === conta.id} className="px-3 py-2 rounded-lg bg-neutral-900 text-white text-xs font-bold disabled:opacity-50">
                   {buscando === conta.id ? 'Buscando…' : 'Buscar números'}
                 </button>
               </div>
@@ -435,53 +378,58 @@ export const ContasFluxo: React.FC<Props> = ({ onShowToast }) => {
               <p className={`text-xs px-3 py-2 rounded-lg ${teste.ok ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>{teste.mensagem}</p>
             )}
 
-            {alertas.length > 0 && (
+            {[...avisos, ...alertas].length > 0 && (
               <div className="space-y-1">
-                {alertas.map((a, i) => (
+                {[...avisos, ...alertas].map((a, i) => (
                   <p key={i} className="text-[11px] text-amber-900 bg-amber-50 border border-amber-200 rounded px-2 py-1">{a}</p>
                 ))}
               </div>
             )}
 
-            {/* Números salvos: saúde, segredo, marca e log */}
-            {conta.numeros.length === 0 && <p className="text-xs text-neutral-500">Nenhum número salvo ainda. Clique em "Buscar números".</p>}
-            {conta.numeros.map(n => {
-              const valorMarca = n.ignorado ? '__ignorar' : n.marcaId || '';
-              return (
-                <div key={n.id} className="border border-neutral-200 rounded-lg p-3 space-y-2">
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div>
-                      <div className="font-mono text-sm font-bold">{n.numero || n.instanceId || n.metaPhoneNumberId}</div>
-                      <div className="flex flex-wrap gap-1.5 mt-1">
-                        <Pill ok={n.statusFluxo === 'connected'} texto={`status ${n.statusFluxo || 'desconhecido'}`} />
-                        <Pill ok neutro texto={n.modoFluxo === 'coexistence' ? 'coexistência' : n.modoFluxo || 'modo desconhecido'} />
-                        <Pill ok={n.qualidade === 'green'} texto={QUALIDADE_TEXTO[n.qualidade || 'unknown'] || 'qualidade desconhecida'} />
-                        {typeof n.limite24h === 'number' && <Pill ok neutro texto={`limite ${n.limite24h}/24 h`} />}
-                        {typeof n.diasAcesso === 'number' && <Pill ok={n.diasAcesso > 7} texto={`acesso: ${n.diasAcesso} dia(s)`} />}
-                        <Pill ok={n.temSegredoWebhook} texto={`webhook ${n.temSegredoWebhook ? 'ok' : 'falta'}`} />
-                      </div>
-                      <div className="text-[11px] text-neutral-500 mt-1">
-                        Último evento: {dataCurta(n.ultimoEventoEm)}
-                        {n.saudeAtualizadaEm ? ` · saúde atualizada em ${dataCurta(n.saudeAtualizadaEm)}` : ''}
-                      </div>
-                    </div>
-                    <select
-                      className="text-xs border border-neutral-300 rounded-lg px-2 py-1.5"
-                      value={valorMarca}
-                      onChange={e => mudarMarcaNumero(conta, n, e.target.value)}
-                      aria-label={`Marca do número ${n.numero || ''}`}
-                    >
-                      <option value="">Pendente (escolher marca)</option>
-                      {marcas.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                      <option value="__ignorar">Não usar</option>
-                    </select>
-                  </div>
+            {conta.numeros.length === 0 && (
+              <p className="text-xs text-neutral-500 border border-dashed border-neutral-300 rounded-lg p-4 text-center">
+                Nenhum número ainda. Clique em "Buscar números" para trazer os números da FluxoAPI.
+              </p>
+            )}
 
-                  <div className="flex flex-wrap items-center gap-2">
+            {/* Cartões de número */}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+              {conta.numeros.map(n => {
+                const valorMarca = n.ignorado ? '__ignorar' : n.marcaId || '';
+                return (
+                  <div key={n.id} className="border border-neutral-200 rounded-xl p-4 space-y-3">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <div className="font-mono text-sm font-bold">{n.numero || n.instanceId || n.metaPhoneNumberId}</div>
+                        <div className="text-[11px] text-neutral-500">{n.instanceId ? `ID ${n.instanceId}` : 'Só na Meta (sem instância na FluxoAPI)'}</div>
+                      </div>
+                      <select
+                        className="text-xs border border-neutral-300 rounded-lg px-2 py-1.5"
+                        value={valorMarca}
+                        onChange={e => mudarMarcaNumero(conta, n, e.target.value)}
+                        aria-label={`Marca do número ${n.numero || ''}`}
+                      >
+                        <option value="">Marca pendente</option>
+                        {marcas.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                        <option value="__ignorar">Não usar</option>
+                      </select>
+                    </div>
+
+                    <div className="flex flex-wrap gap-1.5">
+                      <Pill ok={n.statusFluxo === 'connected'} texto={`status ${n.statusFluxo || 'desconhecido'}`} />
+                      <Pill ok neutro texto={n.modoFluxo === 'coexistence' ? 'coexistência' : n.modoFluxo || 'modo desconhecido'} />
+                      <Pill ok={n.qualidade === 'green'} texto={QUALIDADE_TEXTO[n.qualidade || 'unknown'] || 'qualidade desconhecida'} />
+                      {typeof n.limite24h === 'number' && <Pill ok neutro texto={`limite ${n.limite24h}/24 h`} />}
+                      {typeof n.diasAcesso === 'number' && <Pill ok={n.diasAcesso > 7} texto={`acesso: ${n.diasAcesso} dia(s)`} />}
+                      {n.instanceId && <Pill ok={n.temSegredoWebhook} texto={`webhook ${n.temSegredoWebhook ? 'ok' : 'falta'}`} />}
+                    </div>
+
+                    <div className="text-[11px] text-neutral-500">Último evento: {dataCurta(n.ultimoEventoEm)}</div>
+
                     {n.instanceId && (
-                      <>
+                      <div className="flex flex-wrap items-center gap-2">
                         <input
-                          className="text-xs border border-neutral-300 rounded-lg px-3 py-1.5 flex-1 min-w-[220px]"
+                          className="text-xs border border-neutral-300 rounded-lg px-3 py-1.5 flex-1 min-w-[200px]"
                           type="password"
                           autoComplete="new-password"
                           placeholder={n.temSegredoWebhook ? 'Trocar o segredo do webhook (whsec_…)' : 'Segredo do webhook deste número (whsec_…)'}
@@ -492,85 +440,27 @@ export const ContasFluxo: React.FC<Props> = ({ onShowToast }) => {
                         <button onClick={() => alternarEventos(n.instanceId!)} className="px-3 py-1.5 rounded-lg border border-neutral-300 text-xs font-bold hover:bg-neutral-50">
                           {eventosAbertos === n.instanceId ? 'Fechar eventos' : 'Ver eventos'}
                         </button>
-                      </>
+                      </div>
+                    )}
+
+                    {eventosAbertos === n.instanceId && n.instanceId && (
+                      <div className="border-t border-neutral-100 pt-2">
+                        {(eventos[n.instanceId] || []).length === 0 && <p className="text-xs text-neutral-500">Nenhum evento registrado para este número.</p>}
+                        <ul className="space-y-1">
+                          {(eventos[n.instanceId] || []).map((ev, i) => (
+                            <li key={(ev.eventId || '') + i} className="text-[11px] text-neutral-700 flex flex-wrap gap-2">
+                              <span className="text-neutral-400">{dataCurta(ev.recebidoEm)}</span>
+                              <span className="font-mono">{ev.tipo}</span>
+                              {ev.resumo && <span>{ev.resumo}</span>}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     )}
                   </div>
-
-                  {eventosAbertos === n.instanceId && n.instanceId && (
-                    <div className="border-t border-neutral-100 pt-2">
-                      {(eventos[n.instanceId] || []).length === 0 && <p className="text-xs text-neutral-500">Nenhum evento registrado para este número.</p>}
-                      <ul className="space-y-1">
-                        {(eventos[n.instanceId] || []).map((ev, i) => (
-                          <li key={(ev.eventId || '') + i} className="text-[11px] text-neutral-700 flex flex-wrap gap-2">
-                            <span className="text-neutral-400">{dataCurta(ev.recebidoEm)}</span>
-                            <span className="font-mono">{ev.tipo}</span>
-                            {ev.resumo && <span>{ev.resumo}</span>}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-
-            {/* Descoberta: números da FluxoAPI ainda não escolhidos */}
-            {contaAberta === conta.id && (
-              <div className="border-t border-neutral-200 pt-3 space-y-2">
-                {(avisosDescoberta[conta.id] || []).map((a, i) => (
-                  <p key={i} className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded px-2 py-1">{a}</p>
-                ))}
-                {(candidatos[conta.id] || []).length === 0 && <p className="text-xs text-neutral-500">Nenhum número encontrado.</p>}
-                {(candidatos[conta.id] || []).map(c => {
-                  const chave = chaveDecisao(conta.id, c);
-                  const d = decisoes[chave] || { tipo: 'pendente' };
-                  const valor = d.tipo === 'marca' ? d.marcaId : d.tipo === 'ignorar' ? '__ignorar' : '';
-                  return (
-                    <div key={chave} className="flex flex-wrap items-center gap-2 text-xs border border-neutral-200 rounded-lg p-2">
-                      <div className="flex-1 min-w-[180px]">
-                        <div className="font-mono font-bold">{c.numero || '—'} <span className="font-normal text-neutral-500">{c.nomeVerificado || ''}</span></div>
-                        <div className="text-[11px] text-neutral-500">
-                          {c.bmName ? `BM: ${c.bmName}` : 'Sem BM (token da Meta ausente)'}
-                          {' · '}{c.conferido ? 'conferido na FluxoAPI e na Meta' : c.instanceId ? 'só na FluxoAPI' : 'só na Meta'}
-                          {c.statusFluxo ? ` · ${c.statusFluxo}` : ''}
-                        </div>
-                      </div>
-                      {c.instanceId && (
-                        <>
-                          <input
-                            className="text-xs border border-neutral-300 rounded-lg px-2 py-1.5 min-w-[200px]"
-                            type="password"
-                            autoComplete="new-password"
-                            placeholder="Segredo do webhook (whsec_…)"
-                            value={segredosNumero[c.instanceId] || ''}
-                            onChange={e => setSegredosNumero(prev => ({ ...prev, [c.instanceId!]: e.target.value }))}
-                          />
-                          <button onClick={() => salvarSegredoNumero(conta, c.instanceId!)} className="px-3 py-1.5 rounded-lg border border-neutral-300 text-xs font-bold">Salvar segredo</button>
-                        </>
-                      )}
-                      <select
-                        className="text-xs border border-neutral-300 rounded-lg px-2 py-1.5"
-                        value={valor}
-                        onChange={e => {
-                          const v = e.target.value;
-                          const nova: Decisao = v === '' ? { tipo: 'pendente' } : v === '__ignorar' ? { tipo: 'ignorar' } : { tipo: 'marca', marcaId: v };
-                          setDecisoes(prev => ({ ...prev, [chave]: nova }));
-                        }}
-                      >
-                        <option value="">Escolher marca…</option>
-                        {marcas.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                        <option value="__ignorar">Não usar</option>
-                      </select>
-                    </div>
-                  );
-                })}
-                {(candidatos[conta.id] || []).length > 0 && (
-                  <button onClick={() => gravarVinculos(conta)} className="px-4 py-2 rounded-lg bg-neutral-900 text-white text-xs font-bold">
-                    Salvar escolhas
-                  </button>
-                )}
-              </div>
-            )}
+                );
+              })}
+            </div>
           </div>
         );
       })}

@@ -291,6 +291,47 @@ export async function definirSegredoWebhookInstancia(
   );
 }
 
+/**
+ * Guarda os números encontrados na descoberta, sem marca (pendente). Assim eles continuam na tela depois de F5.
+ * Não mexe em marca, ignorado nem segredo de quem já existe: só atualiza dados que vieram da FluxoAPI/Meta.
+ */
+export async function registrarNumerosDescobertos(
+  pool: PoolSql,
+  contaId: string,
+  candidatos: Array<{
+    instanceId: string | null;
+    metaPhoneNumberId: string | null;
+    numero: string | null;
+    wabaId: string | null;
+    bmId: string | null;
+    statusFluxo: string | null;
+    qualidadeMeta: string | null;
+  }>
+): Promise<number> {
+  let gravados = 0;
+  for (const c of candidatos) {
+    const inst = c.instanceId ? String(c.instanceId) : null;
+    const meta = c.metaPhoneNumberId ? String(c.metaPhoneNumberId) : null;
+    if (!inst && !meta) continue;
+    const alvo = inst ? 'instance_id' : 'meta_phone_number_id';
+    await pool.query(
+      `INSERT INTO fluxo_instancias (id, conta_id, instance_id, meta_phone_number_id, numero, waba_id, bm_id, status_fluxo, qualidade, saude_atualizada_em, atualizado_em)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+       ON CONFLICT (${alvo}) DO UPDATE SET
+         numero = COALESCE(EXCLUDED.numero, fluxo_instancias.numero),
+         waba_id = COALESCE(EXCLUDED.waba_id, fluxo_instancias.waba_id),
+         bm_id = COALESCE(EXCLUDED.bm_id, fluxo_instancias.bm_id),
+         status_fluxo = COALESCE(EXCLUDED.status_fluxo, fluxo_instancias.status_fluxo),
+         qualidade = COALESCE(EXCLUDED.qualidade, fluxo_instancias.qualidade),
+         saude_atualizada_em = CURRENT_TIMESTAMP,
+         atualizado_em = CURRENT_TIMESTAMP`,
+      [novoId('inst'), contaId, inst, meta, c.numero ?? null, c.wabaId ?? null, c.bmId ?? null, c.statusFluxo ?? null, c.qualidadeMeta ?? null]
+    );
+    gravados++;
+  }
+  return gravados;
+}
+
 /** Segredo de webhook de um número, decifrado. Só para o servidor validar a assinatura. */
 export async function segredoWebhookDaInstancia(pool: PoolSql, instanceId: string): Promise<string | null> {
   const r = await pool.query(`SELECT webhook_secret_cifrado FROM fluxo_instancias WHERE instance_id = $1`, [String(instanceId)]);
