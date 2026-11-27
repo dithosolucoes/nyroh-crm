@@ -4,7 +4,7 @@
 import type { Express } from 'express';
 import crypto from 'crypto';
 import { cifrarSegredo } from '../cifraSegredos.js';
-import { listarContas, salvarConta, salvarVinculos, registrarInstancia, obterCredenciaisDaConta } from '../fluxoContas.js';
+import { listarContas, salvarConta, salvarVinculos, registrarInstancia, obterCredenciaisDaConta, definirSegredoWebhookInstancia, listarEventosInstancia, atualizarSaudeInstancia } from '../fluxoContas.js';
 import { descobrirNumerosDaConta } from '../fluxoDescoberta.js';
 
 type StoredMetaTemplate = any;
@@ -132,6 +132,65 @@ export function registrarFluxoMeta(app: Express): void {
       return res.json({ ok: true, id });
     } catch (err: any) {
       return res.status(400).json({ error: err?.message || 'Dados inválidos.' });
+    }
+  });
+
+  // Segredo de webhook de UM número (a FluxoAPI tem um por instância). Nunca devolve o valor.
+  app.post('/api/admin/fluxo/instancias/:instanceId/segredo', async (req: any, res) => {
+    if (contasRecusa(req, res)) return;
+    const { contaId, segredo } = req.body || {};
+    if (!contaId) return res.status(400).json({ error: 'Informe a conta do número.' });
+    try {
+      await definirSegredoWebhookInstancia(D.pgPool, String(contaId), String(req.params.instanceId), String(segredo || ''));
+      auditar(req, 'segredo_webhook_numero', { contaId, instanceId: req.params.instanceId });
+      return res.json({ ok: true });
+    } catch (err: any) {
+      const semChave = /NYROH_CHAVE_SEGREDOS/.test(String(err?.message));
+      return res.status(semChave ? 503 : 400).json({ error: semChave ? 'Configure NYROH_CHAVE_SEGREDOS antes de salvar segredos. Nada foi gravado.' : (err?.message || 'Dados inválidos.') });
+    }
+  });
+
+  // Log dos últimos eventos aceitos de um número.
+  app.get('/api/admin/fluxo/instancias/:instanceId/eventos', async (req: any, res) => {
+    if (contasRecusa(req, res)) return;
+    try {
+      return res.json({ eventos: await listarEventosInstancia(D.pgPool, String(req.params.instanceId), 30) });
+    } catch {
+      return res.status(500).json({ error: 'Não foi possível listar os eventos.' });
+    }
+  });
+
+  // Teste de conexão: confere chave e segredo na FluxoAPI e atualiza status, modo e qualidade de cada número.
+  app.post('/api/admin/fluxo/contas/:id/testar', async (req: any, res) => {
+    if (contasRecusa(req, res)) return;
+    try {
+      const credenciais = await obterCredenciaisDaConta(D.pgPool, String(req.params.id));
+      if (!credenciais) return res.status(404).json({ error: 'Conta não encontrada.' });
+      if (!credenciais.apiKey || !credenciais.apiSecret) {
+        return res.status(400).json({ ok: false, error: 'Faltam a chave ou o segredo da FluxoAPI nesta conta.' });
+      }
+      const fRes = await executeFluxoRequest({ method: 'GET', path: '/instances', apiKey: credenciais.apiKey, apiSecret: credenciais.apiSecret });
+      if (!fRes.success) {
+        const info = describeFluxoError(fRes.error, fRes.status);
+        auditar(req, 'teste_conexao_falhou', { contaId: req.params.id, code: info.code });
+        return res.status(502).json({ ok: false, error: info.message, code: info.code });
+      }
+      const lista: any[] = Array.isArray(fRes.data) ? fRes.data : [];
+      for (const i of lista) {
+        await atualizarSaudeInstancia(D.pgPool, String(i.id), {
+          status: i.status ?? null,
+          modo: i.mode ?? null,
+          qualidade: i.quality ?? null,
+          limite24h: typeof i.messaging_limit_24h === 'number' ? i.messaging_limit_24h : null,
+        });
+      }
+      auditar(req, 'teste_conexao', { contaId: req.params.id, instancias: lista.length });
+      return res.json({
+        ok: true,
+        instancias: lista.map((i: any) => ({ instanceId: i.id, nome: i.name, status: i.status, modo: i.mode, qualidade: i.quality, telefone: i.phone ?? null })),
+      });
+    } catch (err: any) {
+      return res.status(502).json({ ok: false, error: err?.message || 'Falha ao falar com a FluxoAPI.' });
     }
   });
 

@@ -35,6 +35,30 @@ export interface NumeroVinculado {
   marcaId: string | null;
   ignorado: boolean;
   ultimoEventoEm: string | null;
+  /** Segredo de webhook deste número (só "tem/não tem"; o valor nunca sai do servidor). */
+  temSegredoWebhook: boolean;
+  statusFluxo: string | null;
+  modoFluxo: string | null;
+  qualidade: string | null;
+  limite24h: number | null;
+  diasAcesso: number | null;
+  saudeAtualizadaEm: string | null;
+}
+
+export interface SaudeInstancia {
+  status?: string | null;
+  modo?: string | null;
+  qualidade?: string | null;
+  limite24h?: number | null;
+  diasAcesso?: number | null;
+}
+
+export interface EventoRecebido {
+  eventId: string | null;
+  instanceId: string | null;
+  tipo: string;
+  resumo: string | null;
+  recebidoEm: string;
 }
 
 export interface ContaListada {
@@ -73,7 +97,8 @@ export async function listarContas(pool: PoolSql): Promise<ContaListada[]> {
        FROM fluxo_contas ORDER BY criado_em`
   );
   const numeros = await pool.query(
-    `SELECT id, conta_id, instance_id, meta_phone_number_id, numero, waba_id, bm_id, marca_id, ignorado, ultimo_evento_em
+    `SELECT id, conta_id, instance_id, meta_phone_number_id, numero, waba_id, bm_id, marca_id, ignorado, ultimo_evento_em,
+            webhook_secret_cifrado IS NOT NULL AS tem_segredo, status_fluxo, modo_fluxo, qualidade, limite_24h, dias_acesso, saude_atualizada_em
        FROM fluxo_instancias ORDER BY criado_em`
   );
   return contas.rows.map((c: any) => ({
@@ -96,6 +121,13 @@ export async function listarContas(pool: PoolSql): Promise<ContaListada[]> {
         marcaId: i.marca_id ?? null,
         ignorado: Boolean(i.ignorado),
         ultimoEventoEm: i.ultimo_evento_em ? new Date(i.ultimo_evento_em).toISOString() : null,
+        temSegredoWebhook: Boolean(i.tem_segredo),
+        statusFluxo: i.status_fluxo ?? null,
+        modoFluxo: i.modo_fluxo ?? null,
+        qualidade: i.qualidade ?? null,
+        limite24h: i.limite_24h ?? null,
+        diasAcesso: i.dias_acesso ?? null,
+        saudeAtualizadaEm: i.saude_atualizada_em ? new Date(i.saude_atualizada_em).toISOString() : null,
       })),
   }));
 }
@@ -233,4 +265,98 @@ export async function registrarInstancia(
     [id, contaId, instanceId, dados.numero ?? null, dados.marcaId ?? null]
   );
   return { id };
+}
+
+/**
+ * Segredo de webhook de UM número (cada número da FluxoAPI tem o seu). Cria a linha do número se ainda não existir,
+ * sem marca: o operador escolhe a marca depois. Não troca a conta de um número já existente.
+ */
+export async function definirSegredoWebhookInstancia(
+  pool: PoolSql,
+  contaId: string,
+  instanceId: string,
+  segredo: string
+): Promise<void> {
+  const inst = String(instanceId || '').trim();
+  const sec = String(segredo || '').trim();
+  if (!inst) throw new Error('ID da instância é obrigatório.');
+  if (!sec) throw new Error('Segredo do webhook é obrigatório.');
+  if (!/^whsec_/.test(sec)) throw new Error('O segredo do webhook começa com whsec_. Copie o valor completo da FluxoAPI.');
+  const cifrado = cifrarSegredo(sec); // falha fechada sem NYROH_CHAVE_SEGREDOS: nada é gravado
+  await pool.query(
+    `INSERT INTO fluxo_instancias (id, conta_id, instance_id, webhook_secret_cifrado, atualizado_em)
+     VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP)
+     ON CONFLICT (instance_id) DO UPDATE SET webhook_secret_cifrado = EXCLUDED.webhook_secret_cifrado, atualizado_em = CURRENT_TIMESTAMP`,
+    [novoId('inst'), contaId, inst, cifrado]
+  );
+}
+
+/** Segredo de webhook de um número, decifrado. Só para o servidor validar a assinatura. */
+export async function segredoWebhookDaInstancia(pool: PoolSql, instanceId: string): Promise<string | null> {
+  const r = await pool.query(`SELECT webhook_secret_cifrado FROM fluxo_instancias WHERE instance_id = $1`, [String(instanceId)]);
+  const cifrado = r.rows[0]?.webhook_secret_cifrado;
+  if (!cifrado) return null;
+  try {
+    return decifrarSegredo(cifrado);
+  } catch {
+    console.error(`[fluxo] segredo de webhook do número ${instanceId} não pôde ser aberto. Regrave pelo painel.`);
+    return null;
+  }
+}
+
+/** Atualiza a saúde de um número (status, modo, qualidade, limite e dias de acesso). Só campos enviados mudam. */
+export async function atualizarSaudeInstancia(pool: PoolSql, instanceId: string, s: SaudeInstancia): Promise<void> {
+  await pool.query(
+    `UPDATE fluxo_instancias SET
+       status_fluxo = COALESCE($2, status_fluxo),
+       modo_fluxo = COALESCE($3, modo_fluxo),
+       qualidade = COALESCE($4, qualidade),
+       limite_24h = COALESCE($5, limite_24h),
+       dias_acesso = COALESCE($6, dias_acesso),
+       saude_atualizada_em = CURRENT_TIMESTAMP
+     WHERE instance_id = $1`,
+    [
+      String(instanceId),
+      s.status ?? null,
+      s.modo ?? null,
+      s.qualidade ?? null,
+      typeof s.limite24h === 'number' ? s.limite24h : null,
+      typeof s.diasAcesso === 'number' ? s.diasAcesso : null,
+    ]
+  );
+}
+
+/**
+ * Registra um evento aceito pelo webhook no log do número e marca o último evento recebido.
+ * Idempotente pelo event_id. Apaga o que tiver mais de 30 dias.
+ */
+export async function registrarEventoFluxo(
+  pool: PoolSql,
+  e: { eventId: string | null; instanceId: string | null; tipo: string; resumo?: string | null }
+): Promise<void> {
+  await pool.query(
+    `INSERT INTO fluxo_eventos (event_id, instance_id, tipo, resumo) VALUES ($1, $2, $3, $4)
+     ON CONFLICT (event_id) DO NOTHING`,
+    [e.eventId, e.instanceId, String(e.tipo).slice(0, 64), e.resumo ? String(e.resumo).slice(0, 300) : null]
+  );
+  if (e.instanceId) {
+    await pool.query(`UPDATE fluxo_instancias SET ultimo_evento_em = CURRENT_TIMESTAMP WHERE instance_id = $1`, [e.instanceId]);
+  }
+  await pool.query(`DELETE FROM fluxo_eventos WHERE recebido_em < CURRENT_TIMESTAMP - INTERVAL '30 days'`);
+}
+
+/** Últimos eventos aceitos de um número, do mais novo para o mais antigo. */
+export async function listarEventosInstancia(pool: PoolSql, instanceId: string, limite = 30): Promise<EventoRecebido[]> {
+  const r = await pool.query(
+    `SELECT event_id, instance_id, tipo, resumo, recebido_em FROM fluxo_eventos
+      WHERE instance_id = $1 ORDER BY recebido_em DESC LIMIT $2`,
+    [String(instanceId), Math.max(1, Math.min(200, limite))]
+  );
+  return r.rows.map((l: any) => ({
+    eventId: l.event_id ?? null,
+    instanceId: l.instance_id ?? null,
+    tipo: String(l.tipo),
+    resumo: l.resumo ?? null,
+    recebidoEm: new Date(l.recebido_em).toISOString(),
+  }));
 }

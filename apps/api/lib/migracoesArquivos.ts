@@ -39,6 +39,7 @@ export const MIGRACOES_AUTOMACOES_FILA: MigracaoArquivo[] = [
 /** Cadastro de contas FluxoAPI (tabelas fluxo_contas e fluxo_instancias). Só as tabelas: a funcionalidade é a flag NYROH_FLUXO_CONTAS. */
 export const MIGRACOES_FLUXO_CONTAS: MigracaoArquivo[] = [
   { versao: '0012_fluxo_contas', descricao: 'contas e números da FluxoAPI (segredos cifrados)', arquivo: '2026-11-fluxo-contas.sql' },
+  { versao: '0013_fluxo_instancias_saude', descricao: 'segredo de webhook por número, saúde e log de eventos', arquivo: '2026-12-fluxo-instancias-saude.sql' },
 ];
 
 /** Lê os arquivos da pasta migrations/ e devolve as migrações prontas para o runner. */

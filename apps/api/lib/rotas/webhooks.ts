@@ -6,7 +6,8 @@
 import type { Express } from 'express';
 import type { RespostaWebhookRecebido, RespostaWebhookJaProcessado, RespostaSimulacaoWebhook } from '../../../../shared/contracts/rotas.js';
 import { optOutPorBotaoDoWebhook } from '../descadastroPadrao.js';
-import { segredosWebhookFluxo, registrarEventoPorNumeroMeta, contaDoNumeroMeta } from '../fluxoContas.js';
+import { segredosWebhookFluxo, registrarEventoPorNumeroMeta, contaDoNumeroMeta, segredoWebhookDaInstancia, atualizarSaudeInstancia, registrarEventoFluxo } from '../fluxoContas.js';
+import type { SaudeInstancia } from '../fluxoContas.js';
 
 
 export interface DependenciasWebhooks {
@@ -474,6 +475,7 @@ export async function processWebhookEventAsync(event: any) {
       instanceHealth.field = d.field ?? instanceHealth.field;
       instanceHealth.updatedAt = new Date().toISOString();
       summary = `Número: qualidade ${d.quality || '—'}, limite 24h ${d.messaging_limit_24h ?? '—'}`;
+      await salvarSaudeFluxo(event.instance_id, { qualidade: d.quality ?? null, limite24h: d.messaging_limit_24h ?? null });
       D.broadcastSSE('INSTANCE_STATUS', { ...instanceHealth }, { broadcastAll: true });
       if (d.quality === 'red' || d.quality === 'yellow') {
         console.warn(`⚠️ [FluxoAPI] Qualidade do número caiu para ${String(d.quality).toUpperCase()} — a Meta reduz o limite diário e pode desativar o número. Reduza os disparos.`);
@@ -484,6 +486,7 @@ export async function processWebhookEventAsync(event: any) {
       instanceHealth.accessDaysLeft = event.data.days_left;
       instanceHealth.updatedAt = new Date().toISOString();
       summary = `Acesso do número vence em ${event.data.days_left} dia(s) — reconecte pelo painel da FluxoAPI`;
+      await salvarSaudeFluxo(event.instance_id, { diasAcesso: event.data.days_left ?? null });
       D.broadcastSSE('INSTANCE_ACCESS_EXPIRING', { ...instanceHealth }, { broadcastAll: true });
       console.warn(`⚠️ [FluxoAPI] ${summary}`);
     }
@@ -551,16 +554,62 @@ export async function processWebhookEventAsync(event: any) {
 }
 
 
+/** Contas da FluxoAPI ativas: flag ligada e banco disponível. */
+function contasFluxoAtivas(): boolean {
+  return (process.env.NYROH_FLUXO_CONTAS || '').trim() === 'true' && Boolean(D.usePostgres && D.pgPool);
+}
+
+/** Saúde por número. Falha de banco só vira log: o evento já foi aceito pela assinatura. */
+async function salvarSaudeFluxo(instanceId: string | undefined, saude: SaudeInstancia): Promise<void> {
+  if (!instanceId || !contasFluxoAtivas()) return;
+  try {
+    await atualizarSaudeInstancia(D.pgPool, instanceId, saude);
+  } catch (err: any) {
+    console.error('[fluxo] não consegui salvar a saúde do número:', err?.message);
+  }
+}
+
+/** Log do evento aceito, por número (aparece na tela de Contas). Falha de banco não derruba o webhook. */
+async function registrarLogFluxo(eventId: string, event: any): Promise<void> {
+  if (!contasFluxoAtivas()) return;
+  try {
+    const d = event?.data || {};
+    const resumo =
+      event?.type === 'message.received' ? `mensagem de ${d.from || '?'}`
+      : event?.type === 'message.sent_from_phone' ? `resposta pelo celular para ${d.to || '?'}`
+      : event?.type === 'message.status' ? `status ${d.status || '?'}`
+      : event?.type === 'instance.status_changed' ? `qualidade ${d.quality || '?'}`
+      : event?.type === 'instance.access_expiring' ? `acesso vence em ${d.days_left ?? '?'} dia(s)`
+      : null;
+    await registrarEventoFluxo(D.pgPool, {
+      eventId,
+      instanceId: typeof event?.instance_id === 'string' ? event.instance_id : null,
+      tipo: String(event?.type || 'desconhecido'),
+      resumo,
+    });
+  } catch (err: any) {
+    console.error('[fluxo] não consegui registrar o evento no log:', err?.message);
+  }
+}
+
 /**
- * Valida a assinatura da FluxoAPI contra o segredo do ambiente e contra o de cada conta cadastrada.
- * Devolve a primeira validação que bater; se nenhuma bater, devolve o motivo da última tentativa.
+ * Valida a assinatura da FluxoAPI. Ordem: segredo do próprio número (instance_id do evento),
+ * depois o do ambiente e os das contas. Cada número tem o seu segredo na FluxoAPI.
  */
-async function validarAssinaturaFluxo(rawBody: string, headers: any): Promise<{ isValid: boolean; reason?: string; contaId?: string }> {
+async function validarAssinaturaFluxo(rawBody: string, headers: any, instanceId?: string): Promise<{ isValid: boolean; reason?: string; contaId?: string }> {
   const candidatos: Array<{ contaId?: string; segredo: string }> = [];
+  if (instanceId && contasFluxoAtivas()) {
+    try {
+      const segredoNumero = await segredoWebhookDaInstancia(D.pgPool, instanceId);
+      if (segredoNumero) candidatos.push({ segredo: segredoNumero });
+    } catch (err: any) {
+      console.error('[webhook] não consegui ler o segredo do número:', err?.message);
+    }
+  }
   if ((process.env.FLUXO_WEBHOOK_SECRET || '').trim()) {
     candidatos.push({ segredo: (process.env.FLUXO_WEBHOOK_SECRET || '').trim() });
   }
-  if (D.usePostgres && D.pgPool && (process.env.NYROH_FLUXO_CONTAS || '').trim() === 'true') {
+  if (contasFluxoAtivas()) {
     try {
       candidatos.push(...(await segredosWebhookFluxo(D.pgPool)));
     } catch (err: any) {
@@ -610,7 +659,7 @@ export function registrarRotasWebhooks(app: Express): void {
     // até um bater. Assim não confiamos em nenhum campo do corpo antes de validar.
     const authCheck = metaSig
       ? D.verifyMetaSignature(rawBody, String(metaSig))
-      : await validarAssinaturaFluxo(rawBody, req.headers as any);
+      : await validarAssinaturaFluxo(rawBody, req.headers as any, typeof event.instance_id === 'string' ? event.instance_id : undefined);
     if (!authCheck.isValid) {
       console.warn('[Webhook Auth Failed]:', authCheck.reason);
       return res.status(401).json({ error: 'Unauthorized: Assinatura do webhook inválida.', hint: authCheck.reason });
@@ -640,6 +689,7 @@ export function registrarRotasWebhooks(app: Express): void {
         source: (req.originalUrl && req.originalUrl.includes('fluxo')) ? 'fluxo' : 'meta'
       });
       processedWebhookEventIds.set(eventId, Date.now());
+      if (!metaSig) await registrarLogFluxo(eventId, event);
     } catch (err: any) {
       console.error('[Fast-Receiver Enqueue Error]:', err?.message || err);
       // 5xx → a FluxoAPI reentrega (0s, 30s, 2min, 10min, 1h, 6h, 24h)
