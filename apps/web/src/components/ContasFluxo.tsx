@@ -388,10 +388,10 @@ export const ContasFluxo: React.FC<Props> = ({ onShowToast }) => {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <input className="text-xs border border-neutral-300 rounded-lg px-3 py-2" placeholder="Nome (ex.: Conta Nyroh)" value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} required />
           <input className="text-xs border border-neutral-300 rounded-lg px-3 py-2" placeholder="BM (opcional)" value={form.bmId} onChange={e => setForm({ ...form, bmId: e.target.value })} />
-          <input className="text-xs border border-neutral-300 rounded-lg px-3 py-2" type="password" autoComplete="off" placeholder="Chave da FluxoAPI (fxk_live_…)" value={form.apiKey} onChange={e => setForm({ ...form, apiKey: e.target.value })} />
-          <input className="text-xs border border-neutral-300 rounded-lg px-3 py-2" type="password" autoComplete="off" placeholder="Segredo da FluxoAPI (fxs_…)" value={form.apiSecret} onChange={e => setForm({ ...form, apiSecret: e.target.value })} />
-          <input className="text-xs border border-neutral-300 rounded-lg px-3 py-2" type="password" autoComplete="off" placeholder="Segredo do webhook (whsec_…) do primeiro número" value={form.webhookSecret} onChange={e => setForm({ ...form, webhookSecret: e.target.value })} />
-          <input className="text-xs border border-neutral-300 rounded-lg px-3 py-2" type="password" autoComplete="off" placeholder="Token da Meta (opcional, para ver a BM)" value={form.metaToken} onChange={e => setForm({ ...form, metaToken: e.target.value })} />
+          <input className="text-xs border border-neutral-300 rounded-lg px-3 py-2" type="password" autoComplete="new-password" placeholder="Chave da FluxoAPI (fxk_live_…)" value={form.apiKey} onChange={e => setForm({ ...form, apiKey: e.target.value })} />
+          <input className="text-xs border border-neutral-300 rounded-lg px-3 py-2" type="password" autoComplete="new-password" placeholder="Segredo da FluxoAPI (fxs_…)" value={form.apiSecret} onChange={e => setForm({ ...form, apiSecret: e.target.value })} />
+          <input className="text-xs border border-neutral-300 rounded-lg px-3 py-2" type="password" autoComplete="new-password" placeholder="Segredo do webhook (whsec_…) do primeiro número" value={form.webhookSecret} onChange={e => setForm({ ...form, webhookSecret: e.target.value })} />
+          <input className="text-xs border border-neutral-300 rounded-lg px-3 py-2" type="password" autoComplete="new-password" placeholder="Token da Meta (opcional, para ver a BM)" value={form.metaToken} onChange={e => setForm({ ...form, metaToken: e.target.value })} />
         </div>
         <div className="flex gap-2">
           <button type="submit" disabled={salvando} className="px-4 py-2 rounded-lg bg-neutral-900 text-white text-xs font-bold disabled:opacity-50">
@@ -483,7 +483,7 @@ export const ContasFluxo: React.FC<Props> = ({ onShowToast }) => {
                         <input
                           className="text-xs border border-neutral-300 rounded-lg px-3 py-1.5 flex-1 min-w-[220px]"
                           type="password"
-                          autoComplete="off"
+                          autoComplete="new-password"
                           placeholder={n.temSegredoWebhook ? 'Trocar o segredo do webhook (whsec_…)' : 'Segredo do webhook deste número (whsec_…)'}
                           value={segredosNumero[n.instanceId] || ''}
                           onChange={e => setSegredosNumero(prev => ({ ...prev, [n.instanceId!]: e.target.value }))}
@@ -540,7 +540,7 @@ export const ContasFluxo: React.FC<Props> = ({ onShowToast }) => {
                           <input
                             className="text-xs border border-neutral-300 rounded-lg px-2 py-1.5 min-w-[200px]"
                             type="password"
-                            autoComplete="off"
+                            autoComplete="new-password"
                             placeholder="Segredo do webhook (whsec_…)"
                             value={segredosNumero[c.instanceId] || ''}
                             onChange={e => setSegredosNumero(prev => ({ ...prev, [c.instanceId!]: e.target.value }))}
